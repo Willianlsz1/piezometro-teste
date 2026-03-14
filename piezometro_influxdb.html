@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Piezômetro — Samarco</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-base: #111318; --bg-panel: #181b22; --bg-card: #1e2229; --bg-card2: #22262f;
+    --border: #2a2e38; --text-primary: #e8eaf0; --text-secondary: #8b8fa8; --text-muted: #555a6e;
+    --green: #4cde88; --green-dim: #1a3d2a;
+    --blue: #3da8f5;  --blue-dim: #0e2a42;
+    --yellow: #f5c842; --yellow-dim: #3d3010;
+    --red: #f54242;   --red-dim: #3d1010;
+  }
+  body { background: var(--bg-base); color: var(--text-primary); font-family: 'Inter', 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: var(--bg-panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .logo-area { display: flex; align-items: center; gap: 10px; }
+  .logo-dot { width: 28px; height: 28px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; }
+  .logo-dot svg { width: 14px; height: 14px; }
+  .logo-name { font-size: 14px; font-weight: 600; letter-spacing: .5px; }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .live-badge { display: flex; align-items: center; gap: 7px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 5px 13px; font-size: 12px; color: var(--text-secondary); font-family: monospace; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+
+  .status-bar { display: flex; align-items: center; gap: 8px; padding: 6px 20px; background: var(--bg-panel); border-bottom: 1px solid var(--border); font-size: 11px; font-family: monospace; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .s-ok { background: var(--green); } .s-err { background: var(--red); } .s-sim { background: var(--yellow); }
+
+  .grid-root { flex: 1; display: grid; grid-template-rows: auto 1fr auto; gap: 10px; padding: 14px; }
+  .row-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .row-charts  { display: grid; grid-template-columns: 1fr 300px; gap: 10px; }
+  .row-bottom  { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .metric-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+  .metric-header { display: flex; align-items: center; justify-content: space-between; }
+  .metric-label { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-secondary); }
+  .badge { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; }
+  .badge-warning { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,200,66,.3); }
+  .badge-normal  { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(61,168,245,.3); }
+  .badge-stable  { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(76,222,136,.3); }
+  .badge-critico { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(245,66,66,.3); }
+  .metric-value { font-family: monospace; font-size: 36px; font-weight: 700; line-height: 1; display: flex; align-items: baseline; gap: 4px; }
+  .metric-unit { font-size: 16px; font-weight: 500; opacity: .7; }
+  .metric-sub  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .val-warning { color: var(--yellow); } .val-normal { color: var(--blue); }
+  .val-stable  { color: var(--green); } .val-critico { color: var(--red); }
+
+  .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-secondary); }
+  .panel-tag { font-size: 10px; background: var(--bg-card2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; }
+  .chart-wrap { position: relative; flex: 1; min-height: 160px; }
+
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 8px; }
+  .gauge-value { font-family: monospace; font-size: 28px; font-weight: 700; color: var(--blue); margin-top: -8px; }
+  .gauge-sub   { font-size: 11px; color: var(--text-muted); }
+
+  .alert-box { display: flex; align-items: flex-start; gap: 12px; border-radius: 8px; padding: 11px 13px; margin-top: 4px; }
+  .alert-box.lvl-normal  { background: rgba(76,222,136,.07);  border: 1px solid rgba(76,222,136,.25); }
+  .alert-box.lvl-atencao { background: rgba(245,200,66,.07);  border: 1px solid rgba(245,200,66,.25); }
+  .alert-box.lvl-critico { background: rgba(245,66,66,.07);   border: 1px solid rgba(245,66,66,.25); }
+  .alert-icon { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .alert-icon svg { width: 16px; height: 16px; }
+  .alert-icon.lvl-normal  { background: var(--green-dim); }
+  .alert-icon.lvl-atencao { background: var(--yellow-dim); }
+  .alert-icon.lvl-critico { background: var(--red-dim); }
+  .alert-state { font-size: 13px; font-weight: 700; letter-spacing: .3px; }
+  .alert-state.lvl-normal  { color: var(--green); }
+  .alert-state.lvl-atencao { color: var(--yellow); }
+  .alert-state.lvl-critico { color: var(--red); animation: blink .6s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
+  .alert-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .alert-bar-row { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--text-muted); margin-top: 8px; }
+  .alert-bar-row span:nth-child(2) { text-align: center; } .alert-bar-row span:nth-child(3) { text-align: right; }
+  .alert-bar { height: 6px; border-radius: 3px; margin-top: 3px; display: flex; overflow: hidden; }
+  .ab-green { flex: 1; background: var(--green); }
+  .ab-yellow { flex: 1; } .ab-yellow.on { background: var(--yellow); } .ab-yellow:not(.on) { background: #2a2a2a; }
+  .ab-red    { flex: 1; } .ab-red.on    { background: var(--red); }    .ab-red:not(.on)    { background: #2a2a2a; }
+  .alert-info { font-size: 11px; color: var(--text-secondary); margin-top: 8px; line-height: 1.5; }
+  .alert-info strong { font-family: monospace; }
+
+  .event-list { display: flex; flex-direction: column; }
+  .event-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .event-row:last-child { border-bottom: none; }
+  .ev-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ev-text { flex: 1; color: var(--text-primary); }
+  .ev-time { color: var(--text-muted); font-family: monospace; font-size: 11px; }
+
+  @keyframes flicker { 0%,100%{opacity:1}50%{opacity:.6} }
+  .live-flicker { animation: flicker .6s ease-in-out; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-area">
+    <div class="logo-dot">
+      <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="#111" stroke-width="2"/><circle cx="7" cy="7" r="2" fill="#111"/></svg>
+    </div>
+    <span class="logo-name">Samarco</span>
+  </div>
+  <span class="header-title">Controle de Piezômetro</span>
+  <div class="live-badge">
+    <span class="live-dot"></span>
+    <span id="live-time">Ao vivo · --</span>
+  </div>
+</header>
+
+<div class="status-bar">
+  <span class="status-dot s-err" id="sdot"></span>
+  <span id="stext">Conectando ao InfluxDB Cloud...</span>
+</div>
+
+<div class="grid-root">
+  <div class="row-metrics">
+    <div class="metric-card">
+      <div class="metric-header">
+        <span class="metric-label">Pressão</span>
+        <span class="badge badge-stable" id="badge-p">—</span>
+      </div>
+      <div class="metric-value val-stable">
+        <span id="val-p">—</span><span class="metric-unit">hPa</span>
+      </div>
+      <div class="metric-sub">Normal ≥ 912 · Atenção ≥ 907 · Crítico &lt; 907</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-header">
+        <span class="metric-label">Temperatura</span>
+        <span class="badge badge-normal">Normal</span>
+      </div>
+      <div class="metric-value val-normal">
+        <span id="val-t">—</span><span class="metric-unit">°C</span>
+      </div>
+      <div class="metric-sub">Faixa operacional: 0 – 85 °C</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-header">
+        <span class="metric-label">Altitude</span>
+        <span class="badge badge-stable">Estável</span>
+      </div>
+      <div class="metric-value val-stable">
+        <span id="val-a">—</span><span class="metric-unit">m</span>
+      </div>
+      <div class="metric-sub">Referência: ~800 m (Ribeirão das Neves)</div>
+    </div>
+  </div>
+
+  <div class="row-charts">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Histórico de Pressão (24H)</span>
+        <span class="panel-tag">últimas 24h</span>
+      </div>
+      <div class="chart-wrap"><canvas id="pressureChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Temperatura</span></div>
+      <div class="gauge-wrap">
+        <canvas id="gaugeCanvas" width="180" height="100"></canvas>
+        <div class="gauge-value" id="glabel">— °C</div>
+        <div class="gauge-sub" id="gsub">aguardando dados...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row-bottom">
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Nível de Alerta</span></div>
+      <div class="alert-box lvl-normal" id="abox">
+        <div class="alert-icon lvl-normal" id="aicon">
+          <svg id="asvg" viewBox="0 0 16 16" fill="none"></svg>
+        </div>
+        <div>
+          <div class="alert-state lvl-normal" id="astate">AGUARDANDO</div>
+          <div class="alert-desc" id="adesc">Conectando ao sensor...</div>
+        </div>
+      </div>
+      <div class="alert-bar-row"><span>Normal</span><span>Atenção</span><span>Crítico</span></div>
+      <div class="alert-bar">
+        <div class="ab-green"></div>
+        <div class="ab-yellow" id="aby"></div>
+        <div class="ab-red"    id="abr"></div>
+      </div>
+      <div class="alert-info" id="ainfo">Monitoramento contínuo ativo.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Registro de Eventos</span></div>
+      <div class="event-list" id="evlist">
+        <div class="event-row">
+          <span class="ev-dot" style="background:var(--text-muted)"></span>
+          <span class="ev-text" style="color:var(--text-muted)">Aguardando conexão com InfluxDB...</span>
+          <span class="ev-time">--:--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIGURAÇÃO (extraída do firmware Arduino) ──────────────────────────────
+const CFG = {
+  url:    "https://us-east-1-1.aws.cloud2.influxdata.com",
+  token:  "dNPdQWtPzpKTXumx2f-RKYS-b7XpBI8EWW_0OKnUmP_gy1v5sh_2uVGnFFFXH8ht6IgYOCp4FcB8MpZAvshHtw==",
+  org:    "SAMARCO",
+  bucket: "PIEZOMETRO",
+  meas:   "telemetria_samarco",
+  poll:   10000,            // 10s — igual ao INTERVALO_DB do Arduino
+  thrNormal:  912.0,        // PRESSAO_NORMAL do firmware
+  thrAtencao: 907.0,        // PRESSAO_ATENCAO do firmware
+};
+
+// ── ESTADO ───────────────────────────────────────────────────────────────────
+let chart = null, lastLevel = null, failCount = 0, simTimer = null;
+let events = [];
+
+// ── INFLUXDB: QUERY FLUX ─────────────────────────────────────────────────────
+async function influxQuery(flux) {
+  const r = await fetch(`${CFG.url}/api/v2/query?org=${encodeURIComponent(CFG.org)}`, {
+    method:  "POST",
+    headers: {
+      "Authorization": `Token ${CFG.token}`,
+      "Content-Type":  "application/vnd.flux",
+      "Accept":        "application/csv"
+    },
+    body: flux
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.text();
+}
+
+// Parseia CSV retornado pelo InfluxDB v2
+function parseCSV(csv) {
+  const lines = csv.trim().split("\n").filter(l => l && !l.startsWith("#"));
+  if (lines.length < 2) return [];
+  const h = lines[0].split(",");
+  const iF = h.indexOf("_field"), iV = h.indexOf("_value"), iT = h.indexOf("_time");
+  return lines.slice(1).map(l => {
+    const c = l.split(",");
+    return { field: c[iF], value: parseFloat(c[iV]), time: c[iT] };
+  }).filter(r => !isNaN(r.value));
+}
+
+// Última leitura (range -2m para pegar mesmo se o ESP32 teve delay)
+async function fetchLatest() {
+  const flux = `
+from(bucket: "${CFG.bucket}")
+  |> range(start: -2m)
+  |> filter(fn: (r) => r._measurement == "${CFG.meas}")
+  |> filter(fn: (r) => r._field == "pressao" or r._field == "temperatura" or r._field == "altitude")
+  |> last()`;
+  const rows = parseCSV(await influxQuery(flux));
+  const out = {};
+  rows.forEach(r => { out[r.field] = r.value; });
+  if (!out.pressao) throw new Error("Sem dados recentes");
+  return out;
+}
+
+// Histórico 24h agrupado a cada 30min
+async function fetchHistory() {
+  const flux = `
+from(bucket: "${CFG.bucket}")
+  |> range(start: -24h)
+  |> filter(fn: (r) => r._measurement == "${CFG.meas}")
+  |> filter(fn: (r) => r._field == "pressao")
+  |> aggregateWindow(every: 30m, fn: mean, createEmpty: false)`;
+  const rows = parseCSV(await influxQuery(flux));
+  return rows.map(r => ({
+    label: new Date(r.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    value: parseFloat(r.value.toFixed(3))
+  }));
+}
+
+// ── CHART ────────────────────────────────────────────────────────────────────
+function buildChart(labels, data) {
+  if (chart) chart.destroy();
+  const ctx = document.getElementById("pressureChart").getContext("2d");
+  const g = ctx.createLinearGradient(0, 0, 0, 200);
+  g.addColorStop(0, "rgba(212,168,55,.4)"); g.addColorStop(1, "rgba(212,168,55,0)");
+
+  const mn = Math.min(...data), mx = Math.max(...data);
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets: [{ data, borderColor: "#d4a837", borderWidth: 1.5,
+      backgroundColor: g, fill: true, tension: 0.4, pointRadius: 0,
+      pointHoverRadius: 4, pointHoverBackgroundColor: "#d4a837" }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: "#22262f", borderColor: "#2a2e38", borderWidth: 1,
+          titleColor: "#8b8fa8", bodyColor: "#e8eaf0",
+          bodyFont: { family: "monospace", size: 12 },
+          callbacks: { label: c => c.parsed.y.toFixed(3) + " hPa" } }
+      },
+      scales: {
+        x: { grid: { color: "rgba(42,46,56,.8)", drawTicks: false }, border: { display: false },
+             ticks: { color: "#555a6e", font: { size: 10, family: "monospace" },
+                      maxRotation: 45, callback(v, i) { return i % 4 === 0 ? labels[i] : ""; } } },
+        y: { min: mn - 2, max: mx + 2,
+             grid: { color: "rgba(42,46,56,.8)" }, border: { display: false },
+             ticks: { color: "#555a6e", font: { size: 10, family: "monospace" }, callback: v => v.toFixed(1) } }
+      }
+    },
+    plugins: [{
+      id: "thresholds",
+      afterDraw(ch) {
+        const { ctx: c, scales: { y } } = ch;
+        [{ v: CFG.thrNormal, col: "rgba(76,222,136,.5)", lbl: "912 normal" },
+         { v: CFG.thrAtencao, col: "rgba(245,200,66,.5)", lbl: "907 atenção" }]
+        .forEach(({ v, col, lbl }) => {
+          if (v <= y.max && v >= y.min) {
+            const yp = y.getPixelForValue(v);
+            c.save(); c.strokeStyle = col; c.setLineDash([4,4]); c.lineWidth = 1;
+            c.beginPath(); c.moveTo(ch.chartArea.left, yp); c.lineTo(ch.chartArea.right, yp); c.stroke();
+            c.fillStyle = col; c.font = "10px monospace";
+            c.fillText(lbl, ch.chartArea.left + 4, yp - 4); c.restore();
+          }
+        });
+      }
+    }]
+  });
+}
+
+function pushChart(label, value) {
+  if (!chart) return;
+  chart.data.labels.push(label);
+  chart.data.datasets[0].data.push(value);
+  if (chart.data.labels.length > 60) {
+    chart.data.labels.shift(); chart.data.datasets[0].data.shift();
+  }
+  chart.update("none");
+}
+
+// ── GAUGE ────────────────────────────────────────────────────────────────────
+function drawGauge(t) {
+  const cv = document.getElementById("gaugeCanvas");
+  const c  = cv.getContext("2d");
+  cv.width = 180; cv.height = 100;
+  const cx = 90, cy = 90, r = 70, pct = Math.min(Math.max(t / 85, 0), 1);
+  c.clearRect(0, 0, 180, 100);
+  c.beginPath(); c.arc(cx, cy, r, Math.PI, 0);
+  c.strokeStyle = "#2a2e38"; c.lineWidth = 10; c.lineCap = "round"; c.stroke();
+  const g = c.createLinearGradient(cx - r, cy, cx + r, cy);
+  g.addColorStop(0, "#3da8f5"); g.addColorStop(.5, "#4cde88"); g.addColorStop(1, "#f54242");
+  c.beginPath(); c.arc(cx, cy, r, Math.PI, Math.PI + Math.PI * pct);
+  c.strokeStyle = g; c.lineWidth = 10; c.lineCap = "round"; c.stroke();
+  const a = Math.PI + Math.PI * pct;
+  c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + (r-4)*Math.cos(a), cy + (r-4)*Math.sin(a));
+  c.strokeStyle = "#e8eaf0"; c.lineWidth = 2; c.lineCap = "round"; c.stroke();
+  c.beginPath(); c.arc(cx, cy, 5, 0, Math.PI*2); c.fillStyle = "#e8eaf0"; c.fill();
+  c.fillStyle = "#555a6e"; c.font = "10px monospace";
+  c.fillText("0°", cx - r + 4, cy + 14); c.fillText("85°", cx + r - 24, cy + 14);
+}
+
+// ── NÍVEL DE ALERTA ──────────────────────────────────────────────────────────
+function setAlertLevel(p) {
+  let lv, lbl, desc, iconPath;
+  if (p >= CFG.thrNormal) {
+    lv = "normal"; lbl = "NORMAL"; desc = `Pressão dentro da faixa normal (≥ ${CFG.thrNormal} hPa)`;
+    iconPath = `<circle cx="8" cy="8" r="5.5" stroke="#4cde88" stroke-width="1.5"/><path d="M5.5 8l2 2 3.5-3.5" stroke="#4cde88" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  } else if (p >= CFG.thrAtencao) {
+    lv = "atencao"; lbl = "ATENÇÃO"; desc = `Pressão abaixo de ${CFG.thrNormal} hPa — verificar sensor`;
+    iconPath = `<path d="M8 2L14.5 13.5H1.5L8 2Z" stroke="#f5c842" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5V9.5" stroke="#f5c842" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r=".75" fill="#f5c842"/>`;
+  } else {
+    lv = "critico"; lbl = "CRÍTICO"; desc = `Pressão abaixo de ${CFG.thrAtencao} hPa — ALERTA MÁXIMO`;
+    iconPath = `<circle cx="8" cy="8" r="5.5" stroke="#f54242" stroke-width="1.5"/><path d="M8 5v3.5" stroke="#f54242" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r=".75" fill="#f54242"/>`;
+  }
+
+  // Badge pressão
+  const badge = document.getElementById("badge-p");
+  const vEl   = document.getElementById("val-p");
+  if (lv === "normal")  { badge.className = "badge badge-stable";  badge.textContent = "Normal";  vEl.className = "val-stable"; }
+  if (lv === "atencao") { badge.className = "badge badge-warning"; badge.textContent = "Atenção"; vEl.className = "val-warning"; }
+  if (lv === "critico") { badge.className = "badge badge-critico"; badge.textContent = "Crítico"; vEl.className = "val-critico"; }
+
+  // Alert box
+  document.getElementById("abox").className   = `alert-box lvl-${lv}`;
+  document.getElementById("aicon").className  = `alert-icon lvl-${lv}`;
+  document.getElementById("asvg").innerHTML   = iconPath;
+  document.getElementById("astate").className = `alert-state lvl-${lv}`;
+  document.getElementById("astate").textContent = lbl;
+  document.getElementById("adesc").textContent  = desc;
+
+  // Barras
+  document.getElementById("aby").className = lv !== "normal"  ? "ab-yellow on" : "ab-yellow";
+  document.getElementById("abr").className = lv === "critico" ? "ab-red on"    : "ab-red";
+
+  // Evento se mudou de nível
+  if (lv !== lastLevel) {
+    const col = lv === "normal" ? "var(--green)" : lv === "atencao" ? "var(--yellow)" : "var(--red)";
+    addEvent(col, `Nível alterado para ${lbl} — pressão ${p.toFixed(2)} hPa`);
+    lastLevel = lv;
+  }
+}
+
+// ── EVENTOS ──────────────────────────────────────────────────────────────────
+function addEvent(color, text) {
+  const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  events.unshift({ color, text, time: t });
+  if (events.length > 6) events.pop();
+  document.getElementById("evlist").innerHTML = events.map(e =>
+    `<div class="event-row">
+      <span class="ev-dot" style="background:${e.color}"></span>
+      <span class="ev-text">${e.text}</span>
+      <span class="ev-time">${e.time}</span>
+    </div>`).join("");
+}
+
+// ── APLICA DADOS NA UI ───────────────────────────────────────────────────────
+function applyData({ pressao, temperatura, altitude }) {
+  const flash = id => {
+    const el = document.getElementById(id);
+    el.classList.remove("live-flicker"); void el.offsetWidth; el.classList.add("live-flicker");
+  };
+  document.getElementById("val-p").textContent = pressao.toFixed(3);     flash("val-p");
+  document.getElementById("val-t").textContent = temperatura.toFixed(1); flash("val-t");
+  document.getElementById("val-a").textContent = altitude.toFixed(0);    flash("val-a");
+  document.getElementById("glabel").textContent = temperatura.toFixed(1) + " °C";
+  document.getElementById("gsub").textContent   =
+    temperatura < 45 ? "dentro da faixa normal" : temperatura < 70 ? "temperatura elevada" : "temperatura crítica";
+  document.getElementById("ainfo").innerHTML =
+    `Pressão atual <strong>${pressao.toFixed(3)} hPa</strong> — Monitoramento contínuo ativo.`;
+  drawGauge(temperatura);
+  setAlertLevel(pressao);
+  const lbl = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  pushChart(lbl, pressao);
+}
+
+// ── STATUS BAR ───────────────────────────────────────────────────────────────
+function setStatus(type, msg) {
+  document.getElementById("sdot").className = "status-dot " + { live:"s-ok", sim:"s-sim", err:"s-err" }[type];
+  document.getElementById("stext").textContent = msg;
+}
+
+// ── RELÓGIO ──────────────────────────────────────────────────────────────────
+function updateClock() {
+  const n = new Date();
+  const dd = String(n.getDate()).padStart(2,"0");
+  const mm = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][n.getMonth()];
+  document.getElementById("live-time").textContent =
+    `Ao vivo · ${dd} ${mm} ${n.getFullYear()} ${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`;
+}
+
+// ── SIMULAÇÃO (fallback) ─────────────────────────────────────────────────────
+let sP = 912, sT = 36, sA = 800;
+function simTick() {
+  sP = Math.max(903, Math.min(916, sP + (Math.random() - 0.52) * 0.5));
+  sT = Math.max(20,  Math.min(60,  sT + (Math.random() - 0.5)  * 0.3));
+  sA = Math.max(795, Math.min(810, sA + (Math.random() - 0.5)  * 0.2));
+  applyData({ pressao: sP, temperatura: sT, altitude: sA });
+}
+
+// ── POLLING PRINCIPAL ────────────────────────────────────────────────────────
+async function poll() {
+  try {
+    const data = await fetchLatest();
+    if (simTimer) { clearInterval(simTimer); simTimer = null; }
+    failCount = 0;
+    setStatus("live", `InfluxDB conectado — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
+    applyData(data);
+  } catch (e) {
+    failCount++;
+    console.warn("InfluxDB:", e.message);
+    if (failCount === 1) {
+      setStatus("err", `Falha InfluxDB: ${e.message}`);
+      addEvent("var(--red)", "Erro ao conectar no InfluxDB — ativando simulação");
+    }
+    if (failCount >= 2 && !simTimer) {
+      setStatus("sim", "Modo simulação ativo — InfluxDB indisponível");
+      simTimer = setInterval(simTick, CFG.poll);
+      simTick();
+    }
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+(async function init() {
+  updateClock();
+  setInterval(updateClock, 30000);
+  drawGauge(0);
+
+  // Tenta carregar histórico real
+  let histLabels = [], histData = [];
+  try {
+    const hist = await fetchHistory();
+    if (hist.length === 0) throw new Error("vazio");
+    histLabels = hist.map(h => h.label);
+    histData   = hist.map(h => h.value);
+    addEvent("var(--green)", `Histórico de 24h carregado (${hist.length} pontos)`);
+  } catch {
+    // Histórico simulado para inicializar gráfico
+    const now = Date.now();
+    for (let i = 48; i >= 0; i--) {
+      histLabels.push(new Date(now - i * 30 * 60 * 1000)
+        .toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+      histData.push(parseFloat((912 + (Math.random() - 0.5) * 3).toFixed(3)));
+    }
+  }
+  buildChart(histLabels, histData);
+
+  await poll();
+  setInterval(poll, CFG.poll);
+})();
+</script>
+</body>
+</html>
