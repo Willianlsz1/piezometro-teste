@@ -221,7 +221,7 @@ let events = [];
 // ── INFLUXDB: QUERY FLUX ─────────────────────────────────────────────────────
 // As queries passam pelo proxy /query (server.js) que resolve o CORS.
 // Em dev local sem proxy, troque PROXY_URL por CFG.url + headers abaixo.
-const PROXY_URL = "piezometro-teste.railway.internal/query";  // proxy local (Docker / servidor)
+const PROXY_URL = "https://piezometro-teste-production.up.railway.app/query";
 
 async function influxQuery(flux) {
   const r = await fetch(PROXY_URL, {
