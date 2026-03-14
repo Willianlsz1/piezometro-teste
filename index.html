@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle de Piezômetro — Samarco</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -215,18 +215,18 @@ const CFG = {
 };
 
 // ── ESTADO ───────────────────────────────────────────────────────────────────
-let chart = null, lastLevel = null, failCount = 0, simTimer = null;
+let lastLevel = null, failCount = 0, simTimer = null;
 let events = [];
 
 // ── INFLUXDB: QUERY FLUX ─────────────────────────────────────────────────────
+// As queries passam pelo proxy /query (server.js) que resolve o CORS.
+// Em dev local sem proxy, troque PROXY_URL por CFG.url + headers abaixo.
+const PROXY_URL = "/query";  // proxy local (Docker / servidor)
+
 async function influxQuery(flux) {
-  const r = await fetch(`${CFG.url}/api/v2/query?org=${encodeURIComponent(CFG.org)}`, {
+  const r = await fetch(PROXY_URL, {
     method:  "POST",
-    headers: {
-      "Authorization": `Token ${CFG.token}`,
-      "Content-Type":  "application/vnd.flux",
-      "Accept":        "application/csv"
-    },
+    headers: { "Content-Type": "application/vnd.flux" },
     body: flux
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -276,65 +276,105 @@ from(bucket: "${CFG.bucket}")
 }
 
 // ── CHART ────────────────────────────────────────────────────────────────────
-function buildChart(labels, data) {
-  if (chart) chart.destroy();
-  const ctx = document.getElementById("pressureChart").getContext("2d");
-  const g = ctx.createLinearGradient(0, 0, 0, 200);
-  g.addColorStop(0, "rgba(212,168,55,.4)"); g.addColorStop(1, "rgba(212,168,55,0)");
+// ── CHART CANVAS PURO (CSP-safe, sem Chart.js) ───────────────────────────────
+const chartState = { labels: [], data: [] };
 
-  const mn = Math.min(...data), mx = Math.max(...data);
+function renderChart() {
+  const canvas = document.getElementById("pressureChart");
+  if (!canvas) return;
+  const W = canvas.offsetWidth || 600, H = canvas.offsetHeight || 180;
+  canvas.width = W; canvas.height = H;
+  const c = canvas.getContext("2d");
+  const labels = chartState.labels, data = chartState.data;
+  if (!data.length) return;
 
-  chart = new Chart(ctx, {
-    type: "line",
-    data: { labels, datasets: [{ data, borderColor: "#d4a837", borderWidth: 1.5,
-      backgroundColor: g, fill: true, tension: 0.4, pointRadius: 0,
-      pointHoverRadius: 4, pointHoverBackgroundColor: "#d4a837" }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { backgroundColor: "#22262f", borderColor: "#2a2e38", borderWidth: 1,
-          titleColor: "#8b8fa8", bodyColor: "#e8eaf0",
-          bodyFont: { family: "monospace", size: 12 },
-          callbacks: { label: c => c.parsed.y.toFixed(3) + " hPa" } }
-      },
-      scales: {
-        x: { grid: { color: "rgba(42,46,56,.8)", drawTicks: false }, border: { display: false },
-             ticks: { color: "#555a6e", font: { size: 10, family: "monospace" },
-                      maxRotation: 45, callback(v, i) { return i % 4 === 0 ? labels[i] : ""; } } },
-        y: { min: mn - 2, max: mx + 2,
-             grid: { color: "rgba(42,46,56,.8)" }, border: { display: false },
-             ticks: { color: "#555a6e", font: { size: 10, family: "monospace" }, callback: v => v.toFixed(1) } }
-      }
-    },
-    plugins: [{
-      id: "thresholds",
-      afterDraw(ch) {
-        const { ctx: c, scales: { y } } = ch;
-        [{ v: CFG.thrNormal, col: "rgba(76,222,136,.5)", lbl: "912 normal" },
-         { v: CFG.thrAtencao, col: "rgba(245,200,66,.5)", lbl: "907 atenção" }]
-        .forEach(({ v, col, lbl }) => {
-          if (v <= y.max && v >= y.min) {
-            const yp = y.getPixelForValue(v);
-            c.save(); c.strokeStyle = col; c.setLineDash([4,4]); c.lineWidth = 1;
-            c.beginPath(); c.moveTo(ch.chartArea.left, yp); c.lineTo(ch.chartArea.right, yp); c.stroke();
-            c.fillStyle = col; c.font = "10px monospace";
-            c.fillText(lbl, ch.chartArea.left + 4, yp - 4); c.restore();
-          }
-        });
-      }
-    }]
+  const PAD = { top: 10, right: 16, bottom: 28, left: 44 };
+  const cw = W - PAD.left - PAD.right;
+  const ch = H - PAD.top  - PAD.bottom;
+
+  const mn = Math.min(...data, CFG.thrAtencao) - 1;
+  const mx = Math.max(...data, CFG.thrNormal)  + 1;
+  const scaleY = v => PAD.top + ch - ((v - mn) / (mx - mn)) * ch;
+  const scaleX = i => PAD.left + (i / (data.length - 1)) * cw;
+
+  c.clearRect(0, 0, W, H);
+
+  // Grid horizontal
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const v  = mn + (mx - mn) * (i / steps);
+    const yp = scaleY(v);
+    c.strokeStyle = "rgba(42,46,56,.8)"; c.lineWidth = 1; c.setLineDash([]);
+    c.beginPath(); c.moveTo(PAD.left, yp); c.lineTo(PAD.left + cw, yp); c.stroke();
+    c.fillStyle = "#555a6e"; c.font = "10px monospace"; c.textAlign = "right";
+    c.fillText(v.toFixed(1), PAD.left - 4, yp + 3);
+  }
+
+  // Linhas de threshold
+  [{ v: CFG.thrNormal, col: "rgba(76,222,136,.5)", lbl: "912 normal" },
+   { v: CFG.thrAtencao, col: "rgba(245,200,66,.5)", lbl: "907 atenção" }]
+  .forEach(({ v, col, lbl }) => {
+    const yp = scaleY(v);
+    c.save(); c.strokeStyle = col; c.setLineDash([4, 4]); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(PAD.left, yp); c.lineTo(PAD.left + cw, yp); c.stroke();
+    c.fillStyle = col; c.font = "10px monospace"; c.textAlign = "left";
+    c.fillText(lbl, PAD.left + 4, yp - 4); c.restore();
   });
+
+  // Área preenchida
+  const grad = c.createLinearGradient(0, PAD.top, 0, PAD.top + ch);
+  grad.addColorStop(0, "rgba(212,168,55,.35)"); grad.addColorStop(1, "rgba(212,168,55,0)");
+  c.beginPath(); c.moveTo(scaleX(0), scaleY(data[0]));
+  for (let i = 1; i < data.length; i++) {
+    const x0 = scaleX(i - 1), y0 = scaleY(data[i - 1]);
+    const x1 = scaleX(i),     y1 = scaleY(data[i]);
+    const cpx = (x0 + x1) / 2;
+    c.bezierCurveTo(cpx, y0, cpx, y1, x1, y1);
+  }
+  c.lineTo(scaleX(data.length - 1), PAD.top + ch);
+  c.lineTo(PAD.left, PAD.top + ch); c.closePath();
+  c.fillStyle = grad; c.fill();
+
+  // Linha principal
+  c.beginPath(); c.moveTo(scaleX(0), scaleY(data[0]));
+  for (let i = 1; i < data.length; i++) {
+    const x0 = scaleX(i - 1), y0 = scaleY(data[i - 1]);
+    const x1 = scaleX(i),     y1 = scaleY(data[i]);
+    const cpx = (x0 + x1) / 2;
+    c.bezierCurveTo(cpx, y0, cpx, y1, x1, y1);
+  }
+  c.strokeStyle = "#d4a837"; c.lineWidth = 1.5; c.setLineDash([]); c.stroke();
+
+  // Labels eixo X (a cada 4 pontos)
+  c.fillStyle = "#555a6e"; c.font = "10px monospace"; c.textAlign = "center";
+  for (let i = 0; i < labels.length; i += 4) {
+    c.fillText(labels[i], scaleX(i), H - 6);
+  }
+
+  // Tooltip no último ponto
+  const lx = scaleX(data.length - 1), ly = scaleY(data[data.length - 1]);
+  c.beginPath(); c.arc(lx, ly, 4, 0, Math.PI * 2);
+  c.fillStyle = "#d4a837"; c.fill();
+  c.fillStyle = "#e8eaf0"; c.font = "10px monospace"; c.textAlign = "right";
+  c.fillText(data[data.length - 1].toFixed(3) + " hPa", lx - 8, ly - 6);
+}
+
+function buildChart(labels, data) {
+  chartState.labels = [...labels];
+  chartState.data   = [...data];
+  renderChart();
+  // Re-renderiza se o canvas mudar de tamanho
+  const ro = new ResizeObserver(() => renderChart());
+  ro.observe(document.getElementById("pressureChart"));
 }
 
 function pushChart(label, value) {
-  if (!chart) return;
-  chart.data.labels.push(label);
-  chart.data.datasets[0].data.push(value);
-  if (chart.data.labels.length > 60) {
-    chart.data.labels.shift(); chart.data.datasets[0].data.shift();
+  chartState.labels.push(label);
+  chartState.data.push(value);
+  if (chartState.labels.length > 60) {
+    chartState.labels.shift(); chartState.data.shift();
   }
-  chart.update("none");
+  renderChart();
 }
 
 // ── GAUGE ────────────────────────────────────────────────────────────────────
