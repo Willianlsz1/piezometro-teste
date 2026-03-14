@@ -54,7 +54,8 @@
   .panel-header { display: flex; align-items: center; justify-content: space-between; }
   .panel-title { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-secondary); }
   .panel-tag { font-size: 10px; background: var(--bg-card2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; }
-  .chart-wrap { position: relative; flex: 1; min-height: 160px; }
+  .chart-wrap { position: relative; flex: 1; min-height: 160px; width: 100%; }
+  .chart-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
 
   .gauge-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 8px; }
   .gauge-value { font-family: monospace; font-size: 28px; font-weight: 700; color: var(--blue); margin-top: -8px; }
@@ -282,8 +283,13 @@ const chartState = { labels: [], data: [] };
 function renderChart() {
   const canvas = document.getElementById("pressureChart");
   if (!canvas) return;
-  const W = canvas.offsetWidth || 600, H = canvas.offsetHeight || 180;
-  canvas.width = W; canvas.height = H;
+  const container = canvas.parentElement;
+  const W = container.clientWidth  || 600;
+  const H = container.clientHeight || 180;
+  canvas.style.width  = W + "px";
+  canvas.style.height = H + "px";
+  canvas.width  = W;
+  canvas.height = H;
   const c = canvas.getContext("2d");
   const labels = chartState.labels, data = chartState.data;
   if (!data.length) return;
@@ -362,10 +368,16 @@ function renderChart() {
 function buildChart(labels, data) {
   chartState.labels = [...labels];
   chartState.data   = [...data];
-  renderChart();
-  // Re-renderiza se o canvas mudar de tamanho
-  const ro = new ResizeObserver(() => renderChart());
-  ro.observe(document.getElementById("pressureChart"));
+  // Aguarda layout estabilizar antes de renderizar
+  requestAnimationFrame(() => {
+    renderChart();
+    // Re-renderiza sempre que o container mudar de tamanho
+    const wrap = document.querySelector(".chart-wrap");
+    if (wrap) {
+      const ro = new ResizeObserver(() => requestAnimationFrame(renderChart));
+      ro.observe(wrap);
+    }
+  });
 }
 
 function pushChart(label, value) {
