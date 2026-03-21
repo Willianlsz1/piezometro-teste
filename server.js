@@ -31,6 +31,9 @@ function corsHeaders(res) {
   res.setHeader("Access-Control-Allow-Origin",  ALLOWED_ORIGIN);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  res.setHeader("Vary", "Origin");
+}
   // CORREÇÃO #3b: Não expor Authorization no CORS — o token fica só no servidor
 }
 
@@ -45,6 +48,48 @@ function proxyToInflux(flux, res) {
   const url  = new URL(`${INFLUX_URL}/api/v2/query?org=${encodeURIComponent(INFLUX_ORG)}`);
   const body = Buffer.from(flux, "utf8");
 
+  const req = https.request(
+    {
+      hostname: url.hostname,
+      path:     url.pathname + url.search,
+      method:   "POST",
+      timeout:  15000,
+      headers: {
+        "Authorization":  `Token ${INFLUX_TOKEN}`,
+        "Content-Type":   "application/vnd.flux",
+        "Accept":         "application/csv",
+        "Content-Length": body.length,
+      },
+    },
+    (influxRes) => {
+      // CORS em todas as respostas do proxy
+      res.writeHead(influxRes.statusCode, {
+        "Content-Type":                  "application/csv",
+        "Access-Control-Allow-Origin":   ALLOWED_ORIGIN,
+        "Access-Control-Allow-Methods":  "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers":  "Content-Type",
+        "Vary":                          "Origin",
+      });
+      influxRes.pipe(res);
+    }
+  );
+
+  req.on("timeout", () => {
+    req.destroy(new Error("Timeout ao conectar no InfluxDB (15s)"));
+  });
+
+  req.on("error", (e) => {
+    console.error("Proxy InfluxDB error:", e.message);
+    res.writeHead(502, {
+      "Content-Type":                 "application/json",
+      "Access-Control-Allow-Origin":  ALLOWED_ORIGIN,
+    });
+    res.end(JSON.stringify({ error: e.message }));
+  });
+
+  req.write(body);
+  req.end();
+}
   // CORREÇÃO #4: Timeout de 15s para não travar requisições penduradas
   const req = https.request(
     {
