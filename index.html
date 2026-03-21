@@ -4,280 +4,607 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle de Piezômetro — Samarco</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg-base: #111318; --bg-panel: #181b22; --bg-card: #1e2229; --bg-card2: #22262f;
-    --border: #2a2e38; --text-primary: #e8eaf0; --text-secondary: #8b8fa8; --text-muted: #555a6e;
-    --green: #4cde88; --green-dim: #1a3d2a;
-    --blue: #3da8f5;  --blue-dim: #0e2a42;
-    --yellow: #f5c842; --yellow-dim: #3d3010;
-    --red: #f54242;   --red-dim: #3d1010;
-  }
-  body { background: var(--bg-base); color: var(--text-primary); font-family: 'Inter', 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: var(--bg-panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-  .logo-area { display: flex; align-items: center; gap: 10px; }
-  .logo-dot { width: 28px; height: 28px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; }
-  .logo-dot svg { width: 14px; height: 14px; }
-  .logo-name { font-size: 14px; font-weight: 600; letter-spacing: .5px; }
-  .header-title { font-size: 15px; font-weight: 600; }
-  .live-badge { display: flex; align-items: center; gap: 7px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 5px 13px; font-size: 12px; color: var(--text-secondary); font-family: monospace; }
-  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+:root {
+  --bg-base:    #0c0e12;
+  --bg-panel:   #111418;
+  --bg-card:    #161a20;
+  --bg-card2:   #1c2028;
+  --border:     #252930;
+  --border2:    #1e2229;
+  --text-1:     #dde1ed;
+  --text-2:     #7c8196;
+  --text-3:     #454a5c;
+  --green:      #3ecf7a;
+  --green-bg:   rgba(62,207,122,.08);
+  --green-bd:   rgba(62,207,122,.2);
+  --blue:       #4da8f0;
+  --blue-bg:    rgba(77,168,240,.08);
+  --blue-bd:    rgba(77,168,240,.2);
+  --yellow:     #f0c040;
+  --yellow-bg:  rgba(240,192,64,.08);
+  --yellow-bd:  rgba(240,192,64,.2);
+  --red:        #f04848;
+  --red-bg:     rgba(240,72,72,.08);
+  --red-bd:     rgba(240,72,72,.2);
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
 
-  .status-bar { display: flex; align-items: center; gap: 8px; padding: 6px 20px; background: var(--bg-panel); border-bottom: 1px solid var(--border); font-size: 11px; font-family: monospace; }
-  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
-  .s-ok { background: var(--green); } .s-err { background: var(--red); } .s-sim { background: var(--yellow); }
+body {
+  background: var(--bg-base);
+  color: var(--text-1);
+  font-family: var(--sans);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
 
-  .grid-root { flex: 1; display: grid; grid-template-rows: auto 1fr auto; gap: 10px; padding: 14px; }
-  .row-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .row-charts  { display: grid; grid-template-columns: 1fr 300px; gap: 10px; }
-  .row-bottom  { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 52px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-ring {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--green);
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-ring-inner {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.logo-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-1);
+}
+.header-center {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  letter-spacing: .3px;
+}
+.live-pill {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+.live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
 
-  .metric-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
-  .metric-header { display: flex; align-items: center; justify-content: space-between; }
-  .metric-label { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-secondary); }
-  .badge { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; }
-  .badge-warning { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,200,66,.3); }
-  .badge-normal  { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(61,168,245,.3); }
-  .badge-stable  { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(76,222,136,.3); }
-  .badge-critico { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(245,66,66,.3); }
-  .metric-value { font-family: monospace; font-size: 36px; font-weight: 700; line-height: 1; display: flex; align-items: baseline; gap: 4px; }
-  .metric-unit { font-size: 16px; font-weight: 500; opacity: .7; }
-  .metric-sub  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-  .val-warning { color: var(--yellow); } .val-normal { color: var(--blue); }
-  .val-stable  { color: var(--green); } .val-critico { color: var(--red); }
+/* ── STATUS BAR ── */
+.statusbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 20px;
+  height: 32px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border2);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+.sdot { width: 5px; height: 5px; border-radius: 50%; }
+.s-ok  { background: var(--green); }
+.s-err { background: var(--red); }
+.s-sim { background: var(--yellow); }
 
-  .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
-  .panel-header { display: flex; align-items: center; justify-content: space-between; }
-  .panel-title { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-secondary); }
-  .panel-tag { font-size: 10px; background: var(--bg-card2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; }
-  .chart-wrap { position: relative; flex: 1; min-height: 180px; height: 180px; width: 100%; overflow: hidden; }
-  .chart-wrap canvas { display: block; }
+/* ── LAYOUT ── */
+.root {
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 12px;
+  padding: 14px 16px;
+  overflow: hidden;
+}
 
-  .gauge-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 8px; }
-  .gauge-value { font-family: monospace; font-size: 28px; font-weight: 700; color: var(--blue); margin-top: -8px; }
-  .gauge-sub   { font-size: 11px; color: var(--text-muted); }
+/* ── METRIC CARDS ── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.mcard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color .3s;
+}
+.mcard:hover { border-color: #333847; }
+.mcard-top {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.mcard-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.mbadge {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.mb-green  { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-bd); }
+.mb-blue   { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-bd); }
+.mb-yellow { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow-bd); }
+.mb-red    { background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-bd); }
 
-  .alert-box { display: flex; align-items: flex-start; gap: 12px; border-radius: 8px; padding: 11px 13px; margin-top: 4px; }
-  .alert-box.lvl-normal  { background: rgba(76,222,136,.07);  border: 1px solid rgba(76,222,136,.25); }
-  .alert-box.lvl-atencao { background: rgba(245,200,66,.07);  border: 1px solid rgba(245,200,66,.25); }
-  .alert-box.lvl-critico { background: rgba(245,66,66,.07);   border: 1px solid rgba(245,66,66,.25); }
-  .alert-icon { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .alert-icon svg { width: 16px; height: 16px; }
-  .alert-icon.lvl-normal  { background: var(--green-dim); }
-  .alert-icon.lvl-atencao { background: var(--yellow-dim); }
-  .alert-icon.lvl-critico { background: var(--red-dim); }
-  .alert-state { font-size: 13px; font-weight: 700; letter-spacing: .3px; }
-  .alert-state.lvl-normal  { color: var(--green); }
-  .alert-state.lvl-atencao { color: var(--yellow); }
-  .alert-state.lvl-critico { color: var(--red); animation: blink .6s step-end infinite; }
-  @keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
-  .alert-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
-  .alert-bar-row { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--text-muted); margin-top: 8px; }
-  .alert-bar-row span:nth-child(2) { text-align: center; } .alert-bar-row span:nth-child(3) { text-align: right; }
-  .alert-bar { height: 6px; border-radius: 3px; margin-top: 3px; display: flex; overflow: hidden; }
-  .ab-green { flex: 1; background: var(--green); }
-  .ab-yellow { flex: 1; } .ab-yellow.on { background: var(--yellow); } .ab-yellow:not(.on) { background: #2a2a2a; }
-  .ab-red    { flex: 1; } .ab-red.on    { background: var(--red); }    .ab-red:not(.on)    { background: #2a2a2a; }
-  .alert-info { font-size: 11px; color: var(--text-secondary); margin-top: 8px; line-height: 1.5; }
-  .alert-info strong { font-family: monospace; }
+.mcard-value {
+  display: flex; align-items: baseline; gap: 4px;
+  font-family: var(--mono);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1;
+}
+.mcard-unit { font-size: 15px; font-weight: 400; opacity: .6; }
+.cv-green  { color: var(--green); }
+.cv-blue   { color: var(--blue); }
+.cv-yellow { color: var(--yellow); }
+.cv-red    { color: var(--red); }
 
-  .event-list { display: flex; flex-direction: column; }
-  .event-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
-  .event-row:last-child { border-bottom: none; }
-  .ev-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .ev-text { flex: 1; color: var(--text-primary); }
-  .ev-time { color: var(--text-muted); font-family: monospace; font-size: 11px; }
+.mcard-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border2);
+}
+.mstat {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.mstat-lbl {
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+.mstat-val {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.mstat-val.up   { color: var(--green); }
+.mstat-val.down { color: var(--red); }
 
-  @keyframes flicker { 0%,100%{opacity:1}50%{opacity:.6} }
-  .live-flicker { animation: flicker .6s ease-in-out; }
+/* sparkline */
+.sparkline-wrap { height: 28px; width: 100%; }
+.sparkline-wrap canvas { display: block; }
+
+/* ── CHARTS ROW ── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.panel-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.panel-title {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.panel-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-3);
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+.chart-area {
+  position: relative;
+  flex: 1;
+  min-height: 160px;
+  height: 160px;
+}
+.chart-area canvas { display: block; }
+
+/* ── BOTTOM ROW ── */
+.bottom-row {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 10px;
+}
+
+/* ── ALERT PANEL ── */
+.alert-level-box {
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex; align-items: flex-start; gap: 12px;
+  transition: background .4s, border-color .4s;
+}
+.alb-normal  { background: var(--green-bg);  border: 1px solid var(--green-bd); }
+.alb-atencao { background: var(--yellow-bg); border: 1px solid var(--yellow-bd); }
+.alb-critico { background: var(--red-bg);    border: 1px solid var(--red-bd); }
+.al-icon {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.ali-normal  { background: rgba(62,207,122,.15); }
+.ali-atencao { background: rgba(240,192,64,.15); }
+.ali-critico { background: rgba(240,72,72,.15); }
+.al-icon svg { width: 16px; height: 16px; }
+.al-state {
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 600;
+  letter-spacing: .4px;
+}
+.al-normal  { color: var(--green); }
+.al-atencao { color: var(--yellow); }
+.al-critico { color: var(--red); animation: blink .7s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+.al-desc { font-size: 11px; color: var(--text-2); margin-top: 3px; }
+
+.threshold-bar {
+  display: flex; flex-direction: column; gap: 5px;
+  margin-top: 4px;
+}
+.tb-labels {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  font-size: 9px; font-weight: 600; letter-spacing: .8px;
+  text-transform: uppercase; color: var(--text-3);
+}
+.tb-labels span:nth-child(2) { text-align: center; }
+.tb-labels span:nth-child(3) { text-align: right; }
+.tb-track {
+  height: 5px; border-radius: 3px;
+  display: flex; overflow: hidden; gap: 2px;
+}
+.tb-seg { flex: 1; border-radius: 2px; }
+.tb-green  { background: var(--green); }
+.tb-yellow { background: var(--text-3); transition: background .4s; }
+.tb-red    { background: var(--text-3); transition: background .4s; }
+.tb-yellow.on { background: var(--yellow); }
+.tb-red.on    { background: var(--red); }
+
+.al-info {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  margin-top: 4px;
+  line-height: 1.6;
+}
+
+/* ── ALERT TABLE ── */
+.alert-table-wrap { overflow-y: auto; flex: 1; max-height: 200px; }
+.alert-table-wrap::-webkit-scrollbar { width: 4px; }
+.alert-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+thead th {
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+  background: var(--bg-card);
+}
+tbody tr {
+  border-bottom: 1px solid var(--border2);
+  transition: background .15s;
+}
+tbody tr:hover { background: var(--bg-card2); }
+tbody tr:last-child { border-bottom: none; }
+tbody td {
+  padding: 8px 10px;
+  color: var(--text-2);
+  vertical-align: middle;
+}
+.td-dot {
+  width: 24px;
+}
+.ev-dot-sm {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.td-msg { color: var(--text-1); }
+.td-val { color: var(--text-2); }
+.td-time { color: var(--text-3); font-size: 10px; }
+.td-badge { }
+.tbadge {
+  font-size: 9px; font-weight: 600;
+  letter-spacing: .5px; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 3px;
+}
+.tb-normal  { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-bd); }
+.tb-atencao { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow-bd); }
+.tb-critico { background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-bd); }
+.tb-info    { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-bd); }
+
+/* ── FLASH ── */
+@keyframes flash { 0%{opacity:.4} 100%{opacity:1} }
+.flash { animation: flash .4s ease-out; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo-area">
-    <div class="logo-dot">
-      <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="#111" stroke-width="2"/><circle cx="7" cy="7" r="2" fill="#111"/></svg>
-    </div>
-    <span class="logo-name">Samarco</span>
+  <div class="logo">
+    <div class="logo-ring"><div class="logo-ring-inner"></div></div>
+    <span class="logo-name">SAMARCO</span>
   </div>
-  <span class="header-title">Controle de Piezômetro</span>
-  <div class="live-badge">
+  <span class="header-center">Controle de Piezômetro</span>
+  <div class="live-pill">
     <span class="live-dot"></span>
     <span id="live-time">Ao vivo · --</span>
   </div>
 </header>
 
-<div class="status-bar">
-  <span class="status-dot s-err" id="sdot"></span>
-  <span id="stext">Conectando ao InfluxDB Cloud...</span>
+<div class="statusbar">
+  <span class="sdot s-err" id="sdot"></span>
+  <span id="stext">Conectando ao InfluxDB...</span>
 </div>
 
-<div class="grid-root">
-  <div class="row-metrics">
-    <div class="metric-card">
-      <div class="metric-header">
-        <span class="metric-label">Pressão</span>
-        <span class="badge badge-stable" id="badge-p">—</span>
+<div class="root">
+
+  <!-- MÉTRICAS -->
+  <div class="metrics-row">
+    <!-- Pressão -->
+    <div class="mcard">
+      <div class="mcard-top">
+        <span class="mcard-label">Pressão</span>
+        <span class="mbadge mb-green" id="badge-p">—</span>
       </div>
-      <div class="metric-value val-stable">
-        <span id="val-p">—</span><span class="metric-unit">hPa</span>
+      <div class="mcard-value cv-green">
+        <span id="val-p">—</span><span class="mcard-unit">hPa</span>
       </div>
-      <div class="metric-sub">Normal ≥ 912 · Atenção ≥ 907 · Crítico &lt; 907</div>
+      <div class="sparkline-wrap"><canvas id="spark-p"></canvas></div>
+      <div class="mcard-stats">
+        <div class="mstat"><span class="mstat-lbl">Mín 24h</span><span class="mstat-val" id="p-min">—</span></div>
+        <div class="mstat"><span class="mstat-lbl">Máx 24h</span><span class="mstat-val" id="p-max">—</span></div>
+        <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="p-delta">—</span></div>
+      </div>
     </div>
-    <div class="metric-card">
-      <div class="metric-header">
-        <span class="metric-label">Temperatura</span>
-        <span class="badge badge-normal">Normal</span>
+
+    <!-- Temperatura -->
+    <div class="mcard">
+      <div class="mcard-top">
+        <span class="mcard-label">Temperatura</span>
+        <span class="mbadge mb-blue">Normal</span>
       </div>
-      <div class="metric-value val-normal">
-        <span id="val-t">—</span><span class="metric-unit">°C</span>
+      <div class="mcard-value cv-blue">
+        <span id="val-t">—</span><span class="mcard-unit">°C</span>
       </div>
-      <div class="metric-sub">Faixa operacional: 0 – 85 °C</div>
+      <div class="sparkline-wrap"><canvas id="spark-t"></canvas></div>
+      <div class="mcard-stats">
+        <div class="mstat"><span class="mstat-lbl">Mín 24h</span><span class="mstat-val" id="t-min">—</span></div>
+        <div class="mstat"><span class="mstat-lbl">Máx 24h</span><span class="mstat-val" id="t-max">—</span></div>
+        <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="t-delta">—</span></div>
+      </div>
     </div>
-    <div class="metric-card">
-      <div class="metric-header">
-        <span class="metric-label">Altitude</span>
-        <span class="badge badge-stable">Estável</span>
+
+    <!-- Altitude -->
+    <div class="mcard">
+      <div class="mcard-top">
+        <span class="mcard-label">Altitude</span>
+        <span class="mbadge mb-green">Estável</span>
       </div>
-      <div class="metric-value val-stable">
-        <span id="val-a">—</span><span class="metric-unit">m</span>
+      <div class="mcard-value cv-green">
+        <span id="val-a">—</span><span class="mcard-unit">m</span>
       </div>
-      <div class="metric-sub">Referência: ~800 m (Ribeirão das Neves)</div>
+      <div class="sparkline-wrap"><canvas id="spark-a"></canvas></div>
+      <div class="mcard-stats">
+        <div class="mstat"><span class="mstat-lbl">Mín 24h</span><span class="mstat-val" id="a-min">—</span></div>
+        <div class="mstat"><span class="mstat-lbl">Máx 24h</span><span class="mstat-val" id="a-max">—</span></div>
+        <div class="mstat"><span class="mstat-lbl">Ref.</span><span class="mstat-val">~800 m</span></div>
+      </div>
     </div>
   </div>
 
-  <div class="row-charts">
+  <!-- GRÁFICOS -->
+  <div class="charts-row">
     <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">Histórico de Pressão (24H)</span>
-        <span class="panel-tag">últimas 24h</span>
+      <div class="panel-hdr">
+        <span class="panel-title">Histórico de Pressão</span>
+        <span class="panel-tag">24h</span>
       </div>
-      <div class="chart-wrap"><canvas id="pressureChart"></canvas></div>
+      <div class="chart-area"><canvas id="chart-p"></canvas></div>
     </div>
     <div class="panel">
-      <div class="panel-header"><span class="panel-title">Temperatura</span></div>
-      <div class="gauge-wrap">
-        <canvas id="gaugeCanvas" width="180" height="100"></canvas>
-        <div class="gauge-value" id="glabel">— °C</div>
-        <div class="gauge-sub" id="gsub">aguardando dados...</div>
+      <div class="panel-hdr">
+        <span class="panel-title">Histórico de Temperatura</span>
+        <span class="panel-tag">24h</span>
       </div>
+      <div class="chart-area"><canvas id="chart-t"></canvas></div>
     </div>
   </div>
 
-  <div class="row-bottom">
+  <!-- ALERTA + TABELA -->
+  <div class="bottom-row">
+    <!-- Alerta -->
     <div class="panel">
-      <div class="panel-header"><span class="panel-title">Nível de Alerta</span></div>
-      <div class="alert-box lvl-normal" id="abox">
-        <div class="alert-icon lvl-normal" id="aicon">
+      <div class="panel-hdr"><span class="panel-title">Nível de Alerta</span></div>
+
+      <div class="alert-level-box alb-normal" id="abox">
+        <div class="al-icon ali-normal" id="aicon">
           <svg id="asvg" viewBox="0 0 16 16" fill="none"></svg>
         </div>
         <div>
-          <div class="alert-state lvl-normal" id="astate">AGUARDANDO</div>
-          <div class="alert-desc" id="adesc">Conectando ao sensor...</div>
+          <div class="al-state al-normal" id="astate">AGUARDANDO</div>
+          <div class="al-desc" id="adesc">Conectando ao sensor...</div>
         </div>
       </div>
-      <div class="alert-bar-row"><span>Normal</span><span>Atenção</span><span>Crítico</span></div>
-      <div class="alert-bar">
-        <div class="ab-green"></div>
-        <div class="ab-yellow" id="aby"></div>
-        <div class="ab-red"    id="abr"></div>
+
+      <div class="threshold-bar">
+        <div class="tb-labels"><span>Normal</span><span>Atenção</span><span>Crítico</span></div>
+        <div class="tb-track">
+          <div class="tb-seg tb-green"></div>
+          <div class="tb-seg tb-yellow" id="tby"></div>
+          <div class="tb-seg tb-red" id="tbr"></div>
+        </div>
       </div>
-      <div class="alert-info" id="ainfo">Monitoramento contínuo ativo.</div>
+
+      <div class="al-info" id="ainfo">Monitoramento contínuo ativo.</div>
     </div>
+
+    <!-- Tabela de alertas -->
     <div class="panel">
-      <div class="panel-header"><span class="panel-title">Registro de Eventos</span></div>
-      <div class="event-list" id="evlist">
-        <div class="event-row">
-          <span class="ev-dot" style="background:var(--text-muted)"></span>
-          <span class="ev-text" style="color:var(--text-muted)">Aguardando conexão com InfluxDB...</span>
-          <span class="ev-time">--:--</span>
-        </div>
+      <div class="panel-hdr">
+        <span class="panel-title">Histórico de Eventos</span>
+        <span class="panel-tag" id="ev-count">0 eventos</span>
+      </div>
+      <div class="alert-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="td-dot"></th>
+              <th>Evento</th>
+              <th>Pressão</th>
+              <th>Nível</th>
+              <th>Hora</th>
+            </tr>
+          </thead>
+          <tbody id="ev-tbody">
+            <tr>
+              <td colspan="5" style="color:var(--text-3);text-align:center;padding:16px">
+                Aguardando dados...
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
+
 </div>
 
 <script>
-// ── CONFIGURAÇÃO ──────────────────────────────────────────────────────────────
-// CORREÇÃO #1: Removidos CFG.url e CFG.token do cliente.
-// O token NUNCA deve ficar exposto no HTML (visível a qualquer pessoa no navegador).
-// Toda comunicação com o InfluxDB passa pelo proxy /query no servidor Node.js.
+// ── CONFIG ────────────────────────────────────────────────────────────────────
 const CFG = {
-  bucket: "PIEZOMETRO",
-  meas:   "telemetria_samarco",
-  poll:   10000,         // 10s — igual ao INTERVALO_DB do Arduino
-  thrNormal:  912.0,     // PRESSAO_NORMAL do firmware
-  thrAtencao: 907.0,     // PRESSAO_ATENCAO do firmware
+  bucket:     "PIEZOMETRO",
+  meas:       "telemetria_samarco",
+  poll:       10000,
+  thrNormal:  912.0,
+  thrAtencao: 907.0,
 };
+
+const PROXY_URL = "https://piezometro-teste.onrender.com/query";
 
 // ── ESTADO ────────────────────────────────────────────────────────────────────
 let lastLevel = null, failCount = 0, simTimer = null;
-let events = [];
+let alertHistory = [];
 
-// ── INFLUXDB: QUERY FLUX ──────────────────────────────────────────────────────
-// CORREÇÃO #2: PROXY_URL agora é relativo (/query) em vez de URL hardcoded de
-// produção. Assim funciona corretamente tanto em desenvolvimento local quanto
-// em qualquer ambiente de hospedagem, sem precisar alterar o código.
-const PROXY_URL = "https://piezometro-teste.onrender.com/query";
+// Histórico de sparklines (últimos 20 pontos)
+const sparks = { p: [], t: [], a: [] };
 
+// Histórico de gráficos (24h)
+const charts = {
+  p: { labels: [], data: [] },
+  t: { labels: [], data: [] },
+};
+
+// Stats 24h
+const stats = {
+  p: { min: null, max: null },
+  t: { min: null, max: null },
+  a: { min: null, max: null },
+};
+
+// ── INFLUXDB ──────────────────────────────────────────────────────────────────
 async function influxQuery(flux) {
-  // CORREÇÃO #3: Adicionado AbortController com timeout de 20s para evitar
-  // requisições travadas indefinidamente que bloqueiam o ciclo de polling.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
     const r = await fetch(PROXY_URL, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/vnd.flux" },
-      body:    flux,
-      signal:  controller.signal,
+      body: flux,
+      signal: ctrl.signal,
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.text();
-  } finally {
-    clearTimeout(timer);
-  }
+  } finally { clearTimeout(timer); }
 }
 
-// Parseia CSV retornado pelo InfluxDB v2
-// CORREÇÃO #4: Parser mais robusto que lida com campos entre aspas no CSV
-// (o InfluxDB pode retornar valores com vírgulas dentro de aspas duplas).
 function parseCSV(csv) {
   const lines = csv.trim().split("\n").filter(l => l && !l.startsWith("#"));
   if (lines.length < 2) return [];
-
-  // Divide respeitando aspas
-  function splitCSVLine(line) {
-    const result = [];
-    let cur = "", inQ = false;
+  function split(line) {
+    const res = []; let cur = "", inQ = false;
     for (const ch of line) {
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === "," && !inQ) { result.push(cur); cur = ""; }
-      else { cur += ch; }
+      if (ch === '"') inQ = !inQ;
+      else if (ch === ',' && !inQ) { res.push(cur); cur = ""; }
+      else cur += ch;
     }
-    result.push(cur);
-    return result;
+    res.push(cur); return res;
   }
-
-  const h  = splitCSVLine(lines[0]);
-  const iF = h.indexOf("_field");
-  const iV = h.indexOf("_value");
-  const iT = h.indexOf("_time");
-
-  if (iF < 0 || iV < 0 || iT < 0) return []; // CORREÇÃO #4b: cabeçalho inválido
-
+  const h = split(lines[0]);
+  const iF = h.indexOf("_field"), iV = h.indexOf("_value"), iT = h.indexOf("_time");
+  if (iF < 0 || iV < 0 || iT < 0) return [];
   return lines.slice(1).map(l => {
-    const c = splitCSVLine(l);
+    const c = split(l);
     return { field: c[iF], value: parseFloat(c[iV]), time: c[iT] };
   }).filter(r => !isNaN(r.value));
 }
 
-// Última leitura (range -2m para pegar mesmo se o ESP32 teve delay)
 async function fetchLatest() {
   const flux = `
 from(bucket: "${CFG.bucket}")
@@ -292,13 +619,12 @@ from(bucket: "${CFG.bucket}")
   return out;
 }
 
-// Histórico 24h agrupado a cada 30min
-async function fetchHistory() {
+async function fetchHistory(field) {
   const flux = `
 from(bucket: "${CFG.bucket}")
   |> range(start: -24h)
   |> filter(fn: (r) => r._measurement == "${CFG.meas}")
-  |> filter(fn: (r) => r._field == "pressao")
+  |> filter(fn: (r) => r._field == "${field}")
   |> aggregateWindow(every: 30m, fn: mean, createEmpty: false)`;
   const rows = parseCSV(await influxQuery(flux));
   return rows.map(r => ({
@@ -307,250 +633,277 @@ from(bucket: "${CFG.bucket}")
   }));
 }
 
-// ── CHART CANVAS ──────────────────────────────────────────────────────────────
-const chartState = { labels: [], data: [] };
+// ── SPARKLINE ─────────────────────────────────────────────────────────────────
+function drawSparkline(canvasId, data, color) {
+  const cv = document.getElementById(canvasId);
+  if (!cv) return;
+  const W = cv.parentElement.offsetWidth || 200;
+  cv.width = W; cv.height = 28;
+  const c = cv.getContext("2d");
+  c.clearRect(0, 0, W, 28);
+  if (data.length < 2) return;
+  const mn = Math.min(...data), mx = Math.max(...data);
+  const range = mx - mn || 1;
+  const sx = i => (i / (data.length - 1)) * W;
+  const sy = v => 24 - ((v - mn) / range) * 20;
+  const grad = c.createLinearGradient(0, 0, 0, 28);
+  grad.addColorStop(0, color + "33");
+  grad.addColorStop(1, color + "00");
+  c.beginPath(); c.moveTo(sx(0), sy(data[0]));
+  for (let i = 1; i < data.length; i++) c.lineTo(sx(i), sy(data[i]));
+  c.lineTo(W, 28); c.lineTo(0, 28); c.closePath();
+  c.fillStyle = grad; c.fill();
+  c.beginPath(); c.moveTo(sx(0), sy(data[0]));
+  for (let i = 1; i < data.length; i++) c.lineTo(sx(i), sy(data[i]));
+  c.strokeStyle = color; c.lineWidth = 1.5; c.stroke();
+}
 
-function renderChart() {
-  const canvas = document.getElementById("pressureChart");
-  if (!canvas) return;
-  const wrap = canvas.closest(".chart-wrap");
-  const rect = wrap ? wrap.getBoundingClientRect() : null;
-  const W = (rect && rect.width  > 10 ? rect.width  : canvas.parentElement.offsetWidth  || 600);
-  const H = (rect && rect.height > 10 ? rect.height : 200);
-  canvas.width  = W;
-  canvas.height = H;
-  canvas.style.width  = W + "px";
-  canvas.style.height = H + "px";
-  const c = canvas.getContext("2d");
-  const labels = chartState.labels, data = chartState.data;
+function pushSpark(key, val) {
+  sparks[key].push(val);
+  if (sparks[key].length > 20) sparks[key].shift();
+  const colors = { p: "#3ecf7a", t: "#4da8f0", a: "#3ecf7a" };
+  drawSparkline("spark-" + key, sparks[key], colors[key]);
+}
+
+// ── MAIN CHARTS ───────────────────────────────────────────────────────────────
+function renderMainChart(canvasId, state, color, thresholds) {
+  const cv = document.getElementById(canvasId);
+  if (!cv) return;
+  const wrap = cv.closest(".chart-area");
+  const W = wrap ? wrap.offsetWidth : 500;
+  const H = wrap ? wrap.offsetHeight : 160;
+  cv.width = W; cv.height = H;
+  cv.style.width = W + "px"; cv.style.height = H + "px";
+  const c = cv.getContext("2d");
+  const { labels, data } = state;
   if (!data.length) return;
 
-  const PAD = { top: 10, right: 16, bottom: 28, left: 44 };
+  const PAD = { top: 10, right: 16, bottom: 28, left: 46 };
   const cw = W - PAD.left - PAD.right;
-  const ch = H - PAD.top  - PAD.bottom;
+  const ch = H - PAD.top - PAD.bottom;
 
-  const mn = Math.min(...data, CFG.thrAtencao) - 1;
-  const mx = Math.max(...data, CFG.thrNormal)  + 1;
-  const scaleY = v => PAD.top + ch - ((v - mn) / (mx - mn)) * ch;
-  const scaleX = i => PAD.left + (i / Math.max(data.length - 1, 1)) * cw; // CORREÇÃO #5: evita divisão por zero com 1 ponto
+  let mn = Math.min(...data) - 1;
+  let mx = Math.max(...data) + 1;
+  if (thresholds) {
+    mn = Math.min(mn, thresholds[1].v - 2);
+    mx = Math.max(mx, thresholds[0].v + 2);
+  }
+  const sy = v => PAD.top + ch - ((v - mn) / (mx - mn)) * ch;
+  const sx = i => PAD.left + (i / Math.max(data.length - 1, 1)) * cw;
 
   c.clearRect(0, 0, W, H);
 
-  // Grid horizontal
-  const steps = 4;
-  for (let i = 0; i <= steps; i++) {
-    const v  = mn + (mx - mn) * (i / steps);
-    const yp = scaleY(v);
-    c.strokeStyle = "rgba(42,46,56,.8)"; c.lineWidth = 1; c.setLineDash([]);
-    c.beginPath(); c.moveTo(PAD.left, yp); c.lineTo(PAD.left + cw, yp); c.stroke();
-    c.fillStyle = "#555a6e"; c.font = "10px monospace"; c.textAlign = "right";
-    c.fillText(v.toFixed(1), PAD.left - 4, yp + 3);
+  // Grid
+  for (let i = 0; i <= 4; i++) {
+    const v = mn + (mx - mn) * (i / 4);
+    const y = sy(v);
+    c.strokeStyle = "rgba(37,41,48,.9)"; c.lineWidth = 1; c.setLineDash([]);
+    c.beginPath(); c.moveTo(PAD.left, y); c.lineTo(PAD.left + cw, y); c.stroke();
+    c.fillStyle = "#454a5c"; c.font = "10px 'IBM Plex Mono'"; c.textAlign = "right";
+    c.fillText(v.toFixed(1), PAD.left - 4, y + 3);
   }
 
-  // Linhas de threshold
-  [{ v: CFG.thrNormal, col: "rgba(76,222,136,.5)", lbl: "912 normal" },
-   { v: CFG.thrAtencao, col: "rgba(245,200,66,.5)", lbl: "907 atenção" }]
-  .forEach(({ v, col, lbl }) => {
-    const yp = scaleY(v);
-    c.save(); c.strokeStyle = col; c.setLineDash([4, 4]); c.lineWidth = 1;
-    c.beginPath(); c.moveTo(PAD.left, yp); c.lineTo(PAD.left + cw, yp); c.stroke();
-    c.fillStyle = col; c.font = "10px monospace"; c.textAlign = "left";
-    c.fillText(lbl, PAD.left + 4, yp - 4); c.restore();
-  });
+  // Thresholds
+  if (thresholds) {
+    thresholds.forEach(({ v, col, lbl }) => {
+      const y = sy(v);
+      c.save(); c.strokeStyle = col; c.setLineDash([4, 4]); c.lineWidth = 1;
+      c.beginPath(); c.moveTo(PAD.left, y); c.lineTo(PAD.left + cw, y); c.stroke();
+      c.fillStyle = col; c.font = "9px 'IBM Plex Mono'"; c.textAlign = "left";
+      c.fillText(lbl, PAD.left + 4, y - 4); c.restore();
+    });
+  }
 
   if (data.length === 1) {
-    // CORREÇÃO #5b: Com apenas 1 ponto, desenha um círculo em vez de tentar traçar uma linha
-    const lx = scaleX(0), ly = scaleY(data[0]);
-    c.beginPath(); c.arc(lx, ly, 4, 0, Math.PI * 2);
-    c.fillStyle = "#d4a837"; c.fill();
-    return;
+    c.beginPath(); c.arc(sx(0), sy(data[0]), 4, 0, Math.PI * 2);
+    c.fillStyle = color; c.fill(); return;
   }
 
-  // Área preenchida
+  // Área
   const grad = c.createLinearGradient(0, PAD.top, 0, PAD.top + ch);
-  grad.addColorStop(0, "rgba(212,168,55,.35)"); grad.addColorStop(1, "rgba(212,168,55,0)");
-  c.beginPath(); c.moveTo(scaleX(0), scaleY(data[0]));
+  grad.addColorStop(0, color + "30"); grad.addColorStop(1, color + "00");
+  c.beginPath(); c.moveTo(sx(0), sy(data[0]));
   for (let i = 1; i < data.length; i++) {
-    const x0 = scaleX(i - 1), y0 = scaleY(data[i - 1]);
-    const x1 = scaleX(i),     y1 = scaleY(data[i]);
-    const cpx = (x0 + x1) / 2;
-    c.bezierCurveTo(cpx, y0, cpx, y1, x1, y1);
+    const x0 = sx(i-1), y0 = sy(data[i-1]), x1 = sx(i), y1 = sy(data[i]);
+    c.bezierCurveTo((x0+x1)/2, y0, (x0+x1)/2, y1, x1, y1);
   }
-  c.lineTo(scaleX(data.length - 1), PAD.top + ch);
-  c.lineTo(PAD.left, PAD.top + ch); c.closePath();
+  c.lineTo(sx(data.length-1), PAD.top+ch);
+  c.lineTo(PAD.left, PAD.top+ch); c.closePath();
   c.fillStyle = grad; c.fill();
 
-  // Linha principal
-  c.beginPath(); c.moveTo(scaleX(0), scaleY(data[0]));
+  // Linha
+  c.beginPath(); c.moveTo(sx(0), sy(data[0]));
   for (let i = 1; i < data.length; i++) {
-    const x0 = scaleX(i - 1), y0 = scaleY(data[i - 1]);
-    const x1 = scaleX(i),     y1 = scaleY(data[i]);
-    const cpx = (x0 + x1) / 2;
-    c.bezierCurveTo(cpx, y0, cpx, y1, x1, y1);
+    const x0 = sx(i-1), y0 = sy(data[i-1]), x1 = sx(i), y1 = sy(data[i]);
+    c.bezierCurveTo((x0+x1)/2, y0, (x0+x1)/2, y1, x1, y1);
   }
-  c.strokeStyle = "#d4a837"; c.lineWidth = 1.5; c.setLineDash([]); c.stroke();
+  c.strokeStyle = color; c.lineWidth = 1.5; c.setLineDash([]); c.stroke();
 
-  // Labels eixo X (a cada 4 pontos)
-  c.fillStyle = "#555a6e"; c.font = "10px monospace"; c.textAlign = "center";
-  for (let i = 0; i < labels.length; i += 4) {
-    c.fillText(labels[i], scaleX(i), H - 6);
+  // Labels X
+  c.fillStyle = "#454a5c"; c.font = "10px 'IBM Plex Mono'"; c.textAlign = "center";
+  const step = Math.max(1, Math.floor(labels.length / 6));
+  for (let i = 0; i < labels.length; i += step)
+    c.fillText(labels[i], sx(i), H - 6);
+
+  // Último ponto
+  const lx = sx(data.length-1), ly = sy(data[data.length-1]);
+  c.beginPath(); c.arc(lx, ly, 4, 0, Math.PI*2); c.fillStyle = color; c.fill();
+  c.fillStyle = "#dde1ed"; c.font = "10px 'IBM Plex Mono'"; c.textAlign = "right";
+  c.fillText(data[data.length-1].toFixed(2), lx - 8, ly - 7);
+}
+
+function pushChart(key, label, value) {
+  charts[key].labels.push(label);
+  charts[key].data.push(value);
+  if (charts[key].labels.length > 60) {
+    charts[key].labels.shift(); charts[key].data.shift();
   }
-
-  // Tooltip no último ponto
-  const lx = scaleX(data.length - 1), ly = scaleY(data[data.length - 1]);
-  c.beginPath(); c.arc(lx, ly, 4, 0, Math.PI * 2);
-  c.fillStyle = "#d4a837"; c.fill();
-  c.fillStyle = "#e8eaf0"; c.font = "10px monospace"; c.textAlign = "right";
-  c.fillText(data[data.length - 1].toFixed(3) + " hPa", lx - 8, ly - 6);
 }
 
-function buildChart(labels, data) {
-  chartState.labels = [...labels];
-  chartState.data   = [...data];
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    renderChart();
-    const wrap = document.querySelector(".chart-wrap");
-    if (wrap) {
-      const ro = new ResizeObserver(() => requestAnimationFrame(renderChart));
-      ro.observe(wrap);
-    }
-  }));
+function redrawCharts() {
+  renderMainChart("chart-p", charts.p, "#3ecf7a", [
+    { v: CFG.thrNormal,  col: "rgba(62,207,122,.5)",  lbl: "912 normal" },
+    { v: CFG.thrAtencao, col: "rgba(240,192,64,.5)",   lbl: "907 atenção" },
+  ]);
+  renderMainChart("chart-t", charts.t, "#4da8f0", null);
 }
 
-function pushChart(label, value) {
-  chartState.labels.push(label);
-  chartState.data.push(value);
-  if (chartState.labels.length > 60) {
-    chartState.labels.shift(); chartState.data.shift();
+// ── STATS ─────────────────────────────────────────────────────────────────────
+function updateStats(key, arr) {
+  if (!arr.length) return;
+  stats[key].min = Math.min(...arr);
+  stats[key].max = Math.max(...arr);
+  const delta = stats[key].max - stats[key].min;
+  const fmt = v => v !== null ? v.toFixed(2) : "—";
+  document.getElementById(key + "-min").textContent = fmt(stats[key].min);
+  document.getElementById(key + "-max").textContent = fmt(stats[key].max);
+  if (key !== "a") {
+    const dEl = document.getElementById(key + "-delta");
+    dEl.textContent = (delta >= 0 ? "+" : "") + delta.toFixed(2);
+    dEl.className = "mstat-val " + (delta > 1 ? "up" : "");
   }
-  renderChart();
 }
 
-// ── GAUGE ─────────────────────────────────────────────────────────────────────
-function drawGauge(t) {
-  const cv = document.getElementById("gaugeCanvas");
-  const c  = cv.getContext("2d");
-  cv.width = 180; cv.height = 100;
-  const cx = 90, cy = 90, r = 70, pct = Math.min(Math.max(t / 85, 0), 1);
-  c.clearRect(0, 0, 180, 100);
-  c.beginPath(); c.arc(cx, cy, r, Math.PI, 0);
-  c.strokeStyle = "#2a2e38"; c.lineWidth = 10; c.lineCap = "round"; c.stroke();
-  const g = c.createLinearGradient(cx - r, cy, cx + r, cy);
-  g.addColorStop(0, "#3da8f5"); g.addColorStop(.5, "#4cde88"); g.addColorStop(1, "#f54242");
-  c.beginPath(); c.arc(cx, cy, r, Math.PI, Math.PI + Math.PI * pct);
-  c.strokeStyle = g; c.lineWidth = 10; c.lineCap = "round"; c.stroke();
-  const a = Math.PI + Math.PI * pct;
-  c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + (r-4)*Math.cos(a), cy + (r-4)*Math.sin(a));
-  c.strokeStyle = "#e8eaf0"; c.lineWidth = 2; c.lineCap = "round"; c.stroke();
-  c.beginPath(); c.arc(cx, cy, 5, 0, Math.PI*2); c.fillStyle = "#e8eaf0"; c.fill();
-  c.fillStyle = "#555a6e"; c.font = "10px monospace";
-  c.fillText("0°", cx - r + 4, cy + 14); c.fillText("85°", cx + r - 24, cy + 14);
-}
-
-// ── NÍVEL DE ALERTA ───────────────────────────────────────────────────────────
-function setAlertLevel(p) {
-  let lv, lbl, desc, iconPath;
+// ── ALERTA ────────────────────────────────────────────────────────────────────
+function setAlert(p) {
+  let lv, lbl, desc, icon;
   if (p >= CFG.thrNormal) {
-    lv = "normal"; lbl = "NORMAL"; desc = `Pressão dentro da faixa normal (≥ ${CFG.thrNormal} hPa)`;
-    iconPath = `<circle cx="8" cy="8" r="5.5" stroke="#4cde88" stroke-width="1.5"/><path d="M5.5 8l2 2 3.5-3.5" stroke="#4cde88" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    lv = "normal"; lbl = "NORMAL"; desc = `Pressão dentro da faixa segura (≥ ${CFG.thrNormal} hPa)`;
+    icon = `<circle cx="8" cy="8" r="5.5" stroke="#3ecf7a" stroke-width="1.5"/><path d="M5.5 8l2 2 3.5-3.5" stroke="#3ecf7a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
   } else if (p >= CFG.thrAtencao) {
     lv = "atencao"; lbl = "ATENÇÃO"; desc = `Pressão abaixo de ${CFG.thrNormal} hPa — verificar sensor`;
-    iconPath = `<path d="M8 2L14.5 13.5H1.5L8 2Z" stroke="#f5c842" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5V9.5" stroke="#f5c842" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r=".75" fill="#f5c842"/>`;
+    icon = `<path d="M8 2L14.5 13.5H1.5L8 2Z" stroke="#f0c040" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5V9.5" stroke="#f0c040" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r=".75" fill="#f0c040"/>`;
   } else {
     lv = "critico"; lbl = "CRÍTICO"; desc = `Pressão abaixo de ${CFG.thrAtencao} hPa — ALERTA MÁXIMO`;
-    iconPath = `<circle cx="8" cy="8" r="5.5" stroke="#f54242" stroke-width="1.5"/><path d="M8 5v3.5" stroke="#f54242" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r=".75" fill="#f54242"/>`;
+    icon = `<circle cx="8" cy="8" r="5.5" stroke="#f04848" stroke-width="1.5"/><path d="M8 5v3.5" stroke="#f04848" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r=".75" fill="#f04848"/>`;
   }
 
-  const badge = document.getElementById("badge-p");
-  const vEl   = document.getElementById("val-p");
-  if (lv === "normal")  { badge.className = "badge badge-stable";  badge.textContent = "Normal";  vEl.className = "val-stable"; }
-  if (lv === "atencao") { badge.className = "badge badge-warning"; badge.textContent = "Atenção"; vEl.className = "val-warning"; }
-  if (lv === "critico") { badge.className = "badge badge-critico"; badge.textContent = "Crítico"; vEl.className = "val-critico"; }
+  const bp = document.getElementById("badge-p");
+  const vp = document.getElementById("val-p");
+  if (lv === "normal")  { bp.className = "mbadge mb-green";  bp.textContent = "Normal";  vp.className = "cv-green"; }
+  if (lv === "atencao") { bp.className = "mbadge mb-yellow"; bp.textContent = "Atenção"; vp.className = "cv-yellow"; }
+  if (lv === "critico") { bp.className = "mbadge mb-red";    bp.textContent = "Crítico"; vp.className = "cv-red"; }
 
-  document.getElementById("abox").className   = `alert-box lvl-${lv}`;
-  document.getElementById("aicon").className  = `alert-icon lvl-${lv}`;
-  document.getElementById("asvg").innerHTML   = iconPath;
-  document.getElementById("astate").className = `alert-state lvl-${lv}`;
+  document.getElementById("abox").className   = `alert-level-box alb-${lv}`;
+  document.getElementById("aicon").className  = `al-icon ali-${lv}`;
+  document.getElementById("asvg").innerHTML   = icon;
+  document.getElementById("astate").className = `al-state al-${lv}`;
   document.getElementById("astate").textContent = lbl;
   document.getElementById("adesc").textContent  = desc;
-
-  document.getElementById("aby").className = lv !== "normal"  ? "ab-yellow on" : "ab-yellow";
-  document.getElementById("abr").className = lv === "critico" ? "ab-red on"    : "ab-red";
+  document.getElementById("tby").className = lv !== "normal"  ? "tb-seg tb-yellow on" : "tb-seg tb-yellow";
+  document.getElementById("tbr").className = lv === "critico" ? "tb-seg tb-red on"    : "tb-seg tb-red";
+  document.getElementById("ainfo").textContent = `Pressão atual ${p.toFixed(3)} hPa · Monitoramento ativo`;
 
   if (lv !== lastLevel) {
-    const col = lv === "normal" ? "var(--green)" : lv === "atencao" ? "var(--yellow)" : "var(--red)";
-    addEvent(col, `Nível alterado para ${lbl} — pressão ${p.toFixed(2)} hPa`);
+    addAlertRow(lv, lbl, p);
     lastLevel = lv;
   }
 }
 
-// ── EVENTOS ───────────────────────────────────────────────────────────────────
-// CORREÇÃO #6: Usa textContent em vez de innerHTML para evitar injeção de HTML
-// (mesmo que o risco seja baixo aqui, é uma boa prática defensiva).
-function addEvent(color, text) {
-  const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  events.unshift({ color, text, time: t });
-  if (events.length > 6) events.pop();
+// ── TABELA DE EVENTOS ─────────────────────────────────────────────────────────
+function addAlertRow(lv, lbl, pressao) {
+  const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const msgs = {
+    normal:  "Pressão retornou ao nível normal",
+    atencao: "Pressão em nível de atenção",
+    critico: "ALERTA — pressão crítica detectada",
+  };
+  const colors = { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" };
+  alertHistory.unshift({ lv, lbl, msg: msgs[lv] || lbl, pressao: pressao ? pressao.toFixed(3) : "—", time: t, color: colors[lv] || colors.info });
+  if (alertHistory.length > 50) alertHistory.pop();
+  renderTable();
+}
 
-  const list = document.getElementById("evlist");
-  list.innerHTML = "";
-  events.forEach(e => {
-    const row  = document.createElement("div");
-    row.className = "event-row";
+function addInfoRow(msg) {
+  const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  alertHistory.unshift({ lv: "info", lbl: "INFO", msg, pressao: "—", time: t, color: "#4da8f0" });
+  if (alertHistory.length > 50) alertHistory.pop();
+  renderTable();
+}
 
-    const dot  = document.createElement("span");
-    dot.className = "ev-dot";
-    dot.style.background = e.color;
-
-    const txt  = document.createElement("span");
-    txt.className = "ev-text";
-    txt.textContent = e.text; // textContent — seguro
-
-    const time = document.createElement("span");
-    time.className = "ev-time";
-    time.textContent = e.time;
-
-    row.append(dot, txt, time);
-    list.appendChild(row);
+function renderTable() {
+  const tbody = document.getElementById("ev-tbody");
+  document.getElementById("ev-count").textContent = `${alertHistory.length} evento${alertHistory.length !== 1 ? "s" : ""}`;
+  if (!alertHistory.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--text-3);text-align:center;padding:16px">Nenhum evento registrado</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = "";
+  alertHistory.forEach(e => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="td-dot"><span class="ev-dot-sm" style="background:${e.color}"></span></td>
+      <td class="td-msg">${e.msg}</td>
+      <td class="td-val">${e.pressao} hPa</td>
+      <td class="td-badge"><span class="tbadge tb-${e.lv}">${e.lbl}</span></td>
+      <td class="td-time">${e.time}</td>
+    `;
+    tbody.appendChild(tr);
   });
 }
 
-// ── APLICA DADOS NA UI ────────────────────────────────────────────────────────
-// CORREÇÃO #7: Validação dos dados recebidos antes de exibir.
-// Se algum campo vier como NaN ou undefined, mostra "—" em vez de travar.
+// ── APLICA DADOS ──────────────────────────────────────────────────────────────
 function applyData({ pressao, temperatura, altitude }) {
-  const safe = (v, def = 0) => (typeof v === "number" && isFinite(v) ? v : def);
-  pressao    = safe(pressao,    912);
+  const safe = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
+  pressao     = safe(pressao, 912);
   temperatura = safe(temperatura, 0);
-  altitude   = safe(altitude,   800);
+  altitude    = safe(altitude, 800);
 
   const flash = id => {
     const el = document.getElementById(id);
-    el.classList.remove("live-flicker"); void el.offsetWidth; el.classList.add("live-flicker");
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
   };
-  document.getElementById("val-p").textContent = pressao.toFixed(3);      flash("val-p");
-  document.getElementById("val-t").textContent = temperatura.toFixed(1);  flash("val-t");
-  document.getElementById("val-a").textContent = altitude.toFixed(0);     flash("val-a");
-  document.getElementById("glabel").textContent = temperatura.toFixed(1) + " °C";
-  document.getElementById("gsub").textContent   =
-    temperatura < 45 ? "dentro da faixa normal" : temperatura < 70 ? "temperatura elevada" : "temperatura crítica";
-  document.getElementById("ainfo").textContent =
-    `Pressão atual ${pressao.toFixed(3)} hPa — Monitoramento contínuo ativo.`;
-  drawGauge(temperatura);
-  setAlertLevel(pressao);
+
+  document.getElementById("val-p").textContent = pressao.toFixed(3);     flash("val-p");
+  document.getElementById("val-t").textContent = temperatura.toFixed(1); flash("val-t");
+  document.getElementById("val-a").textContent = altitude.toFixed(0);    flash("val-a");
+
+  // Sparklines
+  pushSpark("p", pressao);
+  pushSpark("t", temperatura);
+  pushSpark("a", altitude);
+
+  // Charts
   const lbl = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  pushChart(lbl, pressao);
+  pushChart("p", lbl, pressao);
+  pushChart("t", lbl, temperatura);
+  redrawCharts();
+
+  // Stats
+  updateStats("p", charts.p.data);
+  updateStats("t", charts.t.data);
+  updateStats("a", sparks.a);
+
+  setAlert(pressao);
 }
 
-// ── STATUS BAR ────────────────────────────────────────────────────────────────
+// ── STATUS ────────────────────────────────────────────────────────────────────
 function setStatus(type, msg) {
-  document.getElementById("sdot").className = "status-dot " + { live:"s-ok", sim:"s-sim", err:"s-err" }[type];
+  document.getElementById("sdot").className = "sdot " + { live: "s-ok", sim: "s-sim", err: "s-err" }[type];
   document.getElementById("stext").textContent = msg;
 }
 
 // ── RELÓGIO ───────────────────────────────────────────────────────────────────
-// CORREÇÃO #8: Atualiza o relógio a cada 1s (era 30s), mantendo a hora sempre
-// precisa ao segundo, sem custo perceptível de CPU.
 function updateClock() {
   const n = new Date();
   const dd = String(n.getDate()).padStart(2, "0");
@@ -558,20 +911,19 @@ function updateClock() {
   const hh = String(n.getHours()).padStart(2, "0");
   const mi = String(n.getMinutes()).padStart(2, "0");
   const ss = String(n.getSeconds()).padStart(2, "0");
-  document.getElementById("live-time").textContent =
-    `Ao vivo · ${dd} ${mm} ${n.getFullYear()} ${hh}:${mi}:${ss}`;
+  document.getElementById("live-time").textContent = `Ao vivo · ${dd} ${mm} ${n.getFullYear()} ${hh}:${mi}:${ss}`;
 }
 
-// ── SIMULAÇÃO (fallback) ──────────────────────────────────────────────────────
+// ── SIMULAÇÃO ─────────────────────────────────────────────────────────────────
 let sP = 912, sT = 36, sA = 800;
 function simTick() {
   sP = Math.max(903, Math.min(916, sP + (Math.random() - 0.52) * 0.5));
-  sT = Math.max(20,  Math.min(60,  sT + (Math.random() - 0.5)  * 0.3));
-  sA = Math.max(795, Math.min(810, sA + (Math.random() - 0.5)  * 0.2));
+  sT = Math.max(20, Math.min(60, sT + (Math.random() - 0.5) * 0.3));
+  sA = Math.max(795, Math.min(810, sA + (Math.random() - 0.5) * 0.2));
   applyData({ pressao: sP, temperatura: sT, altitude: sA });
 }
 
-// ── POLLING PRINCIPAL ─────────────────────────────────────────────────────────
+// ── POLLING ───────────────────────────────────────────────────────────────────
 async function poll() {
   try {
     const data = await fetchLatest();
@@ -584,7 +936,7 @@ async function poll() {
     console.warn("InfluxDB:", e.message);
     if (failCount === 1) {
       setStatus("err", `Falha InfluxDB: ${e.message}`);
-      addEvent("var(--red)", "Erro ao conectar no InfluxDB — ativando simulação");
+      addInfoRow("Erro ao conectar no InfluxDB — ativando simulação");
     }
     if (failCount >= 2 && !simTimer) {
       setStatus("sim", "Modo simulação ativo — InfluxDB indisponível");
@@ -597,25 +949,39 @@ async function poll() {
 // ── INIT ──────────────────────────────────────────────────────────────────────
 (async function init() {
   updateClock();
-  setInterval(updateClock, 1000); // CORREÇÃO #8: 1s em vez de 30s
-  drawGauge(0);
+  setInterval(updateClock, 1000);
 
-  let histLabels = [], histData = [];
+  // Carrega histórico 24h
   try {
-    const hist = await fetchHistory();
-    if (hist.length === 0) throw new Error("vazio");
-    histLabels = hist.map(h => h.label);
-    histData   = hist.map(h => h.value);
-    addEvent("var(--green)", `Histórico de 24h carregado (${hist.length} pontos)`);
-  } catch {
+    const [hp, ht] = await Promise.all([fetchHistory("pressao"), fetchHistory("temperatura")]);
+
+    if (hp.length) {
+      charts.p.labels = hp.map(h => h.label);
+      charts.p.data   = hp.map(h => h.value);
+      updateStats("p", charts.p.data);
+      addInfoRow(`Histórico de pressão carregado (${hp.length} pontos)`);
+    }
+    if (ht.length) {
+      charts.t.labels = ht.map(h => h.label);
+      charts.t.data   = ht.map(h => h.value);
+      updateStats("t", charts.t.data);
+      addInfoRow(`Histórico de temperatura carregado (${ht.length} pontos)`);
+    }
+  } catch (e) {
+    // Fallback simulado
     const now = Date.now();
     for (let i = 48; i >= 0; i--) {
-      histLabels.push(new Date(now - i * 30 * 60 * 1000)
-        .toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
-      histData.push(parseFloat((912 + (Math.random() - 0.5) * 3).toFixed(3)));
+      const lbl = new Date(now - i * 30 * 60 * 1000)
+        .toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      charts.p.labels.push(lbl); charts.p.data.push(parseFloat((912 + (Math.random() - 0.5) * 3).toFixed(3)));
+      charts.t.labels.push(lbl); charts.t.data.push(parseFloat((25 + Math.random() * 15).toFixed(1)));
     }
+    updateStats("p", charts.p.data);
+    updateStats("t", charts.t.data);
   }
-  buildChart(histLabels, histData);
+
+  redrawCharts();
+  window.addEventListener("resize", redrawCharts);
 
   await poll();
   setInterval(poll, CFG.poll);
