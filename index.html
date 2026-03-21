@@ -223,7 +223,7 @@ let events = [];
 // CORREÇÃO #2: PROXY_URL agora é relativo (/query) em vez de URL hardcoded de
 // produção. Assim funciona corretamente tanto em desenvolvimento local quanto
 // em qualquer ambiente de hospedagem, sem precisar alterar o código.
-const PROXY_URL = "https://piezometro-teste-production-b868.up.railway.app/query";
+const PROXY_URL = "https://piezometro-teste.onrender.com/query";
 
 async function influxQuery(flux) {
   // CORREÇÃO #3: Adicionado AbortController com timeout de 20s para evitar
