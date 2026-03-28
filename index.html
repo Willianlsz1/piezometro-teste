@@ -94,6 +94,47 @@
 
   @keyframes flicker { 0%,100%{opacity:1}50%{opacity:.6} }
   .live-flicker { animation: flicker .6s ease-in-out; }
+
+  /* ── GRÁFICO dP/dt ── */
+  .dpdt-badge { font-size: 10px; font-weight: 700; letter-spacing: .6px; padding: 3px 9px; border-radius: 4px; font-family: monospace; }
+  .dpdt-ok   { background: rgba(76,222,136,.12); color: var(--green);  border: 1px solid rgba(76,222,136,.3); }
+  .dpdt-mid  { background: rgba(245,200,66,.12); color: var(--yellow); border: 1px solid rgba(245,200,66,.3); }
+  .dpdt-high { background: rgba(245,66,66,.12);  color: var(--red);    border: 1px solid rgba(245,66,66,.3); }
+
+  /* ── TABELA DE ÚLTIMAS LEITURAS + BOTÃO CSV ── */
+  .readings-scroll { overflow-x: auto; overflow-y: auto; max-height: 200px; }
+  .readings-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+  .readings-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .data-table { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 11px; min-width: 440px; }
+  .data-table thead th { padding: 7px 10px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); }
+  .data-table tbody tr { border-bottom: 1px solid rgba(42,46,56,.6); transition: background .12s; }
+  .data-table tbody tr:hover { background: var(--bg-card2); }
+  .data-table tbody tr:last-child { border-bottom: none; }
+  .data-table tbody td { padding: 8px 10px; color: var(--text-secondary); }
+  .btn-csv { display: inline-flex; align-items: center; gap: 5px; background: var(--bg-card2); border: 1px solid var(--border); border-radius: 5px; padding: 5px 11px; font-size: 11px; color: var(--text-muted); cursor: pointer; transition: border-color .2s, color .2s; font-family: monospace; }
+  .btn-csv:hover { border-color: var(--green); color: var(--green); }
+
+  /* ── COUNTDOWN ÚLTIMA ATUALIZAÇÃO ── */
+  .last-update { font-family: monospace; font-size: 11px; color: var(--text-muted); }
+
+  /* ── RESPONSIVIDADE MOBILE ── */
+  @media (max-width: 768px) {
+    header { padding: 10px 14px; }
+    .header-title { display: none; }
+    .grid-root { padding: 10px 8px; gap: 8px; }
+    .row-metrics { grid-template-columns: 1fr 1fr; }
+    .row-metrics .metric-card:last-child { grid-column: 1 / -1; }
+    .row-charts  { grid-template-columns: 1fr; }
+    .row-bottom  { grid-template-columns: 1fr; }
+    .row-dpdt    { grid-template-columns: 1fr; }
+    .metric-value { font-size: 28px; }
+  }
+  @media (max-width: 480px) {
+    .row-metrics { grid-template-columns: 1fr; }
+    .row-metrics .metric-card:last-child { grid-column: auto; }
+    .metric-value { font-size: 24px; }
+    .live-badge { padding: 4px 10px; font-size: 11px; }
+  }
 </style>
 </head>
 <body>
@@ -169,6 +210,39 @@
     </div>
   </div>
 
+  <!-- GRÁFICO dP/dt + TABELA DE ÚLTIMAS LEITURAS -->
+  <div class="row-dpdt" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Taxa de Variação — dP/dt</span>
+        <span class="dpdt-badge dpdt-ok" id="dpdt-badge">— hPa/min</span>
+      </div>
+      <div class="chart-wrap"><canvas id="dpdtChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Últimas Leituras</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="last-update" id="last-update-text">—</span>
+          <button class="btn-csv" onclick="exportCSV()">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v6M3.5 4.5l2.5 3 2.5-3M1 9.5h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            CSV
+          </button>
+        </div>
+      </div>
+      <div class="readings-scroll">
+        <table class="data-table">
+          <thead>
+            <tr><th>Hora</th><th>Pressão (hPa)</th><th>Temp (°C)</th><th>Alt (m)</th><th>Status</th></tr>
+          </thead>
+          <tbody id="readings-tbody">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:14px">Aguardando dados...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="row-bottom">
     <div class="panel">
       <div class="panel-header"><span class="panel-title">Nível de Alerta</span></div>
@@ -205,12 +279,11 @@
 <script>
 // ── CONFIGURAÇÃO (extraída do firmware Arduino) ──────────────────────────────
 const CFG = {
-  url:    "https://us-east-1-1.aws.cloud2.influxdata.com",
-  token:  "dNPdQWtPzpKTXumx2f-RKYS-b7XpBI8EWW_0OKnUmP_gy1v5sh_2uVGnFFFXH8ht6IgYOCp4FcB8MpZAvshHtw==",
+  // Credenciais NUNCA ficam no frontend — o proxy server.js injeta o token
   org:    "SAMARCO",
   bucket: "PIEZOMETRO",
   meas:   "telemetria_samarco",
-  poll:   10000,            // 10s — igual ao INTERVALO_DB do Arduino
+  poll:   10000,            // 10s — igual ao INTERVALO_LEITURA_MS do firmware
   thrNormal:  912.0,        // PRESSAO_NORMAL do firmware
   thrAtencao: 907.0,        // PRESSAO_ATENCAO do firmware
 };
@@ -482,6 +555,7 @@ function applyData({ pressao, temperatura, altitude }) {
   setAlertLevel(pressao);
   const lbl = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   pushChart(lbl, pressao);
+  addReading({ pressao, temperatura, altitude });
 }
 
 // ── STATUS BAR ───────────────────────────────────────────────────────────────
@@ -531,6 +605,190 @@ async function poll() {
   }
 }
 
+// ── GRÁFICO dP/dt ─────────────────────────────────────────────────────────────
+// Taxa de variação da pressão em hPa/min — métrica crítica em geotecnia
+// para detectar tendências anômalas antes que os valores absolutos disparem.
+const dpdtState = { labels: [], data: [] };
+
+function renderDpdtChart() {
+  const canvas = document.getElementById("dpdtChart");
+  if (!canvas) return;
+  const wrap = canvas.closest(".chart-wrap");
+  const W = (wrap ? wrap.offsetWidth : 400) || 400;
+  const H = (wrap ? wrap.offsetHeight : 180) || 180;
+  canvas.width  = W; canvas.height = H;
+  canvas.style.width = W + "px"; canvas.style.height = H + "px";
+  const c = canvas.getContext("2d");
+  const { labels, data } = dpdtState;
+  if (data.length < 2) { c.clearRect(0,0,W,H); return; }
+
+  const PAD = { top: 10, right: 16, bottom: 28, left: 52 };
+  const cw = W - PAD.left - PAD.right;
+  const ch = H - PAD.top  - PAD.bottom;
+
+  let mn = Math.min(...data, -0.15) - 0.05;
+  let mx = Math.max(...data,  0.15) + 0.05;
+  const sy = v => PAD.top + ch - ((v - mn) / (mx - mn)) * ch;
+  const sx = i => PAD.left + (i / Math.max(data.length - 1, 1)) * cw;
+
+  c.clearRect(0, 0, W, H);
+
+  // Grid
+  for (let i = 0; i <= 4; i++) {
+    const v = mn + (mx - mn) * (i / 4);
+    const y = sy(v);
+    c.strokeStyle = "rgba(42,46,56,.8)"; c.lineWidth = 1; c.setLineDash([]);
+    c.beginPath(); c.moveTo(PAD.left, y); c.lineTo(PAD.left + cw, y); c.stroke();
+    c.fillStyle = "#555a6e"; c.font = "10px monospace"; c.textAlign = "right";
+    c.fillText(v.toFixed(3), PAD.left - 4, y + 3);
+  }
+
+  // Linha zero destacada
+  const y0 = sy(0);
+  c.strokeStyle = "rgba(255,255,255,.18)"; c.setLineDash([3, 3]); c.lineWidth = 1;
+  c.beginPath(); c.moveTo(PAD.left, y0); c.lineTo(PAD.left + cw, y0); c.stroke();
+  c.fillStyle = "rgba(255,255,255,.3)"; c.font = "9px monospace"; c.textAlign = "left";
+  c.fillText("0 (estável)", PAD.left + 4, y0 - 4);
+  c.setLineDash([]);
+
+  // Faixas de atenção
+  [0.1, -0.1].forEach(v => {
+    const y = sy(v);
+    c.strokeStyle = "rgba(245,200,66,.35)"; c.setLineDash([4, 4]); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(PAD.left, y); c.lineTo(PAD.left + cw, y); c.stroke();
+  });
+  c.setLineDash([]);
+
+  // Linha dP/dt colorida por valor
+  for (let i = 1; i < data.length; i++) {
+    const abs = Math.abs(data[i]);
+    const col = abs < 0.1 ? "#4cde88" : abs < 0.5 ? "#f5c842" : "#f54242";
+    c.beginPath(); c.moveTo(sx(i-1), sy(data[i-1])); c.lineTo(sx(i), sy(data[i]));
+    c.strokeStyle = col; c.lineWidth = 1.8; c.stroke();
+  }
+
+  // Pontos
+  data.forEach((v, i) => {
+    const abs = Math.abs(v);
+    const col = abs < 0.1 ? "#4cde88" : abs < 0.5 ? "#f5c842" : "#f54242";
+    c.beginPath(); c.arc(sx(i), sy(v), 2.5, 0, Math.PI * 2);
+    c.fillStyle = col; c.fill();
+  });
+
+  // Labels eixo X
+  c.fillStyle = "#555a6e"; c.font = "10px monospace"; c.textAlign = "center";
+  const step = Math.max(1, Math.floor(labels.length / 6));
+  for (let i = 0; i < labels.length; i += step)
+    c.fillText(labels[i], sx(i), H - 6);
+}
+
+// ── TABELA DE ÚLTIMAS LEITURAS ─────────────────────────────────────────────────
+const readings = []; // Array de { ts, pressao, temperatura, altitude }
+const MAX_READINGS = 20;
+
+/**
+ * Registra uma nova leitura, atualiza a tabela HTML e dispara o cálculo de dP/dt.
+ */
+function addReading({ pressao, temperatura, altitude }) {
+  readings.push({ ts: new Date(), pressao, temperatura, altitude });
+  if (readings.length > MAX_READINGS) readings.shift();
+  renderReadingsTable();
+  updateDpDt();
+  lastUpdateTime = Date.now();
+}
+
+/**
+ * Renderiza a tabela das últimas leituras (mais recente no topo).
+ */
+function renderReadingsTable() {
+  const tbody = document.getElementById("readings-tbody");
+  if (!tbody) return;
+  if (!readings.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:12px">Sem leituras</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = [...readings].reverse().map(r => {
+    const hora  = r.ts.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+    const nivel = r.pressao >= CFG.thrNormal ? "normal" : r.pressao >= CFG.thrAtencao ? "atencao" : "critico";
+    const lbl   = nivel === "normal" ? "Normal" : nivel === "atencao" ? "Atenção" : "Crítico";
+    const col   = nivel === "normal" ? "var(--green)" : nivel === "atencao" ? "var(--yellow)" : "var(--red)";
+    return `<tr>
+      <td style="color:var(--text-muted)">${hora}</td>
+      <td>${r.pressao.toFixed(3)}</td>
+      <td>${r.temperatura.toFixed(1)}</td>
+      <td>${r.altitude.toFixed(0)}</td>
+      <td><span style="color:${col};font-weight:700">${lbl}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+/**
+ * Calcula dP/dt entre os dois pontos mais recentes (hPa/min) e atualiza o gráfico.
+ */
+function updateDpDt() {
+  if (readings.length < 2) return;
+  const a = readings[readings.length - 2];
+  const b = readings[readings.length - 1];
+  const dtMin = (b.ts - a.ts) / 60000;
+  if (dtMin <= 0) return;
+
+  const dpdt = (b.pressao - a.pressao) / dtMin;
+  const lbl  = b.ts.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
+  dpdtState.labels.push(lbl);
+  dpdtState.data.push(parseFloat(dpdt.toFixed(4)));
+  if (dpdtState.data.length > 60) { dpdtState.labels.shift(); dpdtState.data.shift(); }
+
+  // Atualiza badge
+  const badge = document.getElementById("dpdt-badge");
+  if (badge) {
+    const abs = Math.abs(dpdt);
+    badge.textContent = (dpdt >= 0 ? "+" : "") + dpdt.toFixed(4) + " hPa/min";
+    badge.className = "dpdt-badge " + (abs < 0.1 ? "dpdt-ok" : abs < 0.5 ? "dpdt-mid" : "dpdt-high");
+  }
+  renderDpdtChart();
+}
+
+// ── EXPORTAÇÃO CSV ────────────────────────────────────────────────────────────
+/**
+ * Gera e faz download de um arquivo CSV com o histórico de pressão e temperatura.
+ * BOM UTF-8 incluído para compatibilidade com Excel.
+ */
+function exportCSV() {
+  if (!readings.length) {
+    alert("Sem dados para exportar. Aguarde algumas leituras.");
+    return;
+  }
+  const bom  = "\uFEFF";
+  const head = "Hora,Pressao_hPa,Temperatura_C,Altitude_m,Status\n";
+  const rows = [...readings].reverse().map(r => {
+    const hora  = r.ts.toLocaleTimeString("pt-BR");
+    const nivel = r.pressao >= CFG.thrNormal ? "Normal" : r.pressao >= CFG.thrAtencao ? "Atencao" : "Critico";
+    return `${hora},${r.pressao.toFixed(3)},${r.temperatura.toFixed(1)},${r.altitude.toFixed(0)},${nivel}`;
+  }).join("\n");
+
+  const blob = new Blob([bom + head + rows], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement("a"), {
+    href:     url,
+    download: `piezometro-${new Date().toISOString().slice(0,19).replace(/[T:]/g,"-")}.csv`,
+  });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── COUNTDOWN ÚLTIMA ATUALIZAÇÃO ─────────────────────────────────────────────
+let lastUpdateTime = null;
+
+setInterval(() => {
+  const el = document.getElementById("last-update-text");
+  if (!el) return;
+  if (!lastUpdateTime) { el.textContent = "aguardando..."; return; }
+  const s = Math.floor((Date.now() - lastUpdateTime) / 1000);
+  el.textContent = s < 5 ? "agora mesmo" : s < 60 ? `${s}s atrás` : `${Math.floor(s/60)}min atrás`;
+}, 1000);
+
 // ── INIT ─────────────────────────────────────────────────────────────────────
 (async function init() {
   updateClock();
@@ -555,6 +813,11 @@ async function poll() {
     }
   }
   buildChart(histLabels, histData);
+
+  window.addEventListener("resize", () => {
+    renderChart();
+    renderDpdtChart();
+  });
 
   await poll();
   setInterval(poll, CFG.poll);
