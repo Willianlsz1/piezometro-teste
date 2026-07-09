@@ -262,14 +262,20 @@ O sistema classifica o **nível d'água** em três faixas — a mesma lógica no
 ```
 piezometro-teste/
 ├── firmware/
-│   ├── sketch.ino   # Firmware do ESP32 (C++ / Arduino)
-│   └── diagram.json # Circuito do Wokwi (ESP32 + BMP180 + OLED + LEDs + buzzer)
-├── server.js        # Proxy Node.js (Render)
+│   ├── sketch.ino                    # Firmware da SIMULAÇÃO no Wokwi (BMP180 como stand-in)
+│   ├── sketch_fisico_jsn_sr04t.ino   # Firmware do PROTÓTIPO FÍSICO (JSN-SR04T medindo água real)
+│   └── diagram.json                  # Circuito do Wokwi (ESP32 + BMP180 + OLED + LEDs + buzzer)
+├── docs/
+│   ├── MAPEAMENTO_DEMANDA_E_MERCADO.md  # Demanda SAGA × mercado real × regulação (fontes citadas)
+│   └── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e roteiro de demo
+├── server.js        # Proxy Node.js + ingestão + motor de alertas (Render)
 ├── index.html       # Dashboard web (GitHub Pages)
 ├── package.json     # Dependências Node.js
 ├── .env.example     # Modelo de variáveis de ambiente
 └── readme.md        # Este arquivo
 ```
+
+> 🧱 **Vai montar a maquete física?** Siga o guia completo em [`docs/PROTOTIPO_FISICO.md`](docs/PROTOTIPO_FISICO.md) — lista de compras (~R$ 150–220), esquema de ligação do JSN-SR04T (com o divisor de tensão obrigatório no ECHO), calibração e roteiro de demonstração para a banca.
 
 ---
 
