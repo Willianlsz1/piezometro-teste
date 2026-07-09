@@ -11,6 +11,7 @@ const INFLUX_URL   = process.env.INFLUX_URL   || "https://us-east-1-1.aws.cloud2
 const INFLUX_TOKEN = process.env.INFLUX_TOKEN || "";
 const INFLUX_ORG   = process.env.INFLUX_ORG   || "SAMARCO";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
+const ALLOWED_BUCKET = process.env.ALLOWED_BUCKET || "PIEZOMETRO";
 
 if (!INFLUX_TOKEN) {
   console.error("❌  INFLUX_TOKEN não definido. Defina no arquivo .env ou nas variáveis de ambiente.");
@@ -111,6 +112,17 @@ const server = http.createServer((req, res) => {
 
     req.on("end", () => {
       if (!body.trim()) return sendJSON(res, 400, { error: "Body vazio" });
+
+      // Segurança: o proxy só repassa queries que leem o bucket permitido.
+      // Sem isso, qualquer pessoa com a URL poderia executar Flux arbitrário
+      // (listar/ler outros buckets da organização) usando o nosso token.
+      const buckets = [...body.matchAll(/from\s*\(\s*bucket\s*:\s*"([^"]*)"/g)].map(m => m[1]);
+      if (!buckets.length || buckets.some(b => b !== ALLOWED_BUCKET)) {
+        return sendJSON(res, 403, {
+          error: `Apenas consultas ao bucket "${ALLOWED_BUCKET}" são permitidas`,
+        });
+      }
+
       proxyToInflux(body, res);
     });
 

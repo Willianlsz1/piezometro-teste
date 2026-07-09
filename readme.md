@@ -25,7 +25,11 @@ Dashboard em tempo real para monitoramento de pressão, temperatura e altitude v
 
 O sistema monitora continuamente um piezômetro simulado via ESP32, enviando dados de pressão, temperatura e altitude para o InfluxDB Cloud a cada 10 segundos. Um dashboard web exibe os dados em tempo real com histórico de 24 horas, indicadores visuais de alerta e registro de eventos.
 
-Quando o InfluxDB não está acessível, o dashboard ativa automaticamente um **modo de simulação** para demonstração.
+Quando o InfluxDB não está acessível, o dashboard ativa automaticamente um **modo de simulação** para demonstração — sinalizado por um banner amarelo e pela marcação "(simulação)" nos eventos, para que dados fictícios nunca sejam confundidos com leituras reais.
+
+> ⚠️ **Limitações do protótipo (Fase 1):**
+> - O **BMP180 é um sensor barométrico** (pressão atmosférica) usado apenas como *stand-in* de simulação no Wokwi — ele não mede coluna d'água. No hardware real (Fase 2), o sinal virá de um **transdutor piezométrico submersível 4–20 mA** lido por um ADC ADS1115 (ver documento AquaSense).
+> - Por consequência, a lógica de alerta do protótipo é a de um barômetro (**pressão baixa = perigo**). Em um piezômetro real de barragem a lógica é **invertida**: poro-pressão/nível d'água **alto** = perigo (saturação do maciço). Na Fase 2, basta inverter as comparações nos limiares.
 
 ---
 
@@ -106,7 +110,7 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
    - LED Amarelo → GPIO 33
    - LED Vermelho → GPIO 25
    - Buzzer → GPIO 26
-3. Cole o conteúdo de `sketch.ino` no editor
+3. Cole o conteúdo de `firmware/sketch.ino` no editor (e, opcionalmente, o `firmware/diagram.json` na aba **diagram.json** para montar o circuito automaticamente)
 4. Edite as credenciais no topo do arquivo:
 
 ```cpp
@@ -118,15 +122,16 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 #define INFLUXDB_BUCKET "PIEZOMETRO"
 ```
 
-5. Ajuste a calibração de altitude se necessário:
+5. Os limiares padrão foram calibrados para o valor inicial do BMP180 no Wokwi (1013,25 hPa — pressão ao nível do mar):
 
 ```cpp
-// Calibração para Ribeirão das Neves (~800m altitude)
-#define PRESSAO_NORMAL  912.0   // hPa — pressão para nível NORMAL
-#define PRESSAO_ATENCAO 907.0   // hPa — pressão para nível ATENÇÃO
+#define PRESSAO_NORMAL  1010.0   // hPa — acima disso = NORMAL
+#define PRESSAO_ATENCAO 1005.0   // hPa — 1005–1010 = ATENÇÃO; abaixo = CRÍTICO
 ```
 
-6. Clique em **Start Simulation** — o ESP32 enviará dados a cada 10 segundos
+> Estes valores devem ser **os mesmos** do `CFG` em `index.html` (`thrNormal`/`thrAtencao`), para o dashboard espelhar exatamente o firmware.
+
+6. Clique em **Start Simulation** — o ESP32 enviará dados a cada 10 segundos. Para testar os níveis de alerta, clique no BMP180 durante a simulação e mova o slider de pressão (ex.: 1015 → normal, 1007 → atenção, 1000 → crítico)
 
 ---
 
@@ -147,7 +152,10 @@ INFLUX_URL      = https://SEU-CLUSTER.influxdata.com
 INFLUX_TOKEN    = SEU-TOKEN
 INFLUX_ORG      = SUA-ORG
 ALLOWED_ORIGIN  = https://SEU-USUARIO.github.io
+ALLOWED_BUCKET  = PIEZOMETRO
 ```
+
+> 🔐 **Segurança:** o dashboard só **lê** dados — gere para o proxy um token **somente leitura** restrito ao bucket `PIEZOMETRO` (o token de leitura+escrita fica apenas no firmware). O proxy também rejeita queries que referenciem outros buckets (`ALLOWED_BUCKET`).
 
 > ⚠️ **Importante:** `ALLOWED_ORIGIN` deve ser exatamente `https://SEU-USUARIO.github.io` **sem barra final** e **sem o nome do repositório**.
 
@@ -180,9 +188,10 @@ const PROXY_URL = "https://SEU-APP.onrender.com/query";
 | Variável | Descrição | Exemplo |
 |----------|-----------|---------|
 | `INFLUX_URL` | URL do cluster InfluxDB | `https://us-east-1-1.aws.cloud2.influxdata.com` |
-| `INFLUX_TOKEN` | Token de autenticação | `abc123...` |
+| `INFLUX_TOKEN` | Token de autenticação (**use um token somente leitura**) | `abc123...` |
 | `INFLUX_ORG` | Nome da organização | `SAMARCO` |
 | `ALLOWED_ORIGIN` | Origem permitida pelo CORS | `https://willianlsz1.github.io` |
+| `ALLOWED_BUCKET` | Único bucket que o proxy aceita consultar | `PIEZOMETRO` (padrão) |
 | `PORT` | Porta do servidor (opcional) | `3000` (padrão) |
 
 ---
@@ -193,9 +202,11 @@ O sistema classifica a pressão em três níveis, espelhando a lógica do firmwa
 
 | Nível | Condição | LED | Buzzer |
 |-------|----------|-----|--------|
-| 🟢 **Normal** | Pressão ≥ 912 hPa | Verde contínuo | Silencioso |
-| 🟡 **Atenção** | 907 ≤ Pressão < 912 hPa | Amarelo contínuo | 1 bip a cada 2s |
-| 🔴 **Crítico** | Pressão < 907 hPa | Vermelho piscando | Bips contínuos |
+| 🟢 **Normal** | Pressão ≥ 1010 hPa | Verde contínuo | Silencioso |
+| 🟡 **Atenção** | 1005 ≤ Pressão < 1010 hPa | Amarelo contínuo | 1 bip a cada 2s |
+| 🔴 **Crítico** | Pressão < 1005 hPa | Vermelho piscando | Bips contínuos |
+
+> ⚠️ Lógica de **barômetro** (pressão atmosférica baixa = tempestade/perigo), adequada ao BMP180 da simulação. Em um **piezômetro real**, o perigo é o nível d'água/poro-pressão **subir** — na Fase 2 as comparações se invertem (pressão **alta** = crítico).
 
 ---
 
@@ -203,11 +214,14 @@ O sistema classifica a pressão em três níveis, espelhando a lógica do firmwa
 
 ```
 piezometro-teste/
-├── sketch.ino       # Firmware do ESP32 (C++ / Arduino)
+├── firmware/
+│   ├── sketch.ino   # Firmware do ESP32 (C++ / Arduino)
+│   └── diagram.json # Circuito do Wokwi (ESP32 + BMP180 + OLED + LEDs + buzzer)
 ├── server.js        # Proxy Node.js (Render)
 ├── index.html       # Dashboard web (GitHub Pages)
 ├── package.json     # Dependências Node.js
-└── README.md        # Este arquivo
+├── .env.example     # Modelo de variáveis de ambiente
+└── readme.md        # Este arquivo
 ```
 
 ---

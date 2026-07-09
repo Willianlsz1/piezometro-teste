@@ -121,6 +121,20 @@ header {
 .s-err { background: var(--red); }
 .s-sim { background: var(--yellow); }
 
+/* ── BANNER MODO SIMULAÇÃO ── */
+.sim-banner {
+  display: none;
+  align-items: center; justify-content: center; gap: 8px;
+  padding: 7px 20px;
+  background: var(--yellow-bg);
+  border-bottom: 1px solid var(--yellow-bd);
+  color: var(--yellow);
+  font-family: var(--mono);
+  font-size: 12px; font-weight: 600;
+  letter-spacing: .6px; text-transform: uppercase;
+}
+.sim-banner.on { display: flex; }
+
 /* ── LAYOUT ── */
 .root {
   flex: 1;
@@ -405,6 +419,10 @@ tbody td {
   <span id="stext">Conectando ao InfluxDB...</span>
 </div>
 
+<div class="sim-banner" id="sim-banner">
+  ⚠ Modo simulação — dados fictícios para demonstração (sensor/InfluxDB indisponível)
+</div>
+
 <div class="root">
 
   <!-- MÉTRICAS -->
@@ -430,7 +448,7 @@ tbody td {
     <div class="mcard">
       <div class="mcard-top">
         <span class="mcard-label">Temperatura</span>
-        <span class="mbadge mb-blue">Normal</span>
+        <span class="mbadge mb-blue" id="badge-t">—</span>
       </div>
       <div class="mcard-value cv-blue">
         <span id="val-t">—</span><span class="mcard-unit">°C</span>
@@ -447,7 +465,7 @@ tbody td {
     <div class="mcard">
       <div class="mcard-top">
         <span class="mcard-label">Altitude</span>
-        <span class="mbadge mb-green">Estável</span>
+        <span class="mbadge mb-green" id="badge-a">—</span>
       </div>
       <div class="mcard-value cv-green">
         <span id="val-a">—</span><span class="mcard-unit">m</span>
@@ -456,7 +474,7 @@ tbody td {
       <div class="mcard-stats">
         <div class="mstat"><span class="mstat-lbl">Mín 24h</span><span class="mstat-val" id="a-min">—</span></div>
         <div class="mstat"><span class="mstat-lbl">Máx 24h</span><span class="mstat-val" id="a-max">—</span></div>
-        <div class="mstat"><span class="mstat-lbl">Ref.</span><span class="mstat-val">~800 m</span></div>
+        <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="a-delta">—</span></div>
       </div>
     </div>
   </div>
@@ -544,14 +562,17 @@ const CFG = {
   bucket:     "PIEZOMETRO",
   meas:       "telemetria_samarco",
   poll:       10000,
-  thrNormal:  912.0,
-  thrAtencao: 907.0,
+  // Limiares espelhados no firmware (firmware/sketch.ino):
+  // NORMAL ≥ 1010 hPa · ATENÇÃO 1005–1010 · CRÍTICO < 1005
+  // (o BMP180 do Wokwi inicia em 1013,25 hPa — padrão ao nível do mar)
+  thrNormal:  1010.0,
+  thrAtencao: 1005.0,
 };
 
 const PROXY_URL = "https://piezometro-teste.onrender.com/query";
 
 // ── ESTADO ────────────────────────────────────────────────────────────────────
-let lastLevel = null, failCount = 0, simTimer = null;
+let lastLevel = null, failCount = 0, simTimer = null, simActive = false;
 let alertHistory = [];
 
 // Histórico de sparklines (últimos 20 pontos)
@@ -569,6 +590,17 @@ const stats = {
   t: { min: null, max: null },
   a: { min: null, max: null },
 };
+
+// Janela de estatísticas 24h: semeada pelo histórico do InfluxDB e
+// alimentada pelo polling (24h ÷ 10s = 8640 pontos no máximo).
+// (Os gráficos exibem só os últimos 60 pontos, mas mín/máx/variação
+//  são calculados sobre esta janela completa.)
+const statsWin = { p: [], t: [], a: [] };
+const STATS_MAX = 8640;
+function pushStats(key, val) {
+  statsWin[key].push(val);
+  if (statsWin[key].length > STATS_MAX) statsWin[key].shift();
+}
 
 // ── INFLUXDB ──────────────────────────────────────────────────────────────────
 async function influxQuery(flux) {
@@ -764,8 +796,8 @@ function pushChart(key, label, value) {
 
 function redrawCharts() {
   renderMainChart("chart-p", charts.p, "#3ecf7a", [
-    { v: CFG.thrNormal,  col: "rgba(62,207,122,.5)",  lbl: "912 normal" },
-    { v: CFG.thrAtencao, col: "rgba(240,192,64,.5)",   lbl: "907 atenção" },
+    { v: CFG.thrNormal,  col: "rgba(62,207,122,.5)",  lbl: `${CFG.thrNormal} normal` },
+    { v: CFG.thrAtencao, col: "rgba(240,192,64,.5)",   lbl: `${CFG.thrAtencao} atenção` },
   ]);
   renderMainChart("chart-t", charts.t, "#4da8f0", null);
 }
@@ -779,11 +811,9 @@ function updateStats(key, arr) {
   const fmt = v => v !== null ? v.toFixed(2) : "—";
   document.getElementById(key + "-min").textContent = fmt(stats[key].min);
   document.getElementById(key + "-max").textContent = fmt(stats[key].max);
-  if (key !== "a") {
-    const dEl = document.getElementById(key + "-delta");
-    dEl.textContent = (delta >= 0 ? "+" : "") + delta.toFixed(2);
-    dEl.className = "mstat-val " + (delta > 1 ? "up" : "");
-  }
+  const dEl = document.getElementById(key + "-delta");
+  dEl.textContent = (delta >= 0 ? "+" : "") + delta.toFixed(2);
+  dEl.className = "mstat-val " + (delta > 1 ? "up" : "");
 }
 
 // ── ALERTA ────────────────────────────────────────────────────────────────────
@@ -831,7 +861,8 @@ function addAlertRow(lv, lbl, pressao) {
     critico: "ALERTA — pressão crítica detectada",
   };
   const colors = { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" };
-  alertHistory.unshift({ lv, lbl, msg: msgs[lv] || lbl, pressao: pressao ? pressao.toFixed(3) : "—", time: t, color: colors[lv] || colors.info });
+  const msg = (msgs[lv] || lbl) + (simActive ? " (simulação)" : "");
+  alertHistory.unshift({ lv, lbl, msg, pressao: pressao ? pressao.toFixed(3) : "—", time: t, color: colors[lv] || colors.info });
   if (alertHistory.length > 50) alertHistory.pop();
   renderTable();
 }
@@ -867,9 +898,9 @@ function renderTable() {
 // ── APLICA DADOS ──────────────────────────────────────────────────────────────
 function applyData({ pressao, temperatura, altitude }) {
   const safe = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
-  pressao     = safe(pressao, 912);
-  temperatura = safe(temperatura, 0);
-  altitude    = safe(altitude, 800);
+  pressao     = safe(pressao, 1013);  // padrão do BMP180 no Wokwi (nível do mar)
+  temperatura = safe(temperatura, 24);
+  altitude    = safe(altitude, 0);
 
   const flash = id => {
     const el = document.getElementById(id);
@@ -891,10 +922,22 @@ function applyData({ pressao, temperatura, altitude }) {
   pushChart("t", lbl, temperatura);
   redrawCharts();
 
-  // Stats
-  updateStats("p", charts.p.data);
-  updateStats("t", charts.t.data);
-  updateStats("a", sparks.a);
+  // Stats (janela completa de até 24h, não só os pontos visíveis no gráfico)
+  pushStats("p", pressao);
+  pushStats("t", temperatura);
+  pushStats("a", altitude);
+  updateStats("p", statsWin.p);
+  updateStats("t", statsWin.t);
+  updateStats("a", statsWin.a);
+
+  // Badges dinâmicos de temperatura e altitude
+  const bt = document.getElementById("badge-t");
+  if (temperatura >= 0 && temperatura <= 50) { bt.className = "mbadge mb-blue";   bt.textContent = "Normal"; }
+  else                                        { bt.className = "mbadge mb-yellow"; bt.textContent = "Verificar"; }
+  const ba = document.getElementById("badge-a");
+  const aVar = statsWin.a.length ? Math.max(...statsWin.a) - Math.min(...statsWin.a) : 0;
+  if (aVar <= 5) { ba.className = "mbadge mb-green";  ba.textContent = "Estável"; }
+  else           { ba.className = "mbadge mb-yellow"; ba.textContent = "Variando"; }
 
   setAlert(pressao);
 }
@@ -917,12 +960,18 @@ function updateClock() {
 }
 
 // ── SIMULAÇÃO ─────────────────────────────────────────────────────────────────
-let sP = 912, sT = 36, sA = 800;
+// Valores coerentes com o padrão do BMP180 no Wokwi (1013 hPa ≈ nível do mar)
+let sP = 1013, sT = 24, sA = 5;
 function simTick() {
-  sP = Math.max(903, Math.min(916, sP + (Math.random() - 0.52) * 0.5));
-  sT = Math.max(20, Math.min(60, sT + (Math.random() - 0.5) * 0.3));
-  sA = Math.max(795, Math.min(810, sA + (Math.random() - 0.5) * 0.2));
+  sP = Math.max(1002, Math.min(1016, sP + (Math.random() - 0.52) * 0.5));
+  sT = Math.max(15, Math.min(40, sT + (Math.random() - 0.5) * 0.3));
+  sA = Math.max(0, Math.min(20, sA + (Math.random() - 0.5) * 0.3));
   applyData({ pressao: sP, temperatura: sT, altitude: sA });
+}
+
+function setSimMode(on) {
+  simActive = on;
+  document.getElementById("sim-banner").classList.toggle("on", on);
 }
 
 // ── POLLING ───────────────────────────────────────────────────────────────────
@@ -930,6 +979,7 @@ async function poll() {
   try {
     const data = await fetchLatest();
     if (simTimer) { clearInterval(simTimer); simTimer = null; }
+    setSimMode(false);
     failCount = 0;
     setStatus("live", `InfluxDB conectado — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
     applyData(data);
@@ -942,6 +992,7 @@ async function poll() {
     }
     if (failCount >= 2 && !simTimer) {
       setStatus("sim", "Modo simulação ativo — InfluxDB indisponível");
+      setSimMode(true);
       simTimer = setInterval(simTick, CFG.poll);
       simTick();
     }
@@ -960,26 +1011,31 @@ async function poll() {
     if (hp.length) {
       charts.p.labels = hp.map(h => h.label);
       charts.p.data   = hp.map(h => h.value);
-      updateStats("p", charts.p.data);
+      statsWin.p      = hp.map(h => h.value);   // semeia a janela 24h
+      updateStats("p", statsWin.p);
       addInfoRow(`Histórico de pressão carregado (${hp.length} pontos)`);
     }
     if (ht.length) {
       charts.t.labels = ht.map(h => h.label);
       charts.t.data   = ht.map(h => h.value);
-      updateStats("t", charts.t.data);
+      statsWin.t      = ht.map(h => h.value);
+      updateStats("t", statsWin.t);
       addInfoRow(`Histórico de temperatura carregado (${ht.length} pontos)`);
     }
   } catch (e) {
-    // Fallback simulado
+    // Fallback simulado (valores coerentes com o BMP180 do Wokwi)
     const now = Date.now();
     for (let i = 48; i >= 0; i--) {
       const lbl = new Date(now - i * 30 * 60 * 1000)
         .toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      charts.p.labels.push(lbl); charts.p.data.push(parseFloat((912 + (Math.random() - 0.5) * 3).toFixed(3)));
-      charts.t.labels.push(lbl); charts.t.data.push(parseFloat((25 + Math.random() * 15).toFixed(1)));
+      charts.p.labels.push(lbl); charts.p.data.push(parseFloat((1013 + (Math.random() - 0.5) * 3).toFixed(3)));
+      charts.t.labels.push(lbl); charts.t.data.push(parseFloat((22 + Math.random() * 8).toFixed(1)));
     }
-    updateStats("p", charts.p.data);
-    updateStats("t", charts.t.data);
+    statsWin.p = charts.p.data.slice();
+    statsWin.t = charts.t.data.slice();
+    updateStats("p", statsWin.p);
+    updateStats("t", statsWin.t);
+    addInfoRow("Histórico do InfluxDB indisponível — exibindo histórico simulado");
   }
 
   redrawCharts();
