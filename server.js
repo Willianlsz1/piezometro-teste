@@ -327,7 +327,16 @@ const server = http.createServer((req, res) => {
     return res.end();
   }
 
-  const url = new URL(req.url, `http://localhost`);
+  // Rate limiting — aplicado apenas em /query para proteger o proxy InfluxDB
+  if (url.pathname === "/query") {
+    if (!checkRateLimit(ip)) {
+      metrics.blockedByRate++;
+      log("WARN", "Rate limit excedido", { ip, path: url.pathname });
+      return sendJSON(res, 429, { error: "Too Many Requests — máximo 10 req/s por IP" });
+    }
+  }
+
+  log("INFO", `${req.method} ${url.pathname}`, { ip });
 
   // /query → proxy para InfluxDB
   if (req.method === "POST" && url.pathname === "/query") {
@@ -482,3 +491,5 @@ server.listen(PORT, () => {
   setInterval(checkAlerts, ALERT_POLL_SEC * 1000);
   checkAlerts();
 });
+
+module.exports = { server, metrics, checkRateLimit }; // Exportado para uso nos testes
