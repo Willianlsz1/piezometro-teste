@@ -86,6 +86,10 @@
  * vigia o InfluxDB — ver README. No hardware real de campo, um módulo
  * SIM7600 permitiria SMS direto do local, sem depender do servidor.
  *
+ * IDENTIFICAÇÃO DO INSTRUMENTO: cada placa se identifica com um ID único
+ * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), enviado como tag "piezometro"
+ * ao InfluxDB — é esse ID que aparece no dashboard e nos alertas.
+ *
  * CONEXÕES NA MAQUETE (ver docs/PROTOTIPO_FISICO.md para a tabela completa):
  * JSN-SR04T: VCC→5V (VIN)  GND→GND  TRIG→GPIO5  ECHO→[divisor 1k/2k]→GPIO18
  * OLED:      VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
@@ -111,6 +115,7 @@
 #define SERVER_URL  "https://SEU-APP.onrender.com/ingest"  // endpoint /ingest do server.js
 #define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY do servidor
 #define MEASUREMENT "telemetria_samarco"                   // (info) measurement gravado pelo servidor
+#define PIEZOMETRO_ID "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
 
 // ===== SENSOR ULTRASSÔNICO JSN-SR04T =====
 #define PIN_TRIG 5
@@ -174,6 +179,7 @@ void setup() {
   Serial.println("  SAMARCO - NIVEL DE AGUA EM PIEZOMETROS");
   Serial.println("  Protótipo físico (JSN-SR04T)");
   Serial.println("  Telemetria + Alertas + Store & Forward");
+  Serial.println("  Instrumento: " PIEZOMETRO_ID);
   Serial.println("===========================================");
   Serial.println();
 
@@ -283,17 +289,17 @@ void sincronizarNTP() {
 
 // ===== FUNÇÃO: BUFFERIZAR LEITURA (store & forward) =====
 void bufferizarLeitura() {
-  char item[96];
+  char item[128];
 
   if (ntpOk) {
     // Timestamp em SEGUNDOS — o servidor converte para nanossegundos
     long ts = (long)time(nullptr);
     snprintf(item, sizeof(item),
-             "{\"nivel_agua\":%.3f,\"ts\":%ld}",
+             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f,\"ts\":%ld}",
              nivelAgua, ts);
   } else {
     snprintf(item, sizeof(item),
-             "{\"nivel_agua\":%.3f}",
+             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f}",
              nivelAgua);
   }
 

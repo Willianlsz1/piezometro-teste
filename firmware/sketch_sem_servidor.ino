@@ -85,6 +85,11 @@
  * faixa (NORMAL↔ATENÇÃO↔CRÍTICO), com reenvio a cada 15 min enquanto o nível
  * permanecer CRÍTICO. Deixe TELEGRAM_BOT_TOKEN vazio para desativar.
  *
+ * IDENTIFICAÇÃO DO INSTRUMENTO: cada placa se identifica com um ID único
+ * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), gravado como tag "piezometro"
+ * no line protocol do InfluxDB — é esse ID que aparece no dashboard e nos
+ * alertas do Telegram.
+ *
  * CONEXÕES NO WOKWI (ver firmware/diagram.json):
  * BMP180:  VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
  * OLED:    VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
@@ -113,6 +118,7 @@
 #define INFLUXDB_BUCKET "PIEZOMETRO"
 #define INFLUXDB_TOKEN  "COLE-AQUI-SEU-TOKEN-DE-ESCRITA"   // token com permissão de ESCRITA no bucket
 #define MEASUREMENT     "telemetria_samarco"
+#define PIEZOMETRO_ID   "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
 // Telegram (opcional): deixe o token vazio para desativar os alertas
 #define TELEGRAM_BOT_TOKEN ""    // ex.: "123456:ABC-DEF..." (criar com @BotFather)
 #define TELEGRAM_CHAT_ID   ""    // ex.: "-100123456789"
@@ -186,6 +192,7 @@ void setup() {
   Serial.println("  SAMARCO - NIVEL DE AGUA EM PIEZOMETROS");
   Serial.println("  Telemetria + Alertas SEM SERVIDOR");
   Serial.println("  (placa -> InfluxDB direto + Telegram direto)");
+  Serial.println("  Instrumento: " PIEZOMETRO_ID);
   Serial.println("===========================================");
   Serial.println();
 
@@ -305,7 +312,8 @@ void sincronizarNTP() {
 
 // ===== FUNÇÃO: BUFFERIZAR LEITURA (store & forward, em LINE PROTOCOL) =====
 void bufferizarLeitura() {
-  String linha = String(MEASUREMENT) + " nivel_agua=" + String(nivelAgua, 3) +
+  String linha = String(MEASUREMENT) + ",piezometro=" + PIEZOMETRO_ID +
+                 " nivel_agua=" + String(nivelAgua, 3) +
                  ",pressao=" + String(pressao, 3) +
                  ",temperatura=" + String(temperatura, 2);
 
