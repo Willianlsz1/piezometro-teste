@@ -17,6 +17,7 @@ Sistema online de **monitoramento do nível de água em piezômetros** (desafio 
   - [4. Dashboard (GitHub Pages)](#4-dashboard-github-pages)
 - [Variáveis de Ambiente](#variáveis-de-ambiente)
 - [Alertas por Telegram e SMS](#alertas-por-telegram-e-sms)
+- [Arquitetura alternativa: sem servidor](#arquitetura-alternativa-sem-servidor)
 - [Níveis de Alerta](#níveis-de-alerta)
 - [Estrutura do Projeto](#estrutura-do-projeto)
 
@@ -240,6 +241,49 @@ O `server.js` verifica o último `nivel_agua` no InfluxDB a cada `ALERT_POLL_SEC
 3. Defina `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` e `TWILIO_TO` no Render
 
 > 💡 **No hardware real (Fase 2)**, um módulo celular **SIM7600** no próprio ESP32 permitiria enviar SMS direto do campo, sem depender do servidor — importante como redundância se a nuvem estiver fora.
+
+---
+
+## Arquitetura alternativa: sem servidor
+
+Além da arquitetura padrão (com o `server.js` como proxy no Render), o projeto também suporta um modo **sem servidor**, em que o navegador conversa direto com o InfluxDB Cloud:
+
+```
+┌──────────┐   escreve    ┌──────────────────┐   lê (token   ┌───────────┐
+│  ESP32   │ ───────────▶ │  InfluxDB Cloud   │  somente     │ Dashboard │
+│ (Wokwi)  │              │  (bucket          │◀──────────── │ (browser) │
+└──────────┘              │  PIEZOMETRO)      │   leitura)   └───────────┘
+     │                    └──────────────────┘
+     │ notifica direto
+     ▼
+┌──────────┐
+│ Telegram │
+└──────────┘
+```
+
+A API v2 do InfluxDB Cloud aceita requisições **cross-origin** vindas do navegador, então o dashboard consegue consultar o bucket diretamente, sem precisar de um servidor Node.js no meio.
+
+**Quando usar:** em demonstrações rápidas e no TCC, quando o objetivo é reduzir peças em movimento — sem o Render (e sua hibernação após 15 min de inatividade), sem `server.js`, sem variáveis de ambiente no Render. É a forma mais simples de deixar o dashboard "sempre ligado" para a banca, já que ele não depende de nenhum serviço acordar.
+
+**Trade-offs:**
+
+- ⚠️ O token do InfluxDB usado no `index.html` fica **visível no HTML publicado** (GitHub Pages é público). Por isso ele precisa ser **somente leitura** — nunca use aqui o token de escrita do firmware.
+- ⚠️ Sem `server.js` não há motor de alertas contínuo: os alertas por Telegram só disparam enquanto o **ESP32/Wokwi estiver ligado e simulando** (o firmware notifica o Telegram diretamente), e não há SMS via Twilio nem histórico em `GET /alerts`.
+
+**Passos:**
+
+1. Crie **2 tokens** no InfluxDB (Load Data → API Tokens):
+   - um de **escrita**, usado no firmware `firmware/sketch_sem_servidor.ino`;
+   - um **somente leitura** do bucket `PIEZOMETRO`, usado em `INFLUX_DIRECT.token` no `index.html`.
+2. Use o firmware `firmware/sketch_sem_servidor.ino` no Wokwi — ele escreve direto no InfluxDB (e, opcionalmente, chama a API do Telegram), sem passar pelo Render.
+3. Preencha o objeto `INFLUX_DIRECT` no `index.html` (`url`, `org` e o `token` de leitura). Com o token preenchido, o dashboard passa a consultar o InfluxDB diretamente e o status exibe "InfluxDB conectado (direto)".
+
+| | Com servidor | Sem servidor |
+|---|---|---|
+| Segurança do token | Token fica só no Render (nunca exposto) | Token de leitura fica exposto no HTML público |
+| Alertas 24/7 | Sim (server.js roda mesmo com o ESP32 desligado) | Não — só com a placa ligada |
+| Hibernação | Render dorme após 15 min de inatividade | Não há servidor para hibernar |
+| Nº de serviços | ESP32 + Render + InfluxDB | ESP32 + InfluxDB |
 
 ---
 

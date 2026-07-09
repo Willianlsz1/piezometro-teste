@@ -569,6 +569,18 @@ const CFG = {
   thrCritico: 15.0,
 };
 
+// ── MODO DE CONEXÃO ──────────────────────────────────────────────────────────
+// COM SERVIDOR (padrão): deixe INFLUX_DIRECT.token = "" — o dashboard consulta
+// o InfluxDB através do proxy (PROXY_URL), que esconde o token no Render.
+// SEM SERVIDOR: preencha token com um token SOMENTE LEITURA do bucket
+// PIEZOMETRO (InfluxDB → Load Data → API Tokens). O token fica visível no
+// HTML publicado — por isso ele deve ser apenas de leitura, nunca o de escrita!
+const INFLUX_DIRECT = {
+  url:   "https://us-east-1-1.aws.cloud2.influxdata.com",
+  org:   "a6d8947f7ea6219b",
+  token: "",   // preenchido → dispensa o Render
+};
+
 const PROXY_URL = "https://piezometro-teste.onrender.com/query";
 
 // ── ESTADO ────────────────────────────────────────────────────────────────────
@@ -607,12 +619,23 @@ async function influxQuery(flux) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
-    const r = await fetch(PROXY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/vnd.flux" },
-      body: flux,
-      signal: ctrl.signal,
-    });
+    const r = INFLUX_DIRECT.token
+      ? await fetch(`${INFLUX_DIRECT.url}/api/v2/query?org=${encodeURIComponent(INFLUX_DIRECT.org)}`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Token ${INFLUX_DIRECT.token}`,
+            "Content-Type": "application/vnd.flux",
+            "Accept": "application/csv",
+          },
+          body: flux,
+          signal: ctrl.signal,
+        })
+      : await fetch(PROXY_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/vnd.flux" },
+          body: flux,
+          signal: ctrl.signal,
+        });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.text();
   } finally { clearTimeout(timer); }
@@ -981,7 +1004,8 @@ async function poll() {
     if (simTimer) { clearInterval(simTimer); simTimer = null; }
     setSimMode(false);
     failCount = 0;
-    setStatus("live", `InfluxDB conectado — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
+    const modo = INFLUX_DIRECT.token ? "InfluxDB conectado (direto)" : "InfluxDB conectado (via servidor)";
+    setStatus("live", `${modo} — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
     applyData(data);
   } catch (e) {
     failCount++;
