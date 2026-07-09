@@ -1,6 +1,6 @@
 # 🟢 Samarco — Sistema de Monitoramento de Piezômetro
 
-Dashboard em tempo real para monitoramento de pressão, temperatura e altitude via sensor BMP180 em ESP32, com armazenamento no InfluxDB Cloud e visualização em GitHub Pages.
+Sistema online de **monitoramento do nível de água em piezômetros** (desafio SAGA SENAI / Samarco): sensores automáticos no ESP32, transmissão em tempo real para o InfluxDB Cloud, dashboard interativo no GitHub Pages e **alertas preventivos por Telegram e SMS** disparados pelo servidor.
 
 ---
 
@@ -16,6 +16,7 @@ Dashboard em tempo real para monitoramento de pressão, temperatura e altitude v
   - [3. Servidor Proxy (Render)](#3-servidor-proxy-render)
   - [4. Dashboard (GitHub Pages)](#4-dashboard-github-pages)
 - [Variáveis de Ambiente](#variáveis-de-ambiente)
+- [Alertas por Telegram e SMS](#alertas-por-telegram-e-sms)
 - [Níveis de Alerta](#níveis-de-alerta)
 - [Estrutura do Projeto](#estrutura-do-projeto)
 
@@ -23,44 +24,46 @@ Dashboard em tempo real para monitoramento de pressão, temperatura e altitude v
 
 ## Visão Geral
 
-O sistema monitora continuamente um piezômetro simulado via ESP32, enviando dados de pressão, temperatura e altitude para o InfluxDB Cloud a cada 10 segundos. Um dashboard web exibe os dados em tempo real com histórico de 24 horas, indicadores visuais de alerta e registro de eventos.
+O sistema monitora continuamente um piezômetro simulado via ESP32, enviando **nível d'água (m)**, pressão e temperatura para o InfluxDB Cloud a cada 10 segundos — com *store & forward*: leituras feitas sem rede ficam retidas em buffer local (com timestamp NTP) e são reenviadas quando a conexão volta, sem perda de dados.
+
+Um dashboard web exibe os dados em tempo real com histórico de 24 horas, indicadores visuais de alerta e registro de eventos. Em paralelo, o **motor de alertas do servidor** vigia o InfluxDB e dispara notificações por **Telegram** (gratuito) e/ou **SMS via Twilio** quando o nível muda de faixa — o alerta chega mesmo sem ninguém olhando o dashboard, cumprindo o requisito de "alertas preventivos" da demanda.
 
 Quando o InfluxDB não está acessível, o dashboard ativa automaticamente um **modo de simulação** para demonstração — sinalizado por um banner amarelo e pela marcação "(simulação)" nos eventos, para que dados fictícios nunca sejam confundidos com leituras reais.
 
 > ⚠️ **Limitações do protótipo (Fase 1):**
-> - O **BMP180 é um sensor barométrico** (pressão atmosférica) usado apenas como *stand-in* de simulação no Wokwi — ele não mede coluna d'água. No hardware real (Fase 2), o sinal virá de um **transdutor piezométrico submersível 4–20 mA** lido por um ADC ADS1115 (ver documento AquaSense).
-> - Por consequência, a lógica de alerta do protótipo é a de um barômetro (**pressão baixa = perigo**). Em um piezômetro real de barragem a lógica é **invertida**: poro-pressão/nível d'água **alto** = perigo (saturação do maciço). Na Fase 2, basta inverter as comparações nos limiares.
+> - O **BMP180 é um sensor barométrico** usado apenas como *stand-in* no Wokwi — ele não mede coluna d'água. O firmware converte a pressão do slider em um **nível d'água simulado** pela escala didática de **10 hPa = 1 m** (`SIM_ESCALA`). No hardware real (Fase 2), o sinal virá de um **transdutor piezométrico submersível 4–20 mA** lido por um ADC ADS1115, e a conversão passa a ser física real (1 mH₂O ≈ 98,07 hPa), calibrada na instalação.
+> - A lógica de alerta já é a **correta para piezômetro**: nível d'água **alto** = perigo (saturação do maciço).
 
 ---
 
 ## Arquitetura do Sistema
 
 ```
-┌─────────────────┐         ┌──────────────────────┐
-│   ESP32 + BMP180│         │                      │
-│   (Wokwi Sim.)  │──POST──▶│   InfluxDB Cloud     │
-│                 │         │   (us-east-1 AWS)    │
-└─────────────────┘         └──────────┬───────────┘
-                                        │
-                                   Flux Query
-                                        │
-                             ┌──────────▼───────────┐
-                             │   Render.com          │
-                             │   server.js (proxy)  │
-                             │   Node.js            │
-                             └──────────┬───────────┘
-                                        │
-                                   HTTP /query
-                                        │
-                             ┌──────────▼───────────┐
-                             │   GitHub Pages        │
-                             │   index.html          │
-                             │   (Dashboard)        │
-                             └──────────────────────┘
+┌─────────────────┐
+│   ESP32 + BMP180│
+│   (Wokwi Sim.)  │
+└────────┬────────┘
+         │
+  POST /ingest (JSON)
+         │
+┌────────▼───────────────┐      ┌──────────────┐
+│   Render.com            │─────▶│ 🔔 Telegram  │
+│   server.js             │      │ 📱 SMS Twilio│
+│   (ingestão + proxy +   │      └──────────────┘
+│    motor de alertas)    │
+└─────┬──────────────┬────┘
+      │              │
+ Flux Write/Query   HTTP /query
+      │              │
+┌─────▼────────┐ ┌───▼───────────────┐
+│ InfluxDB      │ │   GitHub Pages     │
+│ Cloud         │ │   index.html       │
+│ (us-east-1)   │ │   (Dashboard)     │
+└───────────────┘ └───────────────────┘
 ```
 
 **Por que o proxy?**
-O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O `server.js` no Render atua como intermediário — recebe as queries do dashboard e as repassa ao InfluxDB com o token seguro via variável de ambiente.
+O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O `server.js` no Render atua como intermediário — recebe as queries do dashboard e as repassa ao InfluxDB com o token seguro via variável de ambiente. Agora a placa também fala com o InfluxDB através dele: o ESP32 posta as leituras em `/ingest`, e é o `server.js` quem grava usando o token de escrita. Assim, **nenhum token do InfluxDB fica no firmware** — a placa só carrega a `DEVICE_KEY`, uma chave de dispositivo sem acesso direto ao banco.
 
 ---
 
@@ -68,10 +71,11 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Firmware | C++ (Arduino), ESP32, BMP180 |
+| Firmware | C++ (Arduino), ESP32, BMP180, store & forward com NTP |
 | Simulação | [Wokwi](https://wokwi.com) |
 | Banco de dados | [InfluxDB Cloud](https://cloud2.influxdata.com) (Flux) |
-| Proxy / Backend | Node.js puro (sem frameworks) |
+| Proxy / Backend | Node.js puro (sem frameworks) + motor de alertas |
+| Notificações | Telegram Bot API (gratuito) e Twilio SMS (opcional) |
 | Hospedagem backend | [Render.com](https://render.com) (plano gratuito) |
 | Dashboard / Frontend | HTML + CSS + Canvas API |
 | Hospedagem frontend | [GitHub Pages](https://pages.github.com) |
@@ -114,24 +118,28 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 4. Edite as credenciais no topo do arquivo:
 
 ```cpp
-#define WIFI_SSID      "Wokwi-GUEST"
-#define WIFI_PASS      ""
-#define INFLUXDB_URL   "https://SEU-CLUSTER.influxdata.com"
-#define INFLUXDB_TOKEN "SEU-TOKEN"
-#define INFLUXDB_ORG   "SUA-ORG"
-#define INFLUXDB_BUCKET "PIEZOMETRO"
+#define WIFI_SSID   "Wokwi-GUEST"
+#define WIFI_PASS   ""
+#define SERVER_URL  "https://SEU-APP.onrender.com/ingest"
+#define DEVICE_KEY  "troque-esta-chave"
 ```
 
-5. Os limiares padrão foram calibrados para o valor inicial do BMP180 no Wokwi (1013,25 hPa — pressão ao nível do mar):
+> A placa não fala mais direto com o InfluxDB — ela posta as leituras (JSON) no `/ingest` do `server.js` no Render, autenticando com `DEVICE_KEY` no header `x-device-key`. As credenciais do InfluxDB (`INFLUX_URL`, `INFLUX_WRITE_TOKEN`, `INFLUX_ORG`) ficam só nas variáveis de ambiente do Render — nunca no firmware.
+
+5. O firmware converte a pressão do BMP180 em nível d'água simulado (10 hPa = 1 m) e classifica pelos limiares de **nível**:
 
 ```cpp
-#define PRESSAO_NORMAL  1010.0   // hPa — acima disso = NORMAL
-#define PRESSAO_ATENCAO 1005.0   // hPa — 1005–1010 = ATENÇÃO; abaixo = CRÍTICO
+#define PRESSAO_REF 1013.25  // hPa — padrão do BMP180 no Wokwi ↔ nível 10,0 m
+#define NIVEL_ATENCAO 12.0   // m — acima disso = ATENÇÃO
+#define NIVEL_CRITICO 15.0   // m — acima disso = CRÍTICO
 ```
 
-> Estes valores devem ser **os mesmos** do `CFG` em `index.html` (`thrNormal`/`thrAtencao`), para o dashboard espelhar exatamente o firmware.
+> Estes valores devem ser **os mesmos** do `CFG` em `index.html` (`thrAtencao`/`thrCritico`) e do servidor (`NIVEL_ATENCAO`/`NIVEL_CRITICO`), para dashboard e notificações espelharem exatamente o firmware.
 
-6. Clique em **Start Simulation** — o ESP32 enviará dados a cada 10 segundos. Para testar os níveis de alerta, clique no BMP180 durante a simulação e mova o slider de pressão (ex.: 1015 → normal, 1007 → atenção, 1000 → crítico)
+6. Clique em **Start Simulation** — o ESP32 enviará dados a cada 10 segundos. Para testar os alertas, clique no BMP180 e mova o slider de pressão:
+   - **1013 hPa → 10,0 m** 🟢 normal
+   - **1035 hPa → 12,2 m** 🟡 atenção
+   - **1065 hPa → 15,2 m** 🔴 crítico (e o servidor dispara Telegram/SMS)
 
 ---
 
@@ -148,14 +156,20 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 5. Em **Environment Variables**, adicione:
 
 ```
-INFLUX_URL      = https://SEU-CLUSTER.influxdata.com
-INFLUX_TOKEN    = SEU-TOKEN
-INFLUX_ORG      = SUA-ORG
-ALLOWED_ORIGIN  = https://SEU-USUARIO.github.io
-ALLOWED_BUCKET  = PIEZOMETRO
+INFLUX_URL         = https://SEU-CLUSTER.influxdata.com
+INFLUX_TOKEN       = SEU-TOKEN-SOMENTE-LEITURA
+INFLUX_WRITE_TOKEN = SEU-TOKEN-DE-ESCRITA
+INFLUX_ORG         = SUA-ORG
+ALLOWED_ORIGIN     = https://SEU-USUARIO.github.io
+ALLOWED_BUCKET     = PIEZOMETRO
+DEVICE_KEY         = troque-esta-chave
+
+# Notificações (opcionais — ver seção "Alertas por Telegram e SMS")
+TELEGRAM_BOT_TOKEN = 123456:ABC-DEF...
+TELEGRAM_CHAT_ID   = -100123456789
 ```
 
-> 🔐 **Segurança:** o dashboard só **lê** dados — gere para o proxy um token **somente leitura** restrito ao bucket `PIEZOMETRO` (o token de leitura+escrita fica apenas no firmware). O proxy também rejeita queries que referenciem outros buckets (`ALLOWED_BUCKET`).
+> 🔐 **Segurança:** o dashboard só **lê** dados — o token em `INFLUX_TOKEN` fica **somente leitura**, restrito ao bucket `PIEZOMETRO` e usado pelo `/query`. Quem escreve agora é o próprio servidor, usando `INFLUX_WRITE_TOKEN` no `/ingest` — a placa nunca vê nenhum dos dois; ela só carrega a `DEVICE_KEY`, validada no header `x-device-key`. O proxy também rejeita queries que referenciem outros buckets (`ALLOWED_BUCKET`).
 
 > ⚠️ **Importante:** `ALLOWED_ORIGIN` deve ser exatamente `https://SEU-USUARIO.github.io` **sem barra final** e **sem o nome do repositório**.
 
@@ -189,24 +203,57 @@ const PROXY_URL = "https://SEU-APP.onrender.com/query";
 |----------|-----------|---------|
 | `INFLUX_URL` | URL do cluster InfluxDB | `https://us-east-1-1.aws.cloud2.influxdata.com` |
 | `INFLUX_TOKEN` | Token de autenticação (**use um token somente leitura**) | `abc123...` |
+| `INFLUX_WRITE_TOKEN` | Token de **escrita**, usado só pelo `/ingest` (se ausente, usa `INFLUX_TOKEN`) | `def456...` |
 | `INFLUX_ORG` | Nome da organização | `SAMARCO` |
 | `ALLOWED_ORIGIN` | Origem permitida pelo CORS | `https://willianlsz1.github.io` |
 | `ALLOWED_BUCKET` | Único bucket que o proxy aceita consultar | `PIEZOMETRO` (padrão) |
 | `PORT` | Porta do servidor (opcional) | `3000` (padrão) |
+| `NIVEL_ATENCAO` | Limiar de atenção do nível d'água (m) | `12` (padrão) |
+| `NIVEL_CRITICO` | Limiar crítico do nível d'água (m) | `15` (padrão) |
+| `ALERT_POLL_SEC` | Intervalo de verificação do motor de alertas (s) | `60` (padrão) |
+| `ALERT_REPEAT_MIN` | Reenvio do alerta crítico enquanto persistir (min) | `15` (padrão) |
+| `TELEGRAM_BOT_TOKEN` | Token do bot do Telegram (opcional) | `123456:ABC-DEF...` |
+| `TELEGRAM_CHAT_ID` | Chat/grupo que recebe os alertas | `-100123456789` |
+| `TWILIO_ACCOUNT_SID` | SID da conta Twilio para SMS (opcional) | `ACxxxxxxxx...` |
+| `TWILIO_AUTH_TOKEN` | Token de autenticação Twilio | `xxxxxxxx` |
+| `TWILIO_FROM` | Número Twilio remetente (formato E.164) | `+15551234567` |
+| `TWILIO_TO` | Número que recebe os SMS | `+5531999999999` |
+| `DEVICE_KEY` | Chave que a placa envia no header `x-device-key` ao chamar `/ingest` (vazio = sem autenticação, só em dev) | `troque-esta-chave` |
+
+---
+
+## Alertas por Telegram e SMS
+
+O `server.js` verifica o último `nivel_agua` no InfluxDB a cada `ALERT_POLL_SEC` segundos e notifica **nas transições de faixa** (anti-spam: não repete a mesma faixa; o nível CRÍTICO é reenviado a cada `ALERT_REPEAT_MIN` minutos enquanto persistir). O histórico de notificações fica exposto em `GET /alerts`.
+
+### Telegram (gratuito — recomendado para o TCC)
+
+1. No Telegram, fale com o **@BotFather** → `/newbot` → copie o **token**
+2. Adicione o bot a um grupo (ou fale com ele no privado) e envie uma mensagem qualquer
+3. Acesse `https://api.telegram.org/bot<TOKEN>/getUpdates` e copie o `chat.id`
+4. Defina `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` no Render
+
+### SMS via Twilio (opcional, pago)
+
+1. Crie uma conta em [twilio.com](https://www.twilio.com) (o modo *trial* envia SMS para números verificados)
+2. Compre/ative um número remetente e copie **Account SID** e **Auth Token** do console
+3. Defina `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` e `TWILIO_TO` no Render
+
+> 💡 **No hardware real (Fase 2)**, um módulo celular **SIM7600** no próprio ESP32 permitiria enviar SMS direto do campo, sem depender do servidor — importante como redundância se a nuvem estiver fora.
 
 ---
 
 ## Níveis de Alerta
 
-O sistema classifica a pressão em três níveis, espelhando a lógica do firmware:
+O sistema classifica o **nível d'água** em três faixas — a mesma lógica no firmware (LEDs/buzzer), no dashboard (badges/gráfico) e no servidor (Telegram/SMS):
 
-| Nível | Condição | LED | Buzzer |
-|-------|----------|-----|--------|
-| 🟢 **Normal** | Pressão ≥ 1010 hPa | Verde contínuo | Silencioso |
-| 🟡 **Atenção** | 1005 ≤ Pressão < 1010 hPa | Amarelo contínuo | 1 bip a cada 2s |
-| 🔴 **Crítico** | Pressão < 1005 hPa | Vermelho piscando | Bips contínuos |
+| Nível | Condição | LED | Buzzer | Notificação |
+|-------|----------|-----|--------|-------------|
+| 🟢 **Normal** | Nível < 12 m | Verde contínuo | Silencioso | Só ao retornar de um alerta |
+| 🟡 **Atenção** | 12 ≤ Nível < 15 m | Amarelo contínuo | 1 bip a cada 2s | Telegram/SMS na transição |
+| 🔴 **Crítico** | Nível ≥ 15 m | Vermelho piscando | Bips contínuos | Telegram/SMS na transição + repetição a cada 15 min |
 
-> ⚠️ Lógica de **barômetro** (pressão atmosférica baixa = tempestade/perigo), adequada ao BMP180 da simulação. Em um **piezômetro real**, o perigo é o nível d'água/poro-pressão **subir** — na Fase 2 as comparações se invertem (pressão **alta** = crítico).
+> ✅ Lógica correta de piezômetro: nível d'água **alto** = perigo (saturação do maciço da barragem).
 
 ---
 
@@ -229,5 +276,6 @@ piezometro-teste/
 ## 📝 Observações
 
 - O plano gratuito do Render hiberna após **15 minutos de inatividade**. A primeira requisição após hibernação pode demorar até 50 segundos. O dashboard ativa automaticamente o modo simulação enquanto aguarda.
+- ⚠️ A hibernação também **pausa o motor de alertas** (Telegram/SMS). Para monitoramento contínuo, configure um ping externo gratuito (ex.: [UptimeRobot](https://uptimerobot.com) ou [cron-job.org](https://cron-job.org)) chamando `https://SEU-APP.onrender.com/health` a cada 10 minutos — isso mantém o serviço acordado. Em produção real, use um plano pago ou infraestrutura dedicada.
 - O token do InfluxDB **nunca deve ser commitado** no repositório. Use sempre variáveis de ambiente.
 - O simulador Wokwi usa a rede `Wokwi-GUEST` (sem senha), que possui acesso à internet para enviar dados ao InfluxDB.

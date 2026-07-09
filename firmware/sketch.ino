@@ -1,38 +1,52 @@
 /*
  * ============================================================================
- * SISTEMA DE ALERTAS SAMARCO — BMP180 + OLED + LEDS + BUZZER + INFLUXDB
+ * SAMARCO — MONITORAMENTO ONLINE DO NÍVEL DE ÁGUA EM PIEZÔMETROS
+ * ESP32 + BMP180 (stand-in) + OLED + LEDS + BUZZER + SERVIDOR (JSON) + STORE&FORWARD
  * ============================================================================
  *
- * ⚠️ NOTA CONCEITUAL IMPORTANTE (para o TCC):
- * O BMP180 é um sensor BAROMÉTRICO — mede pressão ATMOSFÉRICA, não a pressão
- * da coluna d'água. Ele é usado aqui apenas como *stand-in* de simulação no
- * Wokwi, já que o simulador não possui transdutor piezométrico. No hardware
- * real (Fase 2), o sinal virá de um transdutor de pressão submersível
- * 4–20 mA lido por um ADC ADS1115 (ver documento AquaSense).
+ * ⚠️ NOTA CONCEITUAL (para o TCC):
+ * O desafio SAGA pede monitoramento do NÍVEL DE ÁGUA (metros de coluna
+ * d'água). O Wokwi não possui transdutor piezométrico, então usamos o BMP180
+ * (barômetro) como *stand-in*: a pressão do slider é convertida em um nível
+ * d'água SIMULADO pela escala didática SIM_ESCALA (10 hPa = 1 m). No hardware
+ * real (Fase 2), o nível virá de um transdutor de pressão submersível
+ * 4–20 mA lido por um ADC ADS1115 — e a conversão passa a ser física real
+ * (1 mH2O ≈ 98,07 hPa), calibrada na instalação.
  *
- * Além disso, a lógica de alerta abaixo (pressão BAIXA = perigo) é a lógica
- * de um barômetro. Em um piezômetro real de barragem a lógica é INVERTIDA:
- * poro-pressão / nível d'água ALTO = perigo (saturação do maciço). Na Fase 2,
- * basta inverter as comparações em determinarAlerta().
+ * LÓGICA DE ALERTA (correta para piezômetro: nível ALTO = perigo):
+ * 🟢 NORMAL   : nível < 12 m           → LED Verde, buzzer OFF
+ * 🟡 ATENÇÃO  : 12 m ≤ nível < 15 m    → LED Amarelo, beep lento (2 s)
+ * 🔴 CRÍTICO  : nível ≥ 15 m           → LED Vermelho pisca, beep rápido
  *
- * SISTEMA DE 3 NÍVEIS DE ALERTA (espelhado no dashboard):
- * 🟢 NORMAL   : Pressão ≥ 1010 hPa → LED Verde ON, Buzzer OFF
- * 🟡 ATENÇÃO  : 1005–1010 hPa      → LED Amarelo ON, Buzzer beep lento (2 s)
- * 🔴 CRÍTICO  : Pressão < 1005 hPa → LED Vermelho PISCA, Buzzer beep rápido
+ * Com o padrão do Wokwi (1013,25 hPa) o nível simulado é 10,0 m (NORMAL).
+ * Durante a simulação, clique no BMP180 e suba a pressão no slider:
+ *   1013 hPa → 10,0 m (normal) · 1035 hPa → 12,2 m (atenção)
+ *   1065 hPa → 15,2 m (CRÍTICO)
  *
- * (O Wokwi inicia o BMP180 em 1013,25 hPa — clique no sensor durante a
- *  simulação e mova o slider de pressão para testar os três níveis.)
+ * ENVIO: o firmware NÃO fala mais direto com o InfluxDB — ele não guarda
+ * nenhum token do banco, apenas a DEVICE_KEY do NOSSO servidor. Cada leitura
+ * vira um JSON simples, que é enviado por HTTPS ao endpoint /ingest do
+ * server.js (rodando no Render); é o servidor quem repassa os dados ao
+ * InfluxDB, com a chave de verdade guardada só lá.
+ *
+ * STORE & FORWARD ("caixa-preta", conceito AquaSense):
+ * Cada leitura recebe timestamp via NTP (em SEGUNDOS, campo "ts") e entra em
+ * um buffer local. O envio ao servidor despacha o buffer inteiro; se a
+ * rede/servidor falhar, os dados ficam retidos e são reenviados no próximo
+ * ciclo — nenhuma leitura se perde. O servidor converte o "ts" de segundos
+ * para nanossegundos antes de gravar no InfluxDB.
+ *
+ * ALERTAS ATIVOS (Telegram/SMS): enviados pelo servidor (server.js), que
+ * vigia o InfluxDB — ver README. No hardware real, um módulo SIM7600
+ * permitiria SMS direto do campo, sem depender do servidor.
  *
  * CONEXÕES NO WOKWI (ver firmware/diagram.json):
- *
  * BMP180:  VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
  * OLED:    VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
- * LEDs (com resistor 220Ω cada):
- *   Verde→GPIO32   Amarelo→GPIO33   Vermelho→GPIO25
+ * LEDs (resistor 220Ω): Verde→GPIO32  Amarelo→GPIO33  Vermelho→GPIO25
  * BUZZER:  (+)→GPIO26  (−)→GND
  *
- * Bibliotecas (Library Manager do Wokwi):
- *   Adafruit BMP085 Library, Adafruit SSD1306, Adafruit GFX Library
+ * Bibliotecas: Adafruit BMP085 Library, Adafruit SSD1306, Adafruit GFX Library
  * ============================================================================
  */
 
@@ -40,20 +54,31 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <time.h>
 #include <Adafruit_BMP085.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
 // ===== CREDENCIAIS (preencha antes de usar!) =====
-#define WIFI_SSID       "Wokwi-GUEST"
-#define WIFI_PASS       ""
-#define INFLUXDB_URL    "https://SEU-CLUSTER.influxdata.com"   // sem barra final
-#define INFLUXDB_TOKEN  "SEU-TOKEN"
-#define INFLUXDB_ORG    "SUA-ORG"
-#define INFLUXDB_BUCKET "PIEZOMETRO"
-#define MEASUREMENT     "telemetria_samarco"   // deve bater com o dashboard!
+#define WIFI_SSID   "Wokwi-GUEST"
+#define WIFI_PASS   ""
+#define SERVER_URL  "https://SEU-APP.onrender.com/ingest"  // endpoint /ingest do server.js
+#define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY do servidor
+#define MEASUREMENT "telemetria_samarco"                   // (info) measurement gravado pelo servidor
 
-// ===== CONFIGURAÇÕES DISPLAY OLED =====
+// ===== CONVERSÃO PRESSÃO → NÍVEL D'ÁGUA (simulação) =====
+// nivel = NIVEL_REF + (pressao_hPa − PRESSAO_REF) / SIM_ESCALA
+// Escala didática: 10 hPa por metro, para o slider do Wokwi varrer os 3 níveis.
+// No hardware real: nivel = (P_transdutor − P_atmosferica) / 98.07 (mH2O).
+#define PRESSAO_REF 1013.25  // hPa — padrão do BMP180 no Wokwi
+#define NIVEL_REF   10.0     // m  — nível no ponto de referência
+#define SIM_ESCALA  10.0     // hPa por metro (didático)
+
+// ===== LIMIARES DE NÍVEL (m) — espelhados em index.html e server.js =====
+#define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
+#define NIVEL_CRITICO 15.0   // acima disso = CRÍTICO
+
+// ===== DISPLAY OLED =====
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
@@ -65,13 +90,12 @@
 #define LED_VERMELHO 25
 #define BUZZER       26
 
-// ===== LIMITES DE PRESSÃO (hPa) — espelhados em index.html (CFG) =====
-#define PRESSAO_NORMAL  1010.0   // Acima disso = NORMAL
-#define PRESSAO_ATENCAO 1005.0   // Entre 1005–1010 = ATENÇÃO; abaixo = CRÍTICO
-
 // ===== INTERVALOS (ms) =====
 #define INTERVALO_LEITURA 1000UL    // leitura local + LEDs + display
-#define INTERVALO_ENVIO   10000UL   // envio ao InfluxDB
+#define INTERVALO_ENVIO   10000UL   // envio ao servidor (Render)
+
+// ===== STORE & FORWARD =====
+#define BUFFER_MAX 120              // ~20 min de leituras retidas sem rede
 
 // ===== OBJETOS =====
 Adafruit_BMP085 bmp;
@@ -80,7 +104,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 // ===== VARIÁVEIS GLOBAIS =====
 float temperatura = 0;
 float pressao = 0;
-float altitude = 0;
+float nivelAgua = 0;
 
 String nivelAlerta = "NORMAL";
 int corAtual = 0; // 0=Verde, 1=Amarelo, 2=Vermelho
@@ -90,6 +114,10 @@ unsigned long ultimaLeitura = 0;
 unsigned long ultimoEnvio   = 0;
 bool estadoBuzzer = false;
 bool wifiOk = false;
+bool ntpOk = false;
+
+String bufferDados[BUFFER_MAX];
+int bufferCount = 0;
 
 // ===== SETUP =====
 void setup() {
@@ -97,8 +125,8 @@ void setup() {
   delay(1000);
 
   Serial.println("===========================================");
-  Serial.println("  SAMARCO - SISTEMA DE ALERTAS");
-  Serial.println("  Monitoramento de Piezômetro com Alarmes");
+  Serial.println("  SAMARCO - NIVEL DE AGUA EM PIEZOMETROS");
+  Serial.println("  Telemetria + Alertas + Store & Forward");
   Serial.println("===========================================");
   Serial.println();
 
@@ -144,6 +172,7 @@ void setup() {
 
   mostrarTelaInicio();
   conectarWiFi();
+  sincronizarNTP();
 
   Serial.println();
   Serial.println("Sistema pronto!");
@@ -168,10 +197,11 @@ void loop() {
     mostrarDisplay();
   }
 
-  // Ciclo de telemetria: envio ao InfluxDB (a cada 10 s)
+  // Ciclo de telemetria: bufferiza e tenta despachar (a cada 10 s)
   if (agora - ultimoEnvio >= INTERVALO_ENVIO) {
     ultimoEnvio = agora;
-    enviarInfluxDB();
+    bufferizarLeitura();
+    despacharBuffer();
   }
 
   // Buzzer roda a cada passagem para não perder o timing dos beeps
@@ -193,43 +223,86 @@ void conectarWiFi() {
     Serial.print("IP: ");
     Serial.println(WiFi.localIP());
   } else {
-    Serial.println(" FALHOU — sistema segue com alertas locais apenas.");
+    Serial.println(" FALHOU — sistema segue com alertas locais + buffer.");
   }
 }
 
-// ===== FUNÇÃO: ENVIAR AO INFLUXDB (line protocol) =====
-void enviarInfluxDB() {
+// ===== FUNÇÃO: SINCRONIZAR RELÓGIO (NTP) =====
+// Necessário para o store & forward: cada leitura retida no buffer precisa
+// do SEU timestamp, senão o InfluxDB carimbaria tudo com a hora do reenvio.
+void sincronizarNTP() {
+  if (!wifiOk) return;
+  Serial.print("Sincronizando relógio (NTP)");
+  configTime(0, 0, "pool.ntp.org");
+  unsigned long inicio = millis();
+  while (time(nullptr) < 1000000000 && millis() - inicio < 10000) {
+    delay(500);
+    Serial.print(".");
+  }
+  ntpOk = (time(nullptr) >= 1000000000);
+  Serial.println(ntpOk ? " OK!" : " FALHOU — envio sem timestamp local.");
+}
+
+// ===== FUNÇÃO: BUFFERIZAR LEITURA (store & forward) =====
+void bufferizarLeitura() {
+  char item[128];
+
+  if (ntpOk) {
+    // Timestamp em SEGUNDOS — o servidor converte para nanossegundos
+    long ts = (long)time(nullptr);
+    snprintf(item, sizeof(item),
+             "{\"nivel_agua\":%.3f,\"pressao\":%.3f,\"temperatura\":%.2f,\"ts\":%ld}",
+             nivelAgua, pressao, temperatura, ts);
+  } else {
+    snprintf(item, sizeof(item),
+             "{\"nivel_agua\":%.3f,\"pressao\":%.3f,\"temperatura\":%.2f}",
+             nivelAgua, pressao, temperatura);
+  }
+
+  if (bufferCount >= BUFFER_MAX) {
+    // Buffer cheio: descarta a leitura mais ANTIGA (política ring buffer)
+    for (int i = 1; i < BUFFER_MAX; i++) bufferDados[i - 1] = bufferDados[i];
+    bufferCount = BUFFER_MAX - 1;
+    Serial.println("⚠️ Buffer cheio — leitura mais antiga descartada");
+  }
+  bufferDados[bufferCount++] = String(item);
+}
+
+// ===== FUNÇÃO: DESPACHAR BUFFER AO SERVIDOR =====
+void despacharBuffer() {
+  if (bufferCount == 0) return;
+
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("📡 WiFi offline — envio pulado, tentando reconectar...");
+    Serial.printf("📡 WiFi offline — %d leitura(s) retidas no buffer\n", bufferCount);
     WiFi.reconnect();
     return;
   }
+  if (!ntpOk) sincronizarNTP();  // tenta recuperar o relógio quando a rede volta
+
+  // Monta um único JSON com todas as leituras retidas
+  String body = "{\"leituras\":[";
+  for (int i = 0; i < bufferCount; i++) {
+    body += bufferDados[i];
+    if (i < bufferCount - 1) body += ",";
+  }
+  body += "]}";
 
   WiFiClientSecure client;
   client.setInsecure(); // simulação/protótipo; em produção use certificado CA
 
   HTTPClient http;
-  String url = String(INFLUXDB_URL) +
-               "/api/v2/write?org=" + INFLUXDB_ORG +
-               "&bucket=" + INFLUXDB_BUCKET + "&precision=ns";
-
-  // Line protocol: measurement campo1=v1,campo2=v2
-  String body = String(MEASUREMENT) +
-                " pressao="     + String(pressao, 3) +
-                ",temperatura=" + String(temperatura, 2) +
-                ",altitude="    + String(altitude, 2);
-
-  http.begin(client, url);
-  http.addHeader("Authorization", "Token " INFLUXDB_TOKEN);
-  http.addHeader("Content-Type", "text/plain; charset=utf-8");
+  http.begin(client, SERVER_URL);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Key", DEVICE_KEY);
   http.setTimeout(8000);
 
   int code = http.POST(body);
   if (code == 204) {
-    Serial.println("📡 InfluxDB: dados enviados (HTTP 204)");
+    Serial.printf("📡 Servidor: %d leitura(s) enviadas (HTTP 204)\n", bufferCount);
+    bufferCount = 0;  // sucesso — esvazia o buffer
   } else {
-    Serial.print("📡 InfluxDB: falha no envio — HTTP ");
-    Serial.println(code);
+    Serial.printf("📡 Servidor: falha (HTTP %d) — %d leitura(s) retidas\n",
+                  code, bufferCount);
   }
   http.end();
 }
@@ -238,18 +311,19 @@ void enviarInfluxDB() {
 void lerSensor() {
   temperatura = bmp.readTemperature();
   pressao = bmp.readPressure() / 100.0;
-  altitude = bmp.readAltitude(101325);
+  // Conversão simulada pressão → nível d'água (ver nota no topo)
+  nivelAgua = NIVEL_REF + (pressao - PRESSAO_REF) / SIM_ESCALA;
+  if (nivelAgua < 0) nivelAgua = 0;
 }
 
 // ===== FUNÇÃO: DETERMINAR NÍVEL DE ALERTA =====
-// ⚠️ Lógica de barômetro (pressão baixa = perigo). Em piezômetro real,
-//    INVERTER: nível/poro-pressão alto = perigo.
+// Lógica correta de piezômetro: nível d'água ALTO = perigo (saturação).
 void determinarAlerta() {
-  if (pressao >= PRESSAO_NORMAL) {
+  if (nivelAgua < NIVEL_ATENCAO) {
     nivelAlerta = "NORMAL";
     corAtual = 0; // Verde
   }
-  else if (pressao >= PRESSAO_ATENCAO) {
+  else if (nivelAgua < NIVEL_CRITICO) {
     nivelAlerta = "ATENCAO";
     corAtual = 1; // Amarelo
   }
@@ -266,15 +340,13 @@ void atualizarLEDs() {
   digitalWrite(LED_VERMELHO, LOW);
 
   if (corAtual == 0) {
-    // NORMAL — Verde fixo
-    digitalWrite(LED_VERDE, HIGH);
+    digitalWrite(LED_VERDE, HIGH);          // NORMAL — verde fixo
   }
   else if (corAtual == 1) {
-    // ATENÇÃO — Amarelo fixo
-    digitalWrite(LED_AMARELO, HIGH);
+    digitalWrite(LED_AMARELO, HIGH);        // ATENÇÃO — amarelo fixo
   }
   else {
-    // CRÍTICO — Vermelho piscando (alterna a cada ciclo de 1 s)
+    // CRÍTICO — vermelho piscando (alterna a cada ciclo de 1 s)
     static bool estadoVermelho = false;
     estadoVermelho = !estadoVermelho;
     digitalWrite(LED_VERMELHO, estadoVermelho);
@@ -288,7 +360,6 @@ void atualizarBuzzer() {
   unsigned long agora = millis();
 
   if (corAtual == 0) {
-    // NORMAL — Buzzer OFF
     digitalWrite(BUZZER, LOW);
     estadoBuzzer = false;
   }
@@ -302,7 +373,6 @@ void atualizarBuzzer() {
     else if (estadoBuzzer && agora - ultimoBuzzer >= 100) {
       digitalWrite(BUZZER, LOW);
       estadoBuzzer = false;
-      // ultimoBuzzer mantém o início do beep → próximo em +2000 ms
     }
   }
   else {
@@ -318,34 +388,38 @@ void atualizarBuzzer() {
 // ===== FUNÇÃO: MOSTRAR NO SERIAL =====
 void mostrarSerial() {
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  Serial.print("📊 Temperatura: ");
-  Serial.print(temperatura, 1);
-  Serial.println(" °C");
+  Serial.print("💧 Nível d'água: ");
+  Serial.print(nivelAgua, 2);
+  Serial.println(" m");
 
-  Serial.print("📊 Pressão:     ");
+  Serial.print("📊 Pressão:      ");
   Serial.print(pressao, 1);
   Serial.println(" hPa");
 
-  Serial.print("📊 Altitude:    ");
-  Serial.print(altitude, 1);
-  Serial.println(" m");
+  Serial.print("📊 Temperatura:  ");
+  Serial.print(temperatura, 1);
+  Serial.println(" °C");
+
+  Serial.print("💾 Buffer:       ");
+  Serial.print(bufferCount);
+  Serial.println(" leitura(s) pendente(s)");
 
   Serial.println();
 
   if (nivelAlerta == "NORMAL") {
     Serial.println("🟢 STATUS: NORMAL");
-    Serial.println("   → Sistema operando normalmente");
+    Serial.println("   → Nível dentro da faixa segura");
   }
   else if (nivelAlerta == "ATENCAO") {
     Serial.println("🟡 STATUS: ATENÇÃO!");
-    Serial.println("   → Monitorar de perto");
-    Serial.println("   → Pressão se aproximando do limite");
+    Serial.println("   → Nível d'água subindo");
+    Serial.println("   → Intensificar monitoramento");
   }
   else {
     Serial.println("🔴 STATUS: CRÍTICO!!!");
     Serial.println("   → ALERTA MÁXIMO ATIVADO!");
-    Serial.println("   → Pressão abaixo do limite seguro");
-    Serial.println("   → Verificar piezômetro imediatamente!");
+    Serial.println("   → Nível acima do limite de segurança");
+    Serial.println("   → Acionar equipe de geotecnia imediatamente!");
   }
 
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -356,17 +430,15 @@ void mostrarSerial() {
 void mostrarDisplay() {
   display.clearDisplay();
 
-  // Título
   display.setTextSize(1);
   display.setCursor(0, 0);
   display.print("SAMARCO PIEZOMETRO");
   display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
 
-  // Dados do sensor
   display.setCursor(0, 15);
-  display.print("Temp: ");
-  display.print(temperatura, 1);
-  display.print(" C");
+  display.print("Nivel: ");
+  display.print(nivelAgua, 2);
+  display.print(" m");
 
   display.setCursor(0, 25);
   display.print("Press: ");
@@ -374,14 +446,13 @@ void mostrarDisplay() {
   display.print(" hPa");
 
   display.setCursor(0, 35);
-  display.print("Alt: ");
-  display.print(altitude, 0);
-  display.print(" m  ");
+  display.print("Temp: ");
+  display.print(temperatura, 1);
+  display.print(" C  ");
   display.print(wifiOk ? "WiFi:OK" : "WiFi:--");
 
   display.drawLine(0, 45, 128, 45, SSD1306_WHITE);
 
-  // STATUS em destaque
   display.setTextSize(2);
   display.setCursor(0, 50);
 
@@ -406,10 +477,10 @@ void mostrarTelaInicio() {
   display.println("SAMARCO");
 
   display.setTextSize(1);
-  display.setCursor(15, 30);
-  display.println("Sistema de");
-  display.setCursor(25, 42);
-  display.println("Alertas");
+  display.setCursor(8, 30);
+  display.println("Nivel de agua em");
+  display.setCursor(18, 42);
+  display.println("piezometros");
 
   display.setCursor(10, 55);
   display.println("Iniciando...");
@@ -456,16 +527,21 @@ void testarBuzzer() {
 
 /*
  * ============================================================================
- * COMO TESTAR OS NÍVEIS DE ALERTA NO WOKWI:
+ * COMO TESTAR NO WOKWI:
  * ============================================================================
+ * Clique no BMP180 durante a simulação e mova o slider de PRESSÃO
+ * (a escala didática converte 10 hPa em 1 m de nível d'água):
  *
- * Durante a simulação, clique no sensor BMP180 e mova o slider de pressão:
+ * 1. NORMAL  (verde):    1013 hPa → nível 10,0 m
+ * 2. ATENÇÃO (amarelo):  1035 hPa → nível 12,2 m  (beep a cada 2 s)
+ * 3. CRÍTICO (vermelho): 1065 hPa → nível 15,2 m  (LED pisca + beep rápido)
  *
- * 1. NORMAL (Verde):    ajuste para 1015 hPa → LED verde, buzzer OFF
- * 2. ATENÇÃO (Amarelo): ajuste para 1007 hPa → LED amarelo, beep a cada 2 s
- * 3. CRÍTICO (Vermelho): ajuste para 1000 hPa → LED vermelho pisca, beep rápido
+ * O dashboard usa os MESMOS limiares (12 m / 15 m) e o servidor dispara
+ * Telegram/SMS nas transições de nível — veja o README.
  *
- * O dashboard (index.html) usa os MESMOS limiares — mova o slider e veja o
- * nível mudar também na página em até 10 segundos.
+ * TESTE DO STORE & FORWARD: pause a simulação por ~1 min (ou desligue o
+ * WiFi) e observe no Serial o buffer acumulando; ao reconectar, todas as
+ * leituras retidas são enviadas de uma vez (JSON) ao servidor, com seus
+ * timestamps originais, que por sua vez grava tudo no InfluxDB.
  * ============================================================================
  */
