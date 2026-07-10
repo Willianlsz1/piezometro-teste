@@ -69,6 +69,12 @@ TAXA_MAX_M_DIA     = "0.5"
 # index.html (mesmo espírito de NIVEL_ATENCAO/NIVEL_CRITICO).
 STALE_SEG          = "60"
 
+# Histerese (deadband) da classificação de nível, em metros: evita alarme
+# "chattering" quando o nível oscila bem em cima do limiar de ATENÇÃO ou
+# CRÍTICO (ISA-18.2). Só se aplica na DESCIDA de faixa — a subida continua
+# usando o limiar puro, sem atraso. Ver docs/DASHBOARD_PROFISSIONAL.md §5.
+HISTERESE_M        = "0.2"
+
 # Catálogo de instrumentos exibido no dashboard (mapa/seletor de piezômetro):
 # id, nome amigável e coordenadas de cada piezômetro cadastrado. Servido em
 # GET /config para o dashboard carregar no boot em vez de hard-codar a lista.

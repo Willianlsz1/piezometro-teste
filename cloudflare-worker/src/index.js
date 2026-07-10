@@ -42,6 +42,11 @@ function getConfig(env) {
   const TAXA_MAX_M_DIA = parseFloat(env.TAXA_MAX_M_DIA || "0.5");
   const STALE_SEG = parseInt(env.STALE_SEG || "60", 10);
 
+  // P4 — histerese (deadband) na classificação de nível: evita alarme
+  // "chattering" quando o nível oscila bem em cima do limiar (ISA-18.2).
+  // Só é aplicada na DESCIDA de faixa — ver classifyComHisterese().
+  const HISTERESE_M = parseFloat(env.HISTERESE_M || "0.2");
+
   const TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN || "";
   const TELEGRAM_CHAT_ID = env.TELEGRAM_CHAT_ID || "";
   const TWILIO_ACCOUNT_SID = env.TWILIO_ACCOUNT_SID || "";
@@ -55,7 +60,7 @@ function getConfig(env) {
   return {
     ALLOWED_ORIGIN, DEVICE_KEY,
     NIVEL_ATENCAO, NIVEL_CRITICO, ALERT_REPEAT_MIN,
-    SILENCE_ALERT_SEC, TAXA_JANELA_MIN, TAXA_MAX_M_DIA, STALE_SEG,
+    SILENCE_ALERT_SEC, TAXA_JANELA_MIN, TAXA_MAX_M_DIA, STALE_SEG, HISTERESE_M,
     TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,
     TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM, TWILIO_TO,
     telegramOn, smsOn,
@@ -134,10 +139,40 @@ function normalizarLeitura(leitura) {
 }
 
 // ── MOTOR DE ALERTAS ───────────────────────────────────────────────────────────
+// Classificação "pura" (sem histerese): usada tanto na SUBIDA de faixa quanto
+// no primeiro ciclo de um piezômetro (quando ainda não há faixa anterior).
 function classify(cfg, n) {
   if (n >= cfg.NIVEL_CRITICO) return "CRITICO";
   if (n >= cfg.NIVEL_ATENCAO) return "ATENCAO";
   return "NORMAL";
+}
+
+const ORDEM_FAIXA = { NORMAL: 0, ATENCAO: 1, CRITICO: 2 };
+
+// P4 — classificação com histerese (deadband), ver docs/DASHBOARD_PROFISSIONAL.md
+// §5 (ISA-18.2). Subir de faixa é imediato (não há motivo para atrasar um
+// alarme de segurança), mas descer de faixa exige que o nível fique
+// HISTERESE_M abaixo do limiar da faixa anterior — sem isso, um nível
+// oscilando bem em cima de um limiar (ex.: 15,00 / 14,98 / 15,01 m) dispararia
+// e cancelaria o alarme a cada ciclo ("chattering").
+function classifyComHisterese(cfg, nivel, faixaAnterior) {
+  const puro = classify(cfg, nivel);
+  if (faixaAnterior === null) return puro; // primeiro ciclo — sem histerese
+
+  if (ORDEM_FAIXA[puro] >= ORDEM_FAIXA[faixaAnterior]) {
+    // Subida (ou mesma faixa): usa o limiar puro, sem atraso.
+    return puro;
+  }
+
+  // Descida: só confirma o rebaixamento se houver folga suficiente abaixo
+  // do limiar da faixa anterior; caso contrário mantém a faixa anterior.
+  if (faixaAnterior === "CRITICO") {
+    return nivel < cfg.NIVEL_CRITICO - cfg.HISTERESE_M ? puro : "CRITICO";
+  }
+  if (faixaAnterior === "ATENCAO") {
+    return nivel < cfg.NIVEL_ATENCAO - cfg.HISTERESE_M ? puro : "ATENCAO";
+  }
+  return puro; // faixaAnterior === "NORMAL" — não há como descer mais
 }
 
 // Busca o último nível d'água de CADA piezômetro que teve leitura nos
@@ -369,10 +404,12 @@ async function checkAlerts(cfg, env, estado) {
     const agoraSeg = Math.floor(agora / 1000);
 
     for (const [pz, valor] of Object.entries(niveis)) {
-      const nivel = classify(cfg, valor);
       const anterior = Object.prototype.hasOwnProperty.call(estado.lastNotifiedLevel, pz)
         ? estado.lastNotifiedLevel[pz]
         : null; // null = primeiro ciclo deste piezômetro (não notifica NORMAL)
+      // P4 — histerese só se aplica à descida; classify() puro decide a
+      // subida (ver classifyComHisterese()).
+      const nivel = classifyComHisterese(cfg, valor, anterior);
       const mudouDeFaixa = nivel !== anterior;
       const repetirCritico = nivel === "CRITICO" &&
         agora - (estado.lastCriticalNotify[pz] || 0) >= cfg.ALERT_REPEAT_MIN * 60000;
@@ -539,6 +576,7 @@ async function handleDados(url, env, cfg) {
     const { results } = await env.DB.prepare(
       `SELECT CAST(ts / ?1 AS INTEGER) * ?1 AS t,
               AVG(nivel_agua) AS nivel_agua,
+              MAX(nivel_agua) AS nivel_max,
               AVG(pressao) AS pressao,
               AVG(temperatura) AS temperatura
          FROM leituras
@@ -549,9 +587,15 @@ async function handleDados(url, env, cfg) {
       .bind(range.bucket, pzParam, desde)
       .all();
 
+    // P5 — a MÉDIA do bucket mascara excursões breves acima do limiar (ex.:
+    // um pico de 15,3 m por 2 min dentro de um bucket de 30 min vira uma
+    // média de 12,1 m no gráfico). nivel_max preserva o PICO, que é o que
+    // importa em monitoramento de segurança — ver
+    // docs/DASHBOARD_PROFISSIONAL.md §5.
     const pontos = (results || []).map((row) => ({
       ts: row.t,
       nivel_agua: row.nivel_agua,
+      nivel_max: row.nivel_max,
       pressao: row.pressao,
       temperatura: row.temperatura,
     }));
@@ -597,6 +641,7 @@ function handleConfig(env, cfg) {
     piezometros,
     stale_seg: cfg.STALE_SEG, // P2 — janela que o dashboard usa p/ marcar "sem sinal" na UI
     taxa_max_m_dia: cfg.TAXA_MAX_M_DIA, // P3 — limiar de variação rápida
+    histerese_m: cfg.HISTERESE_M, // P4 — deadband de descida de faixa (ISA-18.2)
   });
 }
 

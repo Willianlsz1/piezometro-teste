@@ -96,6 +96,15 @@ Edite o bloco `[vars]` em `wrangler.toml` conforme o seu ambiente:
   é só servido em `GET /config` para o **dashboard** decidir quando marcar um
   piezômetro como "sem sinal" na interface, evitando duplicar esse número
   no `index.html`.
+- `HISTERESE_M` (default `"0.2"`, 20 cm) → folga (deadband) exigida para
+  **descer** de faixa na classificação de nível (CRÍTICO→ATENÇÃO/NORMAL ou
+  ATENÇÃO→NORMAL): o nível precisa cair `HISTERESE_M` metros abaixo do
+  limiar da faixa anterior antes de o motor confirmar o rebaixamento.
+  **Subir** de faixa continua imediato, sem histerese — não faz sentido
+  atrasar um alarme de segurança. Sem essa folga, um nível oscilando bem em
+  cima de um limiar (ex.: 15,00 / 14,98 / 15,01 m) dispararia e cancelaria o
+  alerta a cada ciclo do cron ("chattering"), prática desaconselhada pela
+  norma ISA-18.2 de gerenciamento de alarmes.
 
 ## 6. Deploy
 
@@ -126,7 +135,17 @@ curl https://piezometro-worker.<seu-subdominio>.workers.dev/ultimos
 
 # Série histórica agregada (últimas 24h, buckets de 30min)
 curl "https://piezometro-worker.<seu-subdominio>.workers.dev/dados?pz=PZ-01&range=24h"
+```
 
+Cada ponto de `GET /dados` traz `nivel_agua` (média do bucket) **e**
+`nivel_max` (o maior valor lido dentro daquele bucket). Em monitoramento de
+segurança a média pode mascarar uma excursão breve acima do limiar — um
+bucket de 30 min com um pico de 15,3 m por 2 minutos, por exemplo, pode
+aparecer no gráfico como uma média tranquila de 12,1 m se só `nivel_agua`
+for plotado. `nivel_max` existe para o dashboard conseguir destacar o pico
+real, não apenas a tendência suavizada.
+
+```bash
 # Config (limiares, ranges aceitos e catálogo de piezômetros p/ o dashboard)
 curl https://piezometro-worker.<seu-subdominio>.workers.dev/config
 ```

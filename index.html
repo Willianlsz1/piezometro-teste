@@ -234,6 +234,14 @@ header {
 .tb-semsinal {
   background: var(--gray-bg); color: var(--gray); border: 1px solid var(--gray-bd);
 }
+/* P4 — badge de linha de alarme por taxa de variação (mesma família do âmbar de atenção) */
+.tb-taxa {
+  background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow-bd);
+}
+/* P6 — badge NORMAL neutro nos cards de visão geral (ISA-101: ~90% neutro, cor = anormalidade) */
+.tb-normal-neutro {
+  background: transparent; color: var(--text-2); border: 1px solid var(--border2);
+}
 
 /* ── CHIP "VARIAÇÃO RÁPIDA" (P3) — âmbar, cor + texto ── */
 .chip-taxa-rapida {
@@ -415,7 +423,8 @@ header {
   display: flex; align-items: flex-start; gap: 12px;
   transition: background .4s, border-color .4s;
 }
-.alb-normal   { background: var(--green-bg);  border: 1px solid var(--green-bd); }
+/* P6 — NORMAL neutro no painel de alerta: sem glow verde, peso visual só em atenção/crítico */
+.alb-normal   { background: var(--bg-card2);  border: 1px solid var(--border); }
 .alb-atencao  { background: var(--yellow-bg); border: 1px solid var(--yellow-bd); }
 .alb-critico  { background: var(--red-bg);    border: 1px solid var(--red-bd); }
 .alb-semsinal { background: var(--gray-bg);   border: 1px solid var(--gray-bd); }
@@ -425,7 +434,7 @@ header {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.ali-normal   { background: rgba(62,207,122,.15); }
+.ali-normal   { background: rgba(138,144,163,.14); }
 .ali-atencao  { background: rgba(240,192,64,.15); }
 .ali-critico  { background: rgba(240,72,72,.15); }
 .ali-semsinal { background: rgba(138,144,163,.18); }
@@ -435,7 +444,7 @@ header {
   font-size: 15px; font-weight: 600;
   letter-spacing: .4px;
 }
-.al-normal   { color: var(--green); }
+.al-normal   { color: var(--text-1); }
 .al-atencao  { color: var(--yellow); }
 .al-critico  { color: var(--red); animation: blink .7s step-end infinite; }
 .al-semsinal { color: var(--gray); }
@@ -528,6 +537,20 @@ tbody td {
 .tb-atencao { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow-bd); }
 .tb-critico { background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-bd); }
 .tb-info    { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-bd); }
+
+/* ── P4: ALARMES / EVENTOS empilhados no mesmo painel ── */
+.ev-subpanel { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+.ev-subpanel-hdr { display: flex; align-items: center; justify-content: space-between; }
+.ev-subpanel-title {
+  font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-2);
+}
+.ev-table-wrap-sm { max-height: 108px; }
+
+/* ── P5: legenda "média / máx do intervalo" acima do gráfico de nível ── */
+.chart-legend-inline { display: flex; gap: 12px; font-size: 10px; color: var(--text-3); }
+.cl-item { display: flex; align-items: center; gap: 4px; }
+.cl-swatch { width: 14px; height: 2px; display: inline-block; background: var(--green); }
+.cl-swatch.cl-max { background: none; border-top: 1px dashed var(--green); opacity: .6; }
 
 /* ── FLASH ── */
 @keyframes flash { 0%{opacity:.4} 100%{opacity:1} }
@@ -654,6 +677,11 @@ tbody td {
           <button class="btn-export" id="btn-export" type="button">📥 Exportar CSV</button>
         </div>
       </div>
+      <!-- P5 — legenda curta: pico do intervalo desenhado junto da média, não escondido -->
+      <div class="chart-legend-inline">
+        <span class="cl-item"><span class="cl-swatch"></span>média</span>
+        <span class="cl-item"><span class="cl-swatch cl-max"></span>máx do intervalo</span>
+      </div>
       <div class="chart-area"><canvas id="chart-n"></canvas></div>
     </div>
     <div class="panel">
@@ -723,31 +751,61 @@ tbody td {
       </div>
     </div>
 
-    <!-- Tabela de eventos -->
+    <!-- Tabela de alarmes/eventos (P4 — ISA-18.2: alarme exige ação, evento é informativo) -->
     <div class="panel">
       <div class="panel-hdr">
-        <span class="panel-title" id="events-title">Histórico de Eventos</span>
-        <span class="panel-tag" id="ev-count">0 eventos</span>
+        <span class="panel-title" id="events-title">Alarmes &amp; Eventos</span>
       </div>
-      <div class="alert-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="td-dot"></th>
-              <th>Evento</th>
-              <th>Nível d'água</th>
-              <th>Status</th>
-              <th>Hora</th>
-            </tr>
-          </thead>
-          <tbody id="ev-tbody">
-            <tr>
-              <td colspan="5" style="color:var(--text-3);text-align:center;padding:16px">
-                Aguardando dados...
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="ev-subpanel">
+        <div class="ev-subpanel-hdr">
+          <span class="ev-subpanel-title">🔔 Alarmes (exigem ação)</span>
+          <span class="panel-tag" id="alarm-count">0 alarmes</span>
+        </div>
+        <div class="alert-table-wrap ev-table-wrap-sm">
+          <table>
+            <thead>
+              <tr>
+                <th class="td-dot"></th>
+                <th>Alarme</th>
+                <th>Nível d'água</th>
+                <th>Ação</th>
+                <th>Hora</th>
+              </tr>
+            </thead>
+            <tbody id="alarm-tbody">
+              <tr>
+                <td colspan="5" style="color:var(--text-3);text-align:center;padding:16px">
+                  Nenhum alarme ativo
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ev-subpanel-hdr">
+          <span class="ev-subpanel-title">Eventos</span>
+          <span class="panel-tag" id="ev-count">0 eventos</span>
+        </div>
+        <div class="alert-table-wrap ev-table-wrap-sm">
+          <table>
+            <thead>
+              <tr>
+                <th class="td-dot"></th>
+                <th>Evento</th>
+                <th>Nível d'água</th>
+                <th>Status</th>
+                <th>Hora</th>
+              </tr>
+            </thead>
+            <tbody id="ev-tbody">
+              <tr>
+                <td colspan="5" style="color:var(--text-3);text-align:center;padding:16px">
+                  Aguardando dados...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -767,6 +825,9 @@ const CFG = {
   // sobrescritos por loadConfig() quando /config responder com stale_seg/taxa_max_m_dia.
   staleSeg: 60,
   taxaMaxMDia: 0.5,
+  // P4 — histerese (m) na detecção de borda entre faixas, evita repicar o badge/alarme
+  // bem em cima do limiar; sobrescrita por /config `histerese_m`.
+  histereseM: 0.2,
 };
 
 // Piezômetros monitorados (coordenadas ilustrativas — Complexo de Germano, Mariana/MG)
@@ -797,7 +858,12 @@ const API_URL = "https://piezometro-worker.willianloopes123.workers.dev";
 // `simActive` é um espelho legado de `fonte.simulada`, mantido só porque algum
 // código ainda pode lê-lo por hábito — é escrito EXCLUSIVAMENTE em trocarFonte().
 let lastLevel = null, failCount = 0, simActive = false;
-let alertHistory = [];
+// P4 — ISA-18.2: alarme (exige ação) e evento (informativo) em listas separadas,
+// derivadas de um único ponto de entrada (pushHistorico) que classifica pelo campo `lv`.
+let alarmes = [];
+let eventos = [];
+const HIST_MAX = 50;
+let lastTaxaRapidaState = false; // edge-trigger do alarme de variação rápida (P3+P4)
 let readingsHistory = []; // últimas leituras do piezômetro selecionado (mais recente primeiro)
 let pzLatest = {};         // último valor conhecido de cada piezômetro: { "PZ-01": {nivel,pressao,temperatura,ts,taxa_m_dia}, ... }
 let pzComm = {};           // último estado de comunicação conhecido por pz ("ok"|"stale") — dedupe de eventos (P1)
@@ -814,6 +880,29 @@ function classifyNivel(n) {
 }
 function corPorStatus(lv) {
   return { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0", semsinal: "#8a90a3" }[lv] || "#4da8f0";
+}
+
+// P4 — histerese na detecção de borda (ISA-18.2: evita repicar bem em cima do limiar).
+// Na SUBIDA de faixa a classificação é imediata (prioridade é detectar risco rápido); na
+// DESCIDA só confirma a faixa nova quando o nível cair abaixo de (limiar da faixa anterior −
+// CFG.histereseM). Helper puro, reaproveita classifyNivel — usado tanto para decidir se
+// registra uma linha de alarme/evento quanto para o badge/faixa exibida (mesma regra:
+// o badge não fica piscando na borda).
+function classifyComHisterese(nivel, faixaAnterior) {
+  const bruta = classifyNivel(nivel);
+  if (!faixaAnterior || bruta.lv === faixaAnterior) return bruta;
+  const ordem = { normal: 0, atencao: 1, critico: 2 };
+  const subindo = ordem[bruta.lv] > ordem[faixaAnterior];
+  if (subindo) return bruta;
+  // descida: só confirma se caiu abaixo do limiar da faixa anterior menos a histerese;
+  // senão, mantém a classificação da faixa anterior (não pisca na borda)
+  if (faixaAnterior === "critico") {
+    return nivel < (CFG.thrCritico - CFG.histereseM) ? bruta : { lv: "critico", lbl: "Crítico" };
+  }
+  if (faixaAnterior === "atencao") {
+    return nivel < (CFG.thrAtencao - CFG.histereseM) ? bruta : { lv: "atencao", lbl: "Atenção" };
+  }
+  return bruta;
 }
 
 // ── ESTADO DE COMUNICAÇÃO (P1) ───────────────────────────────────────────────
@@ -842,8 +931,9 @@ function formatUltimaLeitura(ts) {
 const sparks = { n: [], p: [], t: [] };
 
 // Histórico de gráficos (período selecionado)
+// charts.n ganha `maxData` (P5) — série do pico do intervalo, paralela a `data` (a média)
 const charts = {
-  n: { labels: [], data: [], times: [] },
+  n: { labels: [], data: [], times: [], maxData: [] },
   t: { labels: [], data: [], times: [] },
 };
 
@@ -858,11 +948,22 @@ const stats = {
 // alimentada pelo polling.
 // (Os gráficos exibem só os últimos 60 pontos, mas mín/máx/variação
 //  são calculados sobre esta janela completa.)
-const statsWin = { n: [], p: [], t: [] };
+// `nMax` (P5) — janela paralela do pico do intervalo, usada só pelo stat "MÁX 24H" do
+// nível (nunca substitui statsWin.n, que segue sendo a série de médias/leituras).
+const statsWin = { n: [], p: [], t: [], nMax: [] };
 const STATS_MAX = 8640;
 function pushStats(key, val) {
   statsWin[key].push(val);
   if (statsWin[key].length > STATS_MAX) statsWin[key].shift();
+}
+
+// P5 — sobrescreve o stat "MÁX 24H" do nível com o maior valor de statsWin.nMax (pico do
+// intervalo) quando disponível; cai para statsWin.n (média) só na ausência de pico agregado.
+function aplicarMaxNivelPico() {
+  const el = document.getElementById("n-max");
+  if (!el) return;
+  const fonteMax = statsWin.nMax.length ? statsWin.nMax : statsWin.n;
+  if (fonteMax.length) el.textContent = Math.max(...fonteMax).toFixed(2);
 }
 
 // ── API (Cloudflare Worker + D1) ─────────────────────────────────────────────
@@ -881,15 +982,20 @@ async function apiGet(path) {
 // no formato {label,value,time} que os gráficos/stats/tabela consomem, para um campo específico.
 // Compartilhado pelos dois adapters — garante que real e simulado usem exatamente a mesma forma.
 function pontosParaCampo(pontos, field) {
+  // P5 — quando o campo é o nível d'água, propaga também o pico do intervalo (nivel_max),
+  // devolvido pelo Worker em /dados junto da média — o pico nunca pode ficar escondido.
+  const maxField = field === "nivel_agua" ? "nivel_max" : null;
   return (pontos || [])
     .filter(p => p[field] !== null && p[field] !== undefined && Number.isFinite(p[field]))
     .map(p => {
       const ms = p.ts * 1000;
-      return {
+      const out = {
         label: new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
         value: parseFloat(Number(p[field]).toFixed(3)),
         time: ms,
       };
+      if (maxField && Number.isFinite(p[maxField])) out.max = parseFloat(Number(p[maxField]).toFixed(3));
+      return out;
     });
 }
 
@@ -961,7 +1067,7 @@ function pushSpark(key, val) {
 }
 
 // ── MAIN CHARTS ───────────────────────────────────────────────────────────────
-function renderMainChart(canvasId, state, color, thresholds, bucketMs) {
+function renderMainChart(canvasId, state, color, thresholds, bucketMs, maxData) {
   const cv = document.getElementById(canvasId);
   if (!cv) return;
   const wrap = cv.closest(".chart-area");
@@ -987,6 +1093,11 @@ function renderMainChart(canvasId, state, color, thresholds, bucketMs) {
 
   let mn = Math.min(...data) - 1;
   let mx = Math.max(...data) + 1;
+  // P5 — o eixo Y precisa acomodar o pico do intervalo, não só a média
+  if (maxData && maxData.length) {
+    const validMax = maxData.filter(Number.isFinite);
+    if (validMax.length) mx = Math.max(mx, Math.max(...validMax) + 1);
+  }
   if (thresholds) {
     const tvs = thresholds.map(t => t.v);
     mn = Math.min(mn, Math.min(...tvs) - 2);
@@ -1045,6 +1156,25 @@ function renderMainChart(canvasId, state, color, thresholds, bucketMs) {
   }
   c.strokeStyle = color; c.lineWidth = 1.5; c.setLineDash([]); c.stroke();
 
+  // P5 — série do máximo do intervalo: linha fina tracejada, cor mais clara da mesma família,
+  // desenhada ao lado da média (nunca escondida) — mesma regra de gap da linha principal.
+  if (maxData && maxData.length === data.length) {
+    c.save();
+    c.strokeStyle = color + "80";
+    c.lineWidth = 1;
+    c.setLineDash([3, 3]);
+    c.beginPath();
+    let started = false;
+    for (let i = 0; i < maxData.length; i++) {
+      if (!Number.isFinite(maxData[i])) { started = false; continue; }
+      const x = sx(i), y = sy(maxData[i]);
+      if (!started || isGap(i)) { c.moveTo(x, y); started = true; }
+      else c.lineTo(x, y);
+    }
+    c.stroke();
+    c.restore();
+  }
+
   // Labels X
   c.fillStyle = "#454a5c"; c.font = "11px 'IBM Plex Mono'"; c.textAlign = "center";
   const step = Math.max(1, Math.floor(labels.length / 6));
@@ -1058,12 +1188,16 @@ function renderMainChart(canvasId, state, color, thresholds, bucketMs) {
   c.fillText(data[data.length-1].toFixed(2), lx - 10, ly - 9);
 }
 
-function pushChart(key, label, value, time) {
+function pushChart(key, label, value, time, max) {
   charts[key].labels.push(label);
   charts[key].data.push(value);
   charts[key].times.push(time || new Date().toISOString());
+  // P5 — leitura ao vivo é instantânea: na ausência de um pico agregado explícito,
+  // o próprio valor é o "máximo" daquele instante (mantém a série alinhada em tamanho)
+  if (charts[key].maxData) charts[key].maxData.push(Number.isFinite(max) ? max : value);
   if (charts[key].labels.length > 60) {
     charts[key].labels.shift(); charts[key].data.shift(); charts[key].times.shift();
+    if (charts[key].maxData) charts[key].maxData.shift();
   }
 }
 
@@ -1072,7 +1206,7 @@ function redrawCharts() {
   renderMainChart("chart-n", charts.n, "#3ecf7a", [
     { v: CFG.thrCritico, col: "rgba(240,72,72,.5)",  lbl: `${CFG.thrCritico} m crítico` },
     { v: CFG.thrAtencao, col: "rgba(240,192,64,.5)", lbl: `${CFG.thrAtencao} m atenção` },
-  ], bucketMs);
+  ], bucketMs, charts.n.maxData);
   renderMainChart("chart-t", charts.t, "#4da8f0", null, bucketMs);
 }
 
@@ -1103,11 +1237,14 @@ function updatePeriodLabels() {
 // ── ALERTA ────────────────────────────────────────────────────────────────────
 // Lógica de piezômetro: nível d'água ALTO = perigo (saturação do maciço)
 function setAlert(n) {
-  const { lv } = classifyNivel(n);
+  // P4 — histerese na borda: mesma regra vale para o badge/faixa exibida (não pisca)
+  // e para a decisão de registrar uma nova linha de alarme/evento abaixo.
+  const { lv } = classifyComHisterese(n, lastLevel);
   let desc, icon;
   if (lv === "normal") {
     desc = `Nível d'água na faixa segura (< ${CFG.thrAtencao} m) — operação normal, sem ação necessária`;
-    icon = `<circle cx="8" cy="8" r="5.5" stroke="#3ecf7a" stroke-width="1.5"/><path d="M5.5 8l2 2 3.5-3.5" stroke="#3ecf7a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    // P6 — ícone neutro no estado normal (cor reservada a anormalidade, ISA-101)
+    icon = `<circle cx="8" cy="8" r="5.5" stroke="#7c8196" stroke-width="1.5"/><path d="M5.5 8l2 2 3.5-3.5" stroke="#7c8196" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
   } else if (lv === "atencao") {
     desc = `Nível entre ${CFG.thrAtencao} e ${CFG.thrCritico} m — observar de perto e intensificar o monitoramento`;
     icon = `<path d="M8 2L14.5 13.5H1.5L8 2Z" stroke="#f0c040" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5V9.5" stroke="#f0c040" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r=".75" fill="#f0c040"/>`;
@@ -1162,7 +1299,30 @@ function setAlertSemSinal(ts) {
     : "Sem comunicação — nenhuma leitura recebida";
 }
 
-// ── TABELA DE EVENTOS ─────────────────────────────────────────────────────────
+// ── TABELA DE ALARMES / EVENTOS (P4 — ISA-18.2) ──────────────────────────────
+// Alarme = exige uma ação definida do operador; evento = informativo. `ACOES` dá a ação
+// esperada de cada faixa de alarme, mostrada na coluna "Ação" da tabela de alarmes.
+const ACOES = {
+  atencao:  "→ intensificar monitoramento",
+  critico:  "→ acionar equipe de geotecnia",
+  semsinal: "→ verificar instrumento/comunicação",
+  taxa:     "→ investigar tendência",
+};
+function classificarKind(lv) {
+  return (lv === "atencao" || lv === "critico" || lv === "semsinal" || lv === "taxa") ? "alarme" : "evento";
+}
+
+// Único ponto de entrada nas duas listas — classifica pelo campo `lv` e roteia para
+// `alarmes` ou `eventos` (nunca as duas), aplicando o limite de 50 cada.
+function pushHistorico(entry) {
+  entry.kind = classificarKind(entry.lv);
+  entry.acao = ACOES[entry.lv] || "";
+  const alvo = entry.kind === "alarme" ? alarmes : eventos;
+  alvo.unshift(entry);
+  if (alvo.length > HIST_MAX) alvo.pop();
+  renderTable();
+}
+
 function addAlertRow(lv, lbl, nivel) {
   const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const msgs = {
@@ -1172,41 +1332,45 @@ function addAlertRow(lv, lbl, nivel) {
   };
   const colors = { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" };
   const msg = (msgs[lv] || lbl) + ` (${pzSelecionado})` + (fonte.simulada ? " (simulação)" : "");
-  alertHistory.unshift({ lv, lbl, msg, nivel: Number.isFinite(nivel) ? nivel.toFixed(2) : "—", time: t, color: colors[lv] || colors.info });
-  if (alertHistory.length > 50) alertHistory.pop();
-  renderTable();
+  pushHistorico({ lv, lbl, msg, nivel: Number.isFinite(nivel) ? nivel.toFixed(2) : "—", time: t, color: colors[lv] || colors.info });
 }
 
 function addInfoRow(msg) {
   const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  alertHistory.unshift({ lv: "info", lbl: "INFO", msg, nivel: "—", time: t, color: "#4da8f0" });
-  if (alertHistory.length > 50) alertHistory.pop();
-  renderTable();
+  pushHistorico({ lv: "info", lbl: "INFO", msg, nivel: "—", time: t, color: "#4da8f0" });
+}
+
+// P3+P4 — alarme de variação rápida: dispara só na borda (transição parado→rápido), com
+// a ação "investigar tendência". Ver lastTaxaRapidaState, atualizado em applyData().
+function addTaxaRow(taxa) {
+  const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const sinal = taxa >= 0 ? "+" : "";
+  const msg = `📈 Variação rápida do nível d'água (${sinal}${taxa.toFixed(2)} m/dia) — ${pzSelecionado}`;
+  pushHistorico({ lv: "taxa", lbl: "TAXA", msg, nivel: "—", time: t, color: corPorStatus("atencao") });
 }
 
 // P1 — evento de transição de comunicação (ok↔stale) de QUALQUER piezômetro monitorado
 // (não só o selecionado); dedupe: só dispara na transição, guardando o estado anterior
-// por pz em `pzComm`. Entra na mesma lista de eventos (addInfoRow/addAlertRow).
+// por pz em `pzComm`. "stale" é ALARME (exige verificar instrumento); "ok" é EVENTO
+// (comunicação restabelecida — confirmação pontual, cor verde reservada a isso).
 function addComunicacaoRow(pzId, estado, ts) {
   const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   if (estado === "stale") {
     const hhmm = Number.isFinite(ts)
       ? new Date(ts * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
       : "—";
-    alertHistory.unshift({
+    pushHistorico({
       lv: "semsinal", lbl: "SEM SINAL",
       msg: `⚠️ ${pzId} sem sinal (última leitura ${hhmm})`,
       nivel: "—", time: t, color: corPorStatus("semsinal"),
     });
   } else {
-    alertHistory.unshift({
+    pushHistorico({
       lv: "info", lbl: "INFO",
       msg: `Comunicação restabelecida (${pzId})`,
       nivel: "—", time: t, color: corPorStatus("info"),
     });
   }
-  if (alertHistory.length > 50) alertHistory.pop();
-  renderTable();
 }
 
 // Confere o estado de comunicação de TODOS os piezômetros monitorados e dispara
@@ -1223,25 +1387,45 @@ function checarTransicoesComunicacao(mapa) {
   });
 }
 
-function renderTable() {
-  const tbody = document.getElementById("ev-tbody");
-  document.getElementById("ev-count").textContent = `${alertHistory.length} evento${alertHistory.length !== 1 ? "s" : ""}`;
-  if (!alertHistory.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--text-3);text-align:center;padding:16px">Nenhum evento registrado</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = "";
-  alertHistory.forEach(e => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
+function linhaHistorico(e, colBadgeLbl) {
+  return `
+    <tr>
       <td class="td-dot"><span class="ev-dot-sm" style="background:${e.color}"></span></td>
       <td class="td-msg">${e.msg}</td>
       <td class="td-val">${e.nivel} m</td>
-      <td class="td-badge"><span class="tbadge tb-${e.lv}">${e.lbl}</span></td>
+      <td class="td-badge"><span class="tbadge tb-${e.lv}">${colBadgeLbl}</span></td>
       <td class="td-time">${e.time}</td>
-    `;
-    tbody.appendChild(tr);
-  });
+    </tr>`;
+}
+
+function renderAlarmesTable() {
+  const tbody = document.getElementById("alarm-tbody");
+  const countEl = document.getElementById("alarm-count");
+  if (countEl) countEl.textContent = `${alarmes.length} alarme${alarmes.length !== 1 ? "s" : ""}`;
+  if (!tbody) return;
+  if (!alarmes.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--text-3);text-align:center;padding:16px">Nenhum alarme ativo</td></tr>`;
+    return;
+  }
+  // Coluna "Ação" mostra a ação esperada (ACOES), não o rótulo de status
+  tbody.innerHTML = alarmes.map(e => linhaHistorico(e, e.acao || e.lbl)).join("");
+}
+
+function renderEventosTable() {
+  const tbody = document.getElementById("ev-tbody");
+  const countEl = document.getElementById("ev-count");
+  if (countEl) countEl.textContent = `${eventos.length} evento${eventos.length !== 1 ? "s" : ""}`;
+  if (!tbody) return;
+  if (!eventos.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--text-3);text-align:center;padding:16px">Nenhum evento registrado</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = eventos.map(e => linhaHistorico(e, e.lbl)).join("");
+}
+
+function renderTable() {
+  renderAlarmesTable();
+  renderEventosTable();
 }
 
 // ── TABELA DE ÚLTIMAS LEITURAS ────────────────────────────────────────────────
@@ -1276,9 +1460,12 @@ function exportCSV() {
     const dataHora = dt.toLocaleString("pt-BR");
     const status = classifyNivel(v).lbl;
     const nivelFmt = String(v.toFixed(2)).replace(".", ",");
-    return [dataHora, pzSelecionado, nivelFmt, status].join(";");
+    // P5 — coluna de pico do intervalo (cai para o próprio valor quando não há pico agregado)
+    const maxV = charts.n.maxData && Number.isFinite(charts.n.maxData[i]) ? charts.n.maxData[i] : v;
+    const maxFmt = String(maxV.toFixed(2)).replace(".", ",");
+    return [dataHora, pzSelecionado, nivelFmt, maxFmt, status].join(";");
   });
-  const header = ["Data/Hora", "Piezômetro", "Nível (m)", "Status"].join(";");
+  const header = ["Data/Hora", "Piezômetro", "Nível (m)", "Nível Máx (m)", "Status"].join(";");
   const content = "﻿" + [header, ...rows].join("\r\n");
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -1332,11 +1519,13 @@ function atualizarVisaoGeral(mapa) {
       ? `<span class="chip-taxa-rapida" title="Variação rápida — investigar (ref. >0,1 m/dia já é gatilho profissional)">📈 variação rápida</span>`
       : "";
 
+    // P6 — badge NORMAL neutro (ISA-101: cor = anormalidade, ~90% da UI neutra)
+    const badgeCls = cls.lv === "normal" ? "tbadge tb-normal-neutro" : `tbadge tb-${cls.lv}`;
     return `
       <div class="pz-card${sel}" data-pz="${pz.id}">
         <div class="pz-card-top">
           <span class="pz-card-id">${pz.id}</span>
-          <span class="tbadge tb-${cls.lv}">${cls.lbl}</span>
+          <span class="${badgeCls}">${cls.lbl}</span>
         </div>
         <div class="pz-card-name">${pz.nome}</div>
         <div class="pz-card-value">${valorHtml}</div>
@@ -1400,11 +1589,12 @@ function atualizarMapa(mapa) {
 // ── SELEÇÃO DE PIEZÔMETRO / PERÍODO ───────────────────────────────────────────
 function resetPzState() {
   sparks.n = []; sparks.p = []; sparks.t = [];
-  charts.n = { labels: [], data: [], times: [] };
+  charts.n = { labels: [], data: [], times: [], maxData: [] };
   charts.t = { labels: [], data: [], times: [] };
-  statsWin.n = []; statsWin.p = []; statsWin.t = [];
+  statsWin.n = []; statsWin.p = []; statsWin.t = []; statsWin.nMax = [];
   readingsHistory = [];
   lastLevel = null;
+  lastTaxaRapidaState = false;
   ["n", "p", "t"].forEach(k => {
     const mn = document.getElementById(k + "-min"), mx = document.getElementById(k + "-max");
     const dl = document.getElementById(k + "-delta");
@@ -1427,7 +1617,7 @@ function updatePzLabels() {
   const rt = document.getElementById("pz-tag-readings");
   if (rt) rt.textContent = pzSelecionado;
   const et = document.getElementById("events-title");
-  if (et) et.textContent = `Histórico de Eventos (${pzSelecionado})`;
+  if (et) et.textContent = `Alarmes & Eventos (${pzSelecionado})`;
 }
 
 function selectPiezometro(id) {
@@ -1468,11 +1658,15 @@ async function loadHistoryAndStats() {
   const ht = pontosParaCampo(pontos, "temperatura");
 
   if (hn.length) {
-    charts.n.labels = hn.map(h => h.label);
-    charts.n.data   = hn.map(h => h.value);
-    charts.n.times  = hn.map(h => h.time);
-    statsWin.n      = hn.map(h => h.value);
+    charts.n.labels  = hn.map(h => h.label);
+    charts.n.data    = hn.map(h => h.value);
+    charts.n.times   = hn.map(h => h.time);
+    // P5 — série do pico do intervalo (cai para o próprio valor quando o Worker não manda nivel_max)
+    charts.n.maxData = hn.map(h => Number.isFinite(h.max) ? h.max : h.value);
+    statsWin.n       = hn.map(h => h.value);
+    statsWin.nMax    = charts.n.maxData.slice();
     updateStats("n", statsWin.n);
+    aplicarMaxNivelPico(); // P5 — MÁX 24H usa o pico do intervalo, não a média
     readingsHistory = hn.slice(-12).reverse().map(h => {
       const cls = classifyNivel(h.value);
       return { time: h.label, nivel: h.value, lv: cls.lv, lbl: cls.lbl };
@@ -1545,11 +1739,13 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts }) {
 
   // Stats (janela completa do período, não só os pontos visíveis no gráfico)
   pushStats("n", nivel);
+  pushStats("nMax", nivel); // leitura ao vivo é instantânea: o valor também é o pico do instante
   pushStats("p", pressao);
   pushStats("t", temperatura);
   updateStats("n", statsWin.n);
   updateStats("p", statsWin.p);
   updateStats("t", statsWin.t);
+  aplicarMaxNivelPico(); // P5 — MÁX 24H usa o pico do intervalo, não a média
 
   // Badge dinâmico de temperatura
   const bt = document.getElementById("badge-t");
@@ -1558,6 +1754,14 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts }) {
 
   // P3 — taxa de variação (display), independente do estado de comunicação
   renderTaxa(taxa_m_dia);
+
+  // P3+P4 — alarme de variação rápida, edge-triggered (só na transição parado→rápido),
+  // só com comunicação ok (dado stale não confirma tendência real)
+  const taxaRapidaAgora = Number.isFinite(taxa_m_dia) && Math.abs(taxa_m_dia) > CFG.taxaMaxMDia;
+  if (estadoComunicacao({ ts }) === "ok") {
+    if (taxaRapidaAgora && !lastTaxaRapidaState) addTaxaRow(taxa_m_dia);
+    lastTaxaRapidaState = taxaRapidaAgora;
+  }
 
   // P1 — dado stale nunca é avaliado como normal: alarme de nível fica suspenso,
   // o painel mostra o estado neutro "SEM SINAL" e a leitura VELHA não é
@@ -1662,9 +1866,12 @@ const FonteSimulada = {
     const pontos = [];
     for (let i = fb.count; i >= 0; i--) {
       const time = now - i * fb.stepMs;
+      const nivelAgua = parseFloat((baseLevel + (Math.random() - 0.5) * 1.6).toFixed(3));
       pontos.push({
         ts: Math.floor(time / 1000),
-        nivel_agua: parseFloat((baseLevel + (Math.random() - 0.5) * 1.6).toFixed(3)),
+        nivel_agua: nivelAgua,
+        // P5 — pico simulado do intervalo, sempre ≥ à média, para exercitar a série de máximo
+        nivel_max: parseFloat((nivelAgua + Math.random() * 0.3).toFixed(3)),
         pressao: null,
         temperatura: parseFloat((22 + Math.random() * 8).toFixed(1)),
       });
@@ -1746,6 +1953,7 @@ async function loadConfig() {
     }
     if (cfg && Number.isFinite(cfg.stale_seg)) CFG.staleSeg = cfg.stale_seg;
     if (cfg && Number.isFinite(cfg.taxa_max_m_dia)) CFG.taxaMaxMDia = cfg.taxa_max_m_dia;
+    if (cfg && Number.isFinite(cfg.histerese_m)) CFG.histereseM = cfg.histerese_m; // P4
     if (Array.isArray(cfg && cfg.piezometros) && cfg.piezometros.length) {
       // PIEZOMETROS é const — substitui o conteúdo do array in-place (não reatribui a variável)
       PIEZOMETROS.length = 0;
