@@ -236,62 +236,52 @@ function classify(n) {
 // Busca o último nível d'água de CADA piezômetro (agrupado pela tag
 // "piezometro") e retorna um objeto { "PZ-01": 10.4, "PZ-02": 12.3, ... }
 // (ou {} se não houver dados recentes).
+//
+// Usa o endpoint v1 /query com InfluxQL (não mais Flux + /api/v2/query):
+// contas novas do InfluxDB Cloud são "Serverless" e não respondem a Flux —
+// o v1 /query funciona tanto nelas quanto em contas Cloud TSM antigas.
 async function lerUltimosNiveis() {
-  const flux = `
-from(bucket: "${ALLOWED_BUCKET}")
-  |> range(start: -5m)
-  |> filter(fn: (r) => r._measurement == "${MEASUREMENT}")
-  |> filter(fn: (r) => r._field == "nivel_agua")
-  |> group(columns: ["piezometro"])
-  |> last()`;
+  const query =
+    `SELECT last("nivel_agua") AS nivel_agua FROM "${MEASUREMENT}" ` +
+    `WHERE time >= now() - 5m GROUP BY "piezometro"`;
 
-  const url = new URL(`${INFLUX_URL}/api/v2/query?org=${encodeURIComponent(INFLUX_ORG)}`);
-  const { status, body } = await httpsRequest(
-    {
-      hostname: url.hostname,
-      port:     url.port || 443,   // respeita porta não padrão (ex.: self-hosted :8086)
-      path:     url.pathname + url.search,
-      method:   "POST",
-      headers: {
-        "Authorization": `Token ${INFLUX_TOKEN}`,
-        "Content-Type":  "application/vnd.flux",
-        "Accept":        "application/csv",
-      },
-    },
-    flux
+  const url = new URL(
+    `${INFLUX_URL}/query?db=${encodeURIComponent(ALLOWED_BUCKET)}&q=${encodeURIComponent(query)}`
   );
+  const { status, body } = await httpsRequest({
+    hostname: url.hostname,
+    port:     url.port || 443,   // respeita porta não padrão (ex.: self-hosted :8086)
+    path:     url.pathname + url.search,
+    method:   "GET",
+    headers: {
+      "Authorization": `Token ${INFLUX_TOKEN}`,
+    },
+  });
   if (status !== 200) return {};
 
-  // CSV anotado do Influx com |> group(): a resposta traz VÁRIAS tabelas,
-  // uma por piezômetro, cada uma precedida por suas próprias linhas de
-  // anotação "#..." e (opcionalmente) uma linha em branco separando-a da
-  // tabela anterior. Por isso não assumimos um único cabeçalho fixo na
-  // linha 0 — reprocessamos os índices de coluna toda vez que aparece uma
-  // nova linha de cabeçalho (reconhecida por conter "_value").
+  // Resposta JSON do InfluxQL:
+  // {"results":[{"series":[{"tags":{"piezometro":"PZ-01"},
+  //   "columns":["time","nivel_agua"],"values":[["...",10.2]]}]}]}
+  // Uma série por valor distinto da tag GROUP BY (um piezômetro cada).
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return {};
+  }
+
   const niveis = {};
-  let header = null;
-  let iValue = -1;
-  let iPz = -1;
+  const series = (parsed.results && parsed.results[0] && parsed.results[0].series) || [];
 
-  for (const linhaRaw of body.split("\n")) {
-    const linha = linhaRaw.trim();
-    if (!linha || linha.startsWith("#")) continue; // anotação ou separador de tabela
+  for (const serie of series) {
+    const id = (serie.tags && serie.tags.piezometro) || "PZ-01";
+    const iValue = (serie.columns || []).indexOf("nivel_agua");
+    const primeiraLinha = serie.values && serie.values[0];
+    if (iValue < 0 || !primeiraLinha) continue;
 
-    const cols = linha.split(",");
-    if (cols.includes("_value")) {
-      // Nova linha de cabeçalho — recalcula os índices para esta tabela
-      header = cols;
-      iValue = header.indexOf("_value");
-      iPz    = header.indexOf("piezometro");
-      continue;
-    }
-    if (!header || iValue < 0) continue; // ainda não vimos um cabeçalho válido
-
-    const valor = parseFloat(cols[iValue]);
+    const valor = Number(primeiraLinha[iValue]);
     if (!Number.isFinite(valor)) continue;
 
-    const idBruto = iPz >= 0 ? cols[iPz] : "";
-    const id = idBruto && idBruto.trim() ? idBruto.trim() : "PZ-01";
     niveis[id] = valor;
   }
 
@@ -396,8 +386,8 @@ const server = http.createServer((req, res) => {
     return res.end();
   }
 
-  // Rate limiting — aplicado apenas em /query para proteger o proxy InfluxDB
-  if (url.pathname === "/query") {
+  // Rate limiting — aplicado em /query e /queryql para proteger o proxy InfluxDB
+  if (url.pathname === "/query" || url.pathname === "/queryql") {
     if (!checkRateLimit(ip)) {
       metrics.blockedByRate++;
       log("WARN", "Rate limit excedido", { ip, path: url.pathname });
@@ -407,7 +397,10 @@ const server = http.createServer((req, res) => {
 
   log("INFO", `${req.method} ${url.pathname}`, { ip });
 
-  // /query → proxy para InfluxDB
+  // /query → proxy para InfluxDB (Flux, via /api/v2/query)
+  // Mantido para compatibilidade com contas InfluxDB Cloud TSM antigas.
+  // Contas novas ("Cloud Serverless") não respondem a Flux — use /queryql
+  // (InfluxQL, via v1 /query), que funciona nos dois tipos de conta.
   if (req.method === "POST" && url.pathname === "/query") {
     let body  = "";
     let bytes = 0;
@@ -435,6 +428,84 @@ const server = http.createServer((req, res) => {
       }
 
       proxyToInflux(body, res);
+    });
+
+    return;
+  }
+
+  // /queryql → proxy para InfluxDB (InfluxQL, via v1 /query)
+  // Usado pelo dashboard no modo "com servidor" em contas InfluxDB Cloud
+  // Serverless, onde o /query (Flux) acima não funciona.
+  if (req.method === "POST" && url.pathname === "/queryql") {
+    let body  = "";
+    let bytes = 0;
+
+    req.on("data", (chunk) => {
+      bytes += chunk.length;
+      if (bytes > MAX_BODY_BYTES) {
+        req.destroy();
+        return sendJSON(res, 413, { error: "Payload muito grande" });
+      }
+      body += chunk;
+    });
+
+    req.on("end", () => {
+      let payload;
+      try {
+        payload = JSON.parse(body);
+      } catch {
+        return sendJSON(res, 400, { error: "JSON inválido" });
+      }
+
+      const q = payload && payload.q;
+      if (typeof q !== "string" || !q.trim()) {
+        return sendJSON(res, 400, { error: "Campo 'q' (string) é obrigatório" });
+      }
+
+      // Segurança: o proxy só repassa consultas de LEITURA sobre o
+      // measurement do projeto. Sem isso, qualquer pessoa com a URL poderia
+      // executar InfluxQL arbitrário (outros measurements, DROP, DELETE,
+      // escrita etc.) usando o nosso token.
+      const query = q.trim();
+      const queryUpper = query.toUpperCase();
+      const comecaComSelect = queryUpper.startsWith("SELECT");
+      const referenciaMeasurement = queryUpper.includes(`FROM "${MEASUREMENT.toUpperCase()}"`);
+      const temPontoEVirgula = query.includes(";");
+      const palavrasProibidas = ["INTO", "DROP", "DELETE", "CREATE", "GRANT"];
+      const temPalavraProibida = palavrasProibidas.some((p) => new RegExp(`\\b${p}\\b`, "i").test(query));
+
+      if (!comecaComSelect || !referenciaMeasurement || temPontoEVirgula || temPalavraProibida) {
+        return sendJSON(res, 403, {
+          error:
+            `Apenas consultas SELECT de leitura sobre "${MEASUREMENT}" são permitidas ` +
+            `(sem ";" nem INTO/DROP/DELETE/CREATE/GRANT)`,
+        });
+      }
+
+      const influxUrl = new URL(
+        `${INFLUX_URL}/query?db=${encodeURIComponent(ALLOWED_BUCKET)}&q=${encodeURIComponent(query)}`
+      );
+
+      httpsRequest({
+        hostname: influxUrl.hostname,
+        port:     influxUrl.port || 443,
+        path:     influxUrl.pathname + influxUrl.search,
+        method:   "GET",
+        headers: {
+          "Authorization": `Token ${INFLUX_TOKEN}`,
+        },
+      })
+        .then(({ status, body: influxBody }) => {
+          res.writeHead(status, {
+            "Content-Type":                "application/json; charset=utf-8",
+            "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+          });
+          res.end(influxBody);
+        })
+        .catch((e) => {
+          console.error("Proxy InfluxQL error:", e.message);
+          sendJSON(res, 502, { error: e.message });
+        });
     });
 
     return;
@@ -552,6 +623,7 @@ server.listen(PORT, () => {
   console.log(`   → Dashboard:  http://0.0.0.0:${PORT}/`);
   console.log(`   → Health:     http://0.0.0.0:${PORT}/health`);
   console.log(`   → Proxy:      http://0.0.0.0:${PORT}/query`);
+  console.log(`   → Consulta QL: http://0.0.0.0:${PORT}/queryql`);
   console.log(`   → Ingestão:  http://0.0.0.0:${PORT}/ingest`);
   console.log(`   → Alertas:    http://0.0.0.0:${PORT}/alerts`);
   console.log(`🔔 Notificações — Telegram: ${telegramOn ? "ATIVO" : "desativado"} · SMS (Twilio): ${smsOn ? "ATIVO" : "desativado"}`);
