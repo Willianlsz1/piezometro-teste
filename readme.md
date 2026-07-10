@@ -227,6 +227,8 @@ const PROXY_URL = "https://SEU-APP.onrender.com/query";
 
 O `server.js` verifica o último `nivel_agua` no InfluxDB a cada `ALERT_POLL_SEC` segundos e notifica **nas transições de faixa** (anti-spam: não repete a mesma faixa; o nível CRÍTICO é reenviado a cada `ALERT_REPEAT_MIN` minutos enquanto persistir). O histórico de notificações fica exposto em `GET /alerts`.
 
+O sistema monitora **múltiplos piezômetros**: cada leitura carrega o identificador do instrumento (tag `piezometro`, ex. `PZ-01`), gravado junto com a medição no InfluxDB. O motor de alertas acompanha cada piezômetro separadamente — a mesma lógica de transição de faixa e repetição do CRÍTICO é aplicada por instrumento — e as notificações (e o histórico em `GET /alerts`) indicam qual piezômetro disparou o alerta. O id é configurado no firmware através da constante `PIEZOMETRO_ID`.
+
 ### Telegram (gratuito — recomendado para o TCC)
 
 1. No Telegram, fale com o **@BotFather** → `/newbot` → copie o **token**

@@ -65,6 +65,25 @@ function setCORSHeaders(res) {
   res.setHeader("Vary", "Origin");
 }
 
+// ── LOG E RATE LIMIT (proteção do /query) ────────────────────────────────────
+const metrics = { blockedByRate: 0 };
+
+function log(level, msg, meta) {
+  console.log(`[${level}] ${msg}`, meta || "");
+}
+
+const RATE_LIMIT_WINDOW_MS = 1000;
+const RATE_LIMIT_MAX_REQ   = 10; // máximo de requisições por IP por segundo
+const rateBuckets = new Map(); // ip → timestamps das requisições recentes
+
+function checkRateLimit(ip) {
+  const agora = Date.now();
+  const recentes = (rateBuckets.get(ip) || []).filter((t) => agora - t < RATE_LIMIT_WINDOW_MS);
+  recentes.push(agora);
+  rateBuckets.set(ip, recentes);
+  return recentes.length <= RATE_LIMIT_MAX_REQ;
+}
+
 // Requisição HTTPS genérica que devolve Promise<{status, body}>
 function httpsRequest(options, body) {
   return new Promise((resolve, reject) => {
@@ -133,8 +152,13 @@ function proxyToInflux(flux, res) {
 // servidor converte para line protocol e grava, usando o token de escrita.
 // Assim nenhum token do InfluxDB fica no firmware — só a DEVICE_KEY.
 
-// Converte uma leitura {nivel_agua, pressao?, temperatura?, ts?} em uma linha
-// de line protocol do InfluxDB. Retorna null se nivel_agua não for válido.
+// Identificador do instrumento aceito em leitura.piezometro (ex.: "PZ-01").
+// Só letras/números/"_"/"-", até 32 caracteres — vira TAG no line protocol.
+const PIEZOMETRO_ID_RE = /^[A-Za-z0-9_-]{1,32}$/;
+
+// Converte uma leitura {piezometro?, nivel_agua, pressao?, temperatura?, ts?}
+// em uma linha de line protocol do InfluxDB. Retorna null se nivel_agua não
+// for válido.
 function leituraParaLinha(leitura) {
   if (!leitura || typeof leitura !== "object") return null;
 
@@ -149,7 +173,14 @@ function leituraParaLinha(leitura) {
     campos.push(`temperatura=${leitura.temperatura}`);
   }
 
-  let linha = `${MEASUREMENT} ${campos.join(",")}`;
+  // Identifica de qual piezômetro veio a leitura — gravado como TAG do
+  // measurement, para o motor de alertas monitorar cada instrumento
+  // separadamente. Ausente ou inválido: mantém a linha sem tag, compatível
+  // com leituras antigas de um único piezômetro.
+  const temTag = typeof leitura.piezometro === "string" && PIEZOMETRO_ID_RE.test(leitura.piezometro);
+  const tag    = temTag ? `,piezometro=${leitura.piezometro}` : "";
+
+  let linha = `${MEASUREMENT}${tag} ${campos.join(",")}`;
 
   // ts em segundos (epoch) → nanossegundos, montado como string para não
   // perder precisão. Só aceita valores razoáveis; fora disso, omite o
@@ -190,8 +221,10 @@ function escreverNoInflux(lineProtocol) {
 // O servidor vigia o InfluxDB e dispara Telegram/SMS quando o nível d'água
 // muda de faixa — cumprindo o requisito de "alertas preventivos" da demanda
 // SAGA sem depender de ninguém estar olhando o dashboard.
-let lastNotifiedLevel = null;   // null = primeiro ciclo (não notifica NORMAL)
-let lastCriticalNotify = 0;
+// Estado de notificação por piezômetro (chave = id, ex. "PZ-01"). Ausente no
+// mapa = primeiro ciclo daquele id (não notifica NORMAL).
+const lastNotifiedLevel = {};
+const lastCriticalNotify = {};
 const alertLog = [];            // histórico exposto em GET /alerts
 
 function classify(n) {
@@ -200,12 +233,16 @@ function classify(n) {
   return "NORMAL";
 }
 
-async function lerUltimoNivel() {
+// Busca o último nível d'água de CADA piezômetro (agrupado pela tag
+// "piezometro") e retorna um objeto { "PZ-01": 10.4, "PZ-02": 12.3, ... }
+// (ou {} se não houver dados recentes).
+async function lerUltimosNiveis() {
   const flux = `
 from(bucket: "${ALLOWED_BUCKET}")
   |> range(start: -5m)
   |> filter(fn: (r) => r._measurement == "${MEASUREMENT}")
   |> filter(fn: (r) => r._field == "nivel_agua")
+  |> group(columns: ["piezometro"])
   |> last()`;
 
   const url = new URL(`${INFLUX_URL}/api/v2/query?org=${encodeURIComponent(INFLUX_ORG)}`);
@@ -223,16 +260,42 @@ from(bucket: "${ALLOWED_BUCKET}")
     },
     flux
   );
-  if (status !== 200) return null;
+  if (status !== 200) return {};
 
-  // CSV anotado do Influx: acha a coluna _value na linha de cabeçalho
-  const lines = body.trim().split("\n").filter((l) => l && !l.startsWith("#"));
-  if (lines.length < 2) return null;
-  const header = lines[0].split(",");
-  const iV = header.indexOf("_value");
-  if (iV < 0) return null;
-  const v = parseFloat(lines[1].split(",")[iV]);
-  return Number.isFinite(v) ? v : null;
+  // CSV anotado do Influx com |> group(): a resposta traz VÁRIAS tabelas,
+  // uma por piezômetro, cada uma precedida por suas próprias linhas de
+  // anotação "#..." e (opcionalmente) uma linha em branco separando-a da
+  // tabela anterior. Por isso não assumimos um único cabeçalho fixo na
+  // linha 0 — reprocessamos os índices de coluna toda vez que aparece uma
+  // nova linha de cabeçalho (reconhecida por conter "_value").
+  const niveis = {};
+  let header = null;
+  let iValue = -1;
+  let iPz = -1;
+
+  for (const linhaRaw of body.split("\n")) {
+    const linha = linhaRaw.trim();
+    if (!linha || linha.startsWith("#")) continue; // anotação ou separador de tabela
+
+    const cols = linha.split(",");
+    if (cols.includes("_value")) {
+      // Nova linha de cabeçalho — recalcula os índices para esta tabela
+      header = cols;
+      iValue = header.indexOf("_value");
+      iPz    = header.indexOf("piezometro");
+      continue;
+    }
+    if (!header || iValue < 0) continue; // ainda não vimos um cabeçalho válido
+
+    const valor = parseFloat(cols[iValue]);
+    if (!Number.isFinite(valor)) continue;
+
+    const idBruto = iPz >= 0 ? cols[iPz] : "";
+    const id = idBruto && idBruto.trim() ? idBruto.trim() : "PZ-01";
+    niveis[id] = valor;
+  }
+
+  return niveis;
 }
 
 async function sendTelegram(text) {
@@ -270,7 +333,7 @@ async function sendSMS(text) {
   return status === 201 ? "enviado" : `falha HTTP ${status}`;
 }
 
-async function notificar(nivel, valor) {
+async function notificar(pz, nivel, valor) {
   const emoji = { NORMAL: "🟢", ATENCAO: "🟡", CRITICO: "🔴" }[nivel];
   const acao = {
     NORMAL:  "Nível retornou à faixa segura.",
@@ -278,7 +341,7 @@ async function notificar(nivel, valor) {
     CRITICO: `Nível acima de ${NIVEL_CRITICO} m — ACIONAR EQUIPE DE GEOTECNIA!`,
   }[nivel];
   const text =
-    `${emoji} SAMARCO PIEZÔMETRO — ${nivel}\n` +
+    `${emoji} SAMARCO PIEZÔMETRO ${pz} — ${nivel}\n` +
     `Nível d'água: ${valor.toFixed(2)} m\n${acao}\n` +
     `${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`;
 
@@ -287,30 +350,34 @@ async function notificar(nivel, valor) {
     sendSMS(text).catch((e) => `erro: ${e.message}`),
   ]);
 
-  const registro = { ts: new Date().toISOString(), nivel, valor, telegram, sms };
+  const registro = { ts: new Date().toISOString(), piezometro: pz, nivel, valor, telegram, sms };
   alertLog.unshift(registro);
   if (alertLog.length > 100) alertLog.pop();
-  console.log(`🔔 Alerta ${nivel} (${valor.toFixed(2)} m) — telegram: ${telegram} · sms: ${sms}`);
+  console.log(`🔔 Alerta ${pz} ${nivel} (${valor.toFixed(2)} m) — telegram: ${telegram} · sms: ${sms}`);
 }
 
 async function checkAlerts() {
   try {
-    const valor = await lerUltimoNivel();
-    if (valor === null) return; // sem dados recentes — nada a fazer
-
-    const nivel = classify(valor);
+    const niveis = await lerUltimosNiveis();
     const agora = Date.now();
-    const mudouDeFaixa   = nivel !== lastNotifiedLevel;
-    const repetirCritico = nivel === "CRITICO" &&
-                           agora - lastCriticalNotify >= ALERT_REPEAT_MIN * 60000;
 
-    if (mudouDeFaixa || repetirCritico) {
-      // No primeiro ciclo após o boot, só notifica se já estiver fora do normal
-      if (lastNotifiedLevel !== null || nivel !== "NORMAL") {
-        await notificar(nivel, valor);
-        if (nivel === "CRITICO") lastCriticalNotify = agora;
+    for (const [pz, valor] of Object.entries(niveis)) {
+      const nivel = classify(valor);
+      const anterior = Object.prototype.hasOwnProperty.call(lastNotifiedLevel, pz)
+        ? lastNotifiedLevel[pz]
+        : null; // null = primeiro ciclo deste piezômetro (não notifica NORMAL)
+      const mudouDeFaixa   = nivel !== anterior;
+      const repetirCritico = nivel === "CRITICO" &&
+                             agora - (lastCriticalNotify[pz] || 0) >= ALERT_REPEAT_MIN * 60000;
+
+      if (mudouDeFaixa || repetirCritico) {
+        // No primeiro ciclo após o boot, só notifica se já estiver fora do normal
+        if (anterior !== null || nivel !== "NORMAL") {
+          await notificar(pz, nivel, valor);
+          if (nivel === "CRITICO") lastCriticalNotify[pz] = agora;
+        }
+        lastNotifiedLevel[pz] = nivel;
       }
-      lastNotifiedLevel = nivel;
     }
   } catch (e) {
     console.error("Motor de alertas:", e.message);
@@ -319,6 +386,8 @@ async function checkAlerts() {
 
 // ── SERVIDOR ──────────────────────────────────────────────────────────────────
 const server = http.createServer((req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const ip  = req.socket.remoteAddress;
   setCORSHeaders(res);
 
   // Preflight CORS
@@ -438,6 +507,7 @@ const server = http.createServer((req, res) => {
     return sendJSON(res, 200, {
       canais:   { telegram: telegramOn, sms: smsOn },
       limiares: { atencao: NIVEL_ATENCAO, critico: NIVEL_CRITICO },
+      piezometros: { ...lastNotifiedLevel }, // último estado conhecido por id
       notificacoes: alertLog.slice(0, 50),
     });
   }
