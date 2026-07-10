@@ -35,6 +35,13 @@ function getConfig(env) {
   const NIVEL_CRITICO = parseFloat(env.NIVEL_CRITICO || "15");
   const ALERT_REPEAT_MIN = parseInt(env.ALERT_REPEAT_MIN || "15", 10);
 
+  // P2 (alarme de comunicação) e P3 (taxa de variação) — ver
+  // docs/DASHBOARD_PROFISSIONAL.md §2/§4/§6.
+  const SILENCE_ALERT_SEC = parseInt(env.SILENCE_ALERT_SEC || "900", 10);
+  const TAXA_JANELA_MIN = parseInt(env.TAXA_JANELA_MIN || "60", 10);
+  const TAXA_MAX_M_DIA = parseFloat(env.TAXA_MAX_M_DIA || "0.5");
+  const STALE_SEG = parseInt(env.STALE_SEG || "60", 10);
+
   const TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN || "";
   const TELEGRAM_CHAT_ID = env.TELEGRAM_CHAT_ID || "";
   const TWILIO_ACCOUNT_SID = env.TWILIO_ACCOUNT_SID || "";
@@ -48,6 +55,7 @@ function getConfig(env) {
   return {
     ALLOWED_ORIGIN, DEVICE_KEY,
     NIVEL_ATENCAO, NIVEL_CRITICO, ALERT_REPEAT_MIN,
+    SILENCE_ALERT_SEC, TAXA_JANELA_MIN, TAXA_MAX_M_DIA, STALE_SEG,
     TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,
     TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM, TWILIO_TO,
     telegramOn, smsOn,
@@ -160,6 +168,56 @@ async function lerUltimosNiveis(env) {
   return niveis;
 }
 
+// P2 — busca a última leitura de CADA piezômetro já cadastrado, SEM janela
+// de tempo (ao contrário de lerUltimosNiveis, que só enxerga quem falou nos
+// últimos 5 min). É essa consulta sem filtro que permite detectar quando um
+// instrumento parou de reportar: se ele sumisse da query, não haveria como
+// saber há quanto tempo está mudo.
+async function lerUltimasLeiturasTodas(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT l.piezometro, l.nivel_agua, l.ts
+       FROM leituras l
+       JOIN (
+         SELECT piezometro, MAX(id) AS mid FROM leituras GROUP BY piezometro
+       ) m ON l.id = m.mid`
+  ).all();
+
+  const ultimas = {};
+  for (const row of results || []) {
+    ultimas[row.piezometro] = { nivel_agua: Number(row.nivel_agua), ts: Number(row.ts) };
+  }
+  return ultimas;
+}
+
+// P3 — busca, para um piezômetro, a leitura mais próxima (mais recente que
+// não ultrapasse) de um instante-alvo no passado. Usada tanto pelo motor de
+// alertas (taxa de variação) quanto por GET /ultimos (campo taxa_m_dia).
+async function lerLeituraBaseline(env, piezometro, tsAlvo) {
+  const { results } = await env.DB.prepare(
+    `SELECT nivel_agua, ts FROM leituras
+      WHERE piezometro = ?1 AND ts <= ?2
+      ORDER BY ts DESC LIMIT 1`
+  )
+    .bind(piezometro, tsAlvo)
+    .all();
+
+  const row = results && results[0];
+  if (!row) return null;
+  return { nivel_agua: Number(row.nivel_agua), ts: Number(row.ts) };
+}
+
+// P3 — calcula a taxa de variação (m/dia) entre uma leitura atual e uma
+// leitura-base, exigindo que o intervalo entre elas seja de pelo menos
+// metade da janela configurada (evita taxa inflada por dois pontos quase
+// simultâneos, ex.: piezômetro recém-cadastrado). Retorna null se não houver
+// baseline válida.
+function calcularTaxaMDia(cfg, atual, baseline) {
+  if (!baseline) return null;
+  const deltaSeg = atual.ts - baseline.ts;
+  if (deltaSeg < (cfg.TAXA_JANELA_MIN * 60) / 2) return null;
+  return ((atual.nivel_agua - baseline.nivel_agua) / deltaSeg) * 86400;
+}
+
 async function sendTelegram(cfg, text) {
   if (!cfg.telegramOn) return "desativado";
   try {
@@ -212,10 +270,52 @@ async function notificar(cfg, alertLog, pz, nivel, valor) {
     sendSMS(cfg, text),
   ]);
 
-  const registro = { ts: new Date().toISOString(), piezometro: pz, nivel, valor, telegram, sms };
+  const registro = { ts: new Date().toISOString(), tipo: "nivel", piezometro: pz, nivel, valor, telegram, sms };
   alertLog.unshift(registro);
   if (alertLog.length > 100) alertLog.pop();
   console.log(`🔔 Alerta ${pz} ${nivel} (${valor.toFixed(2)} m) — telegram: ${telegram} · sms: ${sms}`);
+}
+
+// P2 — notifica transição de estado de COMUNICAÇÃO (camada separada do
+// alarme de nível). "silencioMin" só é relevante na transição OK→SEM_SINAL.
+async function notificarComunicacao(cfg, alertLog, pz, status, ultimaLeituraTs, silencioMin) {
+  const dataUltima = new Date(ultimaLeituraTs * 1000).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+  });
+  const text =
+    status === "SEM_SINAL"
+      ? `⚠️ SAMARCO PIEZÔMETRO ${pz} — SEM SINAL\n` +
+        `Sem leituras há ${silencioMin} min (última: ${dataUltima}).\n` +
+        `Verificar instrumento/comunicação.`
+      : `🟢 SAMARCO PIEZÔMETRO ${pz} — COMUNICAÇÃO RESTABELECIDA\n` +
+        `Instrumento voltou a reportar.`;
+
+  const [telegram, sms] = await Promise.all([sendTelegram(cfg, text), sendSMS(cfg, text)]);
+
+  const registro = { ts: new Date().toISOString(), tipo: "comunicacao", piezometro: pz, status, telegram, sms };
+  alertLog.unshift(registro);
+  if (alertLog.length > 100) alertLog.pop();
+  console.log(`🔔 Comunicação ${pz} ${status} — telegram: ${telegram} · sms: ${sms}`);
+}
+
+// P3 — notifica transição de estado de TAXA DE VARIAÇÃO. "taxa"/"limite" só
+// são relevantes na transição OK→TAXA_ALTA (na recuperação a mensagem é só
+// informativa).
+async function notificarTaxa(cfg, alertLog, pz, status, taxa, limite) {
+  const text =
+    status === "TAXA_ALTA"
+      ? `📈 SAMARCO PIEZÔMETRO ${pz} — VARIAÇÃO RÁPIDA\n` +
+        `Nível ${taxa >= 0 ? "subindo" : "descendo"} ${Math.abs(taxa).toFixed(2)} m/dia (limite ${limite})\n` +
+        `Investigar mesmo dentro da faixa normal.`
+      : `🟢 SAMARCO PIEZÔMETRO ${pz} — VARIAÇÃO NORMALIZADA\n` +
+        `Taxa de variação voltou abaixo do limite.`;
+
+  const [telegram, sms] = await Promise.all([sendTelegram(cfg, text), sendSMS(cfg, text)]);
+
+  const registro = { ts: new Date().toISOString(), tipo: "taxa", piezometro: pz, status, taxa, telegram, sms };
+  alertLog.unshift(registro);
+  if (alertLog.length > 100) alertLog.pop();
+  console.log(`🔔 Taxa ${pz} ${status} (${taxa != null ? taxa.toFixed(2) : "?"} m/dia) — telegram: ${telegram} · sms: ${sms}`);
 }
 
 // Estado persistido no KV — uma única chave "state", lida uma vez no início
@@ -223,20 +323,30 @@ async function notificar(cfg, alertLog, pz, nivel, valor) {
 // flag de mutação). Na maioria dos ciclos nenhum piezômetro muda de faixa,
 // então as escritas ficam muito abaixo do limite do free tier do KV
 // (1000 writes/dia) mesmo com cron de 1 minuto.
+function estadoVazio() {
+  return {
+    lastNotifiedLevel: {},
+    lastCriticalNotify: {},
+    commStatus: {}, // P2 — pz → "OK" | "SEM_SINAL"
+    taxaStatus: {}, // P3 — pz → "OK" | "TAXA_ALTA"
+    alertLog: [],
+  };
+}
+
 async function lerEstado(env) {
   const raw = await env.ALERT_STATE.get("state");
-  if (!raw) {
-    return { lastNotifiedLevel: {}, lastCriticalNotify: {}, alertLog: [] };
-  }
+  if (!raw) return estadoVazio();
   try {
     const parsed = JSON.parse(raw);
     return {
       lastNotifiedLevel: parsed.lastNotifiedLevel || {},
       lastCriticalNotify: parsed.lastCriticalNotify || {},
+      commStatus: parsed.commStatus || {},
+      taxaStatus: parsed.taxaStatus || {},
       alertLog: Array.isArray(parsed.alertLog) ? parsed.alertLog : [],
     };
   } catch {
-    return { lastNotifiedLevel: {}, lastCriticalNotify: {}, alertLog: [] };
+    return estadoVazio();
   }
 }
 
@@ -250,8 +360,13 @@ async function salvarEstado(env, estado) {
 async function checkAlerts(cfg, env, estado) {
   let mutou = false;
   try {
+    // Camada de NÍVEL — só enxerga quem teve leitura nos últimos 5 minutos.
+    // Um piezômetro em SEM_SINAL simplesmente não aparece aqui: dado ausente
+    // não conta como NORMAL, então ele fica de fora da avaliação de nível
+    // (em vez de "puxar" a última leitura antiga e mascarar o silêncio).
     const niveis = await lerUltimosNiveis(env);
     const agora = Date.now();
+    const agoraSeg = Math.floor(agora / 1000);
 
     for (const [pz, valor] of Object.entries(niveis)) {
       const nivel = classify(cfg, valor);
@@ -268,6 +383,40 @@ async function checkAlerts(cfg, env, estado) {
           if (nivel === "CRITICO") estado.lastCriticalNotify[pz] = agora;
         }
         estado.lastNotifiedLevel[pz] = nivel;
+        mutou = true;
+      }
+
+      // P3 — taxa de variação, só avaliada para quem tem leitura recente
+      // (mesmo conjunto acima). Compara com a leitura mais próxima de
+      // "agora - TAXA_JANELA_MIN".
+      const tsAlvo = agoraSeg - cfg.TAXA_JANELA_MIN * 60;
+      const baseline = await lerLeituraBaseline(env, pz, tsAlvo);
+      const taxa = calcularTaxaMDia(cfg, { nivel_agua: valor, ts: agoraSeg }, baseline);
+
+      if (taxa !== null) {
+        const statusTaxa = Math.abs(taxa) > cfg.TAXA_MAX_M_DIA ? "TAXA_ALTA" : "OK";
+        const statusTaxaAnterior = estado.taxaStatus[pz] || "OK";
+        if (statusTaxa !== statusTaxaAnterior) {
+          await notificarTaxa(cfg, estado.alertLog, pz, statusTaxa, taxa, cfg.TAXA_MAX_M_DIA);
+          estado.taxaStatus[pz] = statusTaxa;
+          mutou = true;
+        }
+      }
+    }
+
+    // Camada de COMUNICAÇÃO (P2) — consulta TODOS os piezômetros já
+    // cadastrados, sem janela de tempo, para detectar silêncio prolongado.
+    // É deliberadamente separada da camada de nível acima.
+    const ultimas = await lerUltimasLeiturasTodas(env);
+    for (const [pz, leitura] of Object.entries(ultimas)) {
+      const silencioSeg = agoraSeg - leitura.ts;
+      const statusComm = silencioSeg > cfg.SILENCE_ALERT_SEC ? "SEM_SINAL" : "OK";
+      const statusCommAnterior = estado.commStatus[pz] || "OK";
+
+      if (statusComm !== statusCommAnterior) {
+        const silencioMin = Math.round(silencioSeg / 60);
+        await notificarComunicacao(cfg, estado.alertLog, pz, statusComm, leitura.ts, silencioMin);
+        estado.commStatus[pz] = statusComm;
         mutou = true;
       }
     }
@@ -343,11 +492,23 @@ async function handleUltimos(env, cfg) {
 
     const out = {};
     for (const row of results || []) {
+      // P3 — taxa de variação (m/dia) desde a leitura mais próxima de
+      // "agora - TAXA_JANELA_MIN", mesmo cálculo usado no motor de alertas.
+      // null quando ainda não há baseline suficiente (instrumento novo).
+      const tsAlvo = row.ts - cfg.TAXA_JANELA_MIN * 60;
+      const baseline = await lerLeituraBaseline(env, row.piezometro, tsAlvo);
+      const taxa = calcularTaxaMDia(
+        cfg,
+        { nivel_agua: Number(row.nivel_agua), ts: Number(row.ts) },
+        baseline
+      );
+
       out[row.piezometro] = {
         nivel_agua: row.nivel_agua,
         pressao: row.pressao,
         temperatura: row.temperatura,
         ts: row.ts,
+        taxa_m_dia: taxa,
       };
     }
     return json(cfg, 200, out);
@@ -408,6 +569,8 @@ async function handleAlerts(env, cfg) {
     canais: { telegram: cfg.telegramOn, sms: cfg.smsOn },
     limiares: { atencao: cfg.NIVEL_ATENCAO, critico: cfg.NIVEL_CRITICO },
     piezometros: { ...estado.lastNotifiedLevel },
+    comunicacao: { ...estado.commStatus }, // P2
+    taxas: { ...estado.taxaStatus }, // P3
     notificacoes: estado.alertLog.slice(0, 50),
   });
 }
@@ -432,6 +595,8 @@ function handleConfig(env, cfg) {
     limiares: { atencao: cfg.NIVEL_ATENCAO, critico: cfg.NIVEL_CRITICO },
     ranges: Object.keys(RANGES),
     piezometros,
+    stale_seg: cfg.STALE_SEG, // P2 — janela que o dashboard usa p/ marcar "sem sinal" na UI
+    taxa_max_m_dia: cfg.TAXA_MAX_M_DIA, // P3 — limiar de variação rápida
   });
 }
 

@@ -75,6 +75,27 @@ Edite o bloco `[vars]` em `wrangler.toml` conforme o seu ambiente:
 - `NIVEL_ATENCAO`, `NIVEL_CRITICO`, `ALERT_REPEAT_MIN`
 - `TWILIO_FROM`, `TWILIO_TO` (só usados se os segredos Twilio estiverem
   definidos)
+- `SILENCE_ALERT_SEC` (default `"900"`, 15 min) → tempo de silêncio de um
+  piezômetro (sem nenhuma leitura nova, independente do valor) a partir do
+  qual o motor de alertas dispara o **alarme de comunicação** — camada
+  separada do alarme de nível, que avisa Telegram/SMS quando o instrumento
+  "fica mudo" e quando ele volta a reportar. Dado ausente nunca é tratado
+  como NORMAL: enquanto um piezômetro está em silêncio, ele fica de fora da
+  avaliação de nível.
+- `TAXA_JANELA_MIN` (default `"60"`, 1 hora) → janela usada para calcular a
+  **taxa de variação** do nível d'água: cada leitura atual é comparada com a
+  leitura mais próxima de "agora − `TAXA_JANELA_MIN`" para estimar a
+  velocidade de subida/descida em m/dia (campo `taxa_m_dia` em
+  `/ultimos`).
+- `TAXA_MAX_M_DIA` (default `"0.5"`) → limite de taxa de variação (m/dia)
+  acima do qual dispara o alerta de "variação rápida", mesmo com o nível
+  ainda dentro da faixa NORMAL. A referência profissional (ASDSO) é 0,1
+  m/dia; o default aqui é maior de propósito, por se tratar de um protótipo
+  didático com sensor stand-in mais ruidoso.
+- `STALE_SEG` (default `"60"`) → não é usado pelo motor de alertas em si;
+  é só servido em `GET /config` para o **dashboard** decidir quando marcar um
+  piezômetro como "sem sinal" na interface, evitando duplicar esse número
+  no `index.html`.
 
 ## 6. Deploy
 

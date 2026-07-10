@@ -48,6 +48,27 @@ ALERT_REPEAT_MIN   = "15"
 TWILIO_FROM        = ""
 TWILIO_TO          = ""
 
+# Silêncio de instrumento além deste tempo (segundos) = alarme de COMUNICAÇÃO,
+# camada separada do alarme de nível (ver docs/DASHBOARD_PROFISSIONAL.md §2/§6,
+# P2). Default 900s = 15 min.
+SILENCE_ALERT_SEC  = "900"
+
+# Janela (minutos) usada para calcular a taxa de variação do nível d'água
+# (m/dia) — compara a leitura atual com a leitura mais próxima de
+# "agora - TAXA_JANELA_MIN". Default 60 min.
+TAXA_JANELA_MIN    = "60"
+
+# Taxa de variação (m/dia) acima da qual dispara alerta de "variação rápida",
+# mesmo com o nível dentro da faixa normal. Referência profissional (ASDSO):
+# 0,1 m/dia. Default aqui é maior por se tratar de protótipo didático, para
+# não gerar alarme excessivo com o ruído do sensor stand-in.
+TAXA_MAX_M_DIA     = "0.5"
+
+# Janela (segundos) que o DASHBOARD usa para marcar um piezômetro como "sem
+# sinal" na UI — servida via GET /config para não duplicar esse número no
+# index.html (mesmo espírito de NIVEL_ATENCAO/NIVEL_CRITICO).
+STALE_SEG          = "60"
+
 # Catálogo de instrumentos exibido no dashboard (mapa/seletor de piezômetro):
 # id, nome amigável e coordenadas de cada piezômetro cadastrado. Servido em
 # GET /config para o dashboard carregar no boot em vez de hard-codar a lista.

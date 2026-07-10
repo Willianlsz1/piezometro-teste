@@ -34,6 +34,10 @@
   --red:        #f04848;
   --red-bg:     rgba(240,72,72,.08);
   --red-bd:     rgba(240,72,72,.2);
+  /* cinza do estado "sem sinal" — nunca vermelho, nunca aparência de normal (ver docs §2) */
+  --gray:       #8a90a3;
+  --gray-bg:    rgba(138,144,163,.10);
+  --gray-bd:    rgba(138,144,163,.28);
   --mono: 'IBM Plex Mono', monospace;
   --sans: 'IBM Plex Sans', sans-serif;
 }
@@ -214,6 +218,31 @@ header {
 }
 .pz-card-unit { font-size: 12px; opacity: .6; }
 
+/* ── ESTADO "SEM SINAL" (P1) — cinza + hachura, nunca vermelho, nunca parece normal ── */
+.pz-card.pz-sem-sinal {
+  background:
+    repeating-linear-gradient(135deg, rgba(138,144,163,.07) 0 6px, transparent 6px 12px),
+    var(--bg-card2);
+  border-color: var(--border);
+}
+.pz-card-value.valor-esmaecido { opacity: .45; }
+.pz-card-lastseen {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: var(--mono);
+}
+.tb-semsinal {
+  background: var(--gray-bg); color: var(--gray); border: 1px solid var(--gray-bd);
+}
+
+/* ── CHIP "VARIAÇÃO RÁPIDA" (P3) — âmbar, cor + texto ── */
+.chip-taxa-rapida {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 600;
+  color: var(--yellow); background: var(--yellow-bg); border: 1px solid var(--yellow-bd);
+  border-radius: 4px; padding: 2px 6px; margin-top: 2px; align-self: flex-start;
+}
+
 .pz-detail-label { font-size: 11px; color: var(--text-2); }
 .pz-detail-label b { color: var(--text-1); }
 
@@ -285,6 +314,8 @@ header {
   padding-top: 8px;
   border-top: 1px solid var(--border2);
 }
+/* card de nível ganha a 4ª coluna TAXA (P3) */
+.mcard-stats.mcard-stats-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
 .mstat {
   display: flex; flex-direction: column; gap: 2px;
 }
@@ -302,6 +333,7 @@ header {
 }
 .mstat-val.up   { color: var(--green); }
 .mstat-val.down { color: var(--red); }
+.mstat-val.warn { color: var(--yellow); }
 
 /* sparkline */
 .sparkline-wrap { height: 28px; width: 100%; }
@@ -383,27 +415,30 @@ header {
   display: flex; align-items: flex-start; gap: 12px;
   transition: background .4s, border-color .4s;
 }
-.alb-normal  { background: var(--green-bg);  border: 1px solid var(--green-bd); }
-.alb-atencao { background: var(--yellow-bg); border: 1px solid var(--yellow-bd); }
-.alb-critico { background: var(--red-bg);    border: 1px solid var(--red-bd); }
+.alb-normal   { background: var(--green-bg);  border: 1px solid var(--green-bd); }
+.alb-atencao  { background: var(--yellow-bg); border: 1px solid var(--yellow-bd); }
+.alb-critico  { background: var(--red-bg);    border: 1px solid var(--red-bd); }
+.alb-semsinal { background: var(--gray-bg);   border: 1px solid var(--gray-bd); }
 .al-icon {
   width: 34px; height: 34px;
   border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.ali-normal  { background: rgba(62,207,122,.15); }
-.ali-atencao { background: rgba(240,192,64,.15); }
-.ali-critico { background: rgba(240,72,72,.15); }
+.ali-normal   { background: rgba(62,207,122,.15); }
+.ali-atencao  { background: rgba(240,192,64,.15); }
+.ali-critico  { background: rgba(240,72,72,.15); }
+.ali-semsinal { background: rgba(138,144,163,.18); }
 .al-icon svg { width: 16px; height: 16px; }
 .al-state {
   font-family: var(--mono);
   font-size: 15px; font-weight: 600;
   letter-spacing: .4px;
 }
-.al-normal  { color: var(--green); }
-.al-atencao { color: var(--yellow); }
-.al-critico { color: var(--red); animation: blink .7s step-end infinite; }
+.al-normal   { color: var(--green); }
+.al-atencao  { color: var(--yellow); }
+.al-critico  { color: var(--red); animation: blink .7s step-end infinite; }
+.al-semsinal { color: var(--gray); }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
 .al-desc { font-size: 12px; color: var(--text-2); margin-top: 4px; }
 
@@ -562,10 +597,11 @@ tbody td {
         <span id="val-n">—</span><span class="mcard-unit">m</span>
       </div>
       <div class="sparkline-wrap"><canvas id="spark-n"></canvas></div>
-      <div class="mcard-stats">
+      <div class="mcard-stats mcard-stats-4">
         <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="n-min">—</span></div>
         <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="n-max">—</span></div>
         <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="n-delta">—</span></div>
+        <div class="mstat"><span class="mstat-lbl">Taxa</span><span class="mstat-val" id="n-taxa">—</span></div>
       </div>
     </div>
 
@@ -727,6 +763,10 @@ const CFG = {
   // (nível ALTO = perigo — lógica correta de piezômetro)
   thrAtencao: 12.0,
   thrCritico: 15.0,
+  // P1 — janela de "sem sinal" (segundos) e P3 — limiar de taxa de variação (m/dia);
+  // sobrescritos por loadConfig() quando /config responder com stale_seg/taxa_max_m_dia.
+  staleSeg: 60,
+  taxaMaxMDia: 0.5,
 };
 
 // Piezômetros monitorados (coordenadas ilustrativas — Complexo de Germano, Mariana/MG)
@@ -739,10 +779,12 @@ let pzSelecionado = "PZ-01";
 
 // Períodos disponíveis para os gráficos / stats / tabela / export
 // (a chave já é o valor aceito pelo parâmetro `range` da API — /dados?range=24h|7d|30d)
+// `bucketMs` = espaçamento típico do range, usado só para detectar gap no gráfico (P1):
+// intervalo entre pontos consecutivos > 2×bucketMs vira um corte visível na linha.
 const PERIODOS = {
-  "24h": { label: "24h" },
-  "7d":  { label: "7 dias" },
-  "30d": { label: "30 dias" },
+  "24h": { label: "24h",     bucketMs: 30 * 60 * 1000 },
+  "7d":  { label: "7 dias",  bucketMs: 2  * 60 * 60 * 1000 },
+  "30d": { label: "30 dias", bucketMs: 8  * 60 * 60 * 1000 },
 };
 let periodoSelecionado = "24h";
 
@@ -757,7 +799,8 @@ const API_URL = "https://piezometro-worker.willianloopes123.workers.dev";
 let lastLevel = null, failCount = 0, simActive = false;
 let alertHistory = [];
 let readingsHistory = []; // últimas leituras do piezômetro selecionado (mais recente primeiro)
-let pzLatest = {};         // último valor conhecido de cada piezômetro: { "PZ-01": {nivel,pressao,temperatura}, ... }
+let pzLatest = {};         // último valor conhecido de cada piezômetro: { "PZ-01": {nivel,pressao,temperatura,ts,taxa_m_dia}, ... }
+let pzComm = {};           // último estado de comunicação conhecido por pz ("ok"|"stale") — dedupe de eventos (P1)
 let leafletMap = null;
 const pzMarkers = {};      // marcadores do mapa por id de piezômetro
 
@@ -770,7 +813,29 @@ function classifyNivel(n) {
   return { lv: "critico", lbl: "Crítico" };
 }
 function corPorStatus(lv) {
-  return { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" }[lv] || "#4da8f0";
+  return { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0", semsinal: "#8a90a3" }[lv] || "#4da8f0";
+}
+
+// ── ESTADO DE COMUNICAÇÃO (P1) ───────────────────────────────────────────────
+// Helper puro: decide se a leitura de um piezômetro está "ok" ou "stale" (sem sinal).
+// Dado ausente NUNCA é avaliado como normal — ver docs/DASHBOARD_PROFISSIONAL.md §2.
+function estadoComunicacao(leitura) {
+  if (!leitura || !Number.isFinite(leitura.ts)) return "stale";
+  const idadeSeg = Date.now() / 1000 - leitura.ts;
+  return idadeSeg > CFG.staleSeg ? "stale" : "ok";
+}
+
+// Formata "há X min/h/d" a partir de um timestamp em segundos (epoch)
+function formatUltimaLeitura(ts) {
+  if (!Number.isFinite(ts)) return "sem dados";
+  const seg = Math.max(0, Date.now() / 1000 - ts);
+  const min = Math.floor(seg / 60);
+  if (min < 1) return "há <1 min";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  return `há ${d} d`;
 }
 
 // Histórico de sparklines (últimos 20 pontos)
@@ -839,7 +904,7 @@ const FonteApi = {
   simulada: false,
 
   // Último valor de CADA piezômetro — GET /ultimos
-  // Resposta: { "PZ-01": {nivel_agua,pressao,temperatura,ts}, ... } (ts em segundos)
+  // Resposta: { "PZ-01": {nivel_agua,pressao,temperatura,ts,taxa_m_dia}, ... } (ts em segundos)
   async ultimos() {
     const json = await apiGet("/ultimos");
     const ids = Object.keys(json || {});
@@ -847,7 +912,10 @@ const FonteApi = {
     const result = {};
     ids.forEach(id => {
       const row = json[id] || {};
-      result[id] = { nivel: row.nivel_agua, pressao: row.pressao, temperatura: row.temperatura };
+      result[id] = {
+        nivel: row.nivel_agua, pressao: row.pressao, temperatura: row.temperatura,
+        ts: row.ts, taxa_m_dia: Number.isFinite(row.taxa_m_dia) ? row.taxa_m_dia : null,
+      };
     });
     return result;
   },
@@ -893,7 +961,7 @@ function pushSpark(key, val) {
 }
 
 // ── MAIN CHARTS ───────────────────────────────────────────────────────────────
-function renderMainChart(canvasId, state, color, thresholds) {
+function renderMainChart(canvasId, state, color, thresholds, bucketMs) {
   const cv = document.getElementById(canvasId);
   if (!cv) return;
   const wrap = cv.closest(".chart-area");
@@ -902,8 +970,16 @@ function renderMainChart(canvasId, state, color, thresholds) {
   cv.width = W; cv.height = H;
   cv.style.width = W + "px"; cv.style.height = H + "px";
   const c = cv.getContext("2d");
-  const { labels, data } = state;
+  const { labels, data, times } = state;
   if (!data.length) { c.clearRect(0, 0, W, H); return; }
+
+  // P1 — timestamps normalizados em ms (state.times mistura ISO string dos pushes ao vivo
+  // e number ms dos pontos carregados do histórico) para detectar gaps entre pontos.
+  const tms = (times || []).map(t => (typeof t === "number" ? t : new Date(t).getTime()));
+  const isGap = i => (
+    bucketMs && Number.isFinite(tms[i]) && Number.isFinite(tms[i - 1]) &&
+    (tms[i] - tms[i - 1]) > 2 * bucketMs
+  );
 
   const PAD = { top: 10, right: 16, bottom: 28, left: 46 };
   const cw = W - PAD.left - PAD.right;
@@ -959,10 +1035,12 @@ function renderMainChart(canvasId, state, color, thresholds) {
   c.lineTo(PAD.left, PAD.top+ch); c.closePath();
   c.fillStyle = grad; c.fill();
 
-  // Linha
+  // Linha — P1: gap visível (moveTo) em vez de ligar pontos separados por um intervalo
+  // grande demais (> 2×bucketMs) — dado ausente nunca é interpolado silenciosamente.
   c.beginPath(); c.moveTo(sx(0), sy(data[0]));
   for (let i = 1; i < data.length; i++) {
     const x0 = sx(i-1), y0 = sy(data[i-1]), x1 = sx(i), y1 = sy(data[i]);
+    if (isGap(i)) { c.moveTo(x1, y1); continue; }
     c.bezierCurveTo((x0+x1)/2, y0, (x0+x1)/2, y1, x1, y1);
   }
   c.strokeStyle = color; c.lineWidth = 1.5; c.setLineDash([]); c.stroke();
@@ -990,11 +1068,12 @@ function pushChart(key, label, value, time) {
 }
 
 function redrawCharts() {
+  const bucketMs = (PERIODOS[periodoSelecionado] || {}).bucketMs;
   renderMainChart("chart-n", charts.n, "#3ecf7a", [
     { v: CFG.thrCritico, col: "rgba(240,72,72,.5)",  lbl: `${CFG.thrCritico} m crítico` },
     { v: CFG.thrAtencao, col: "rgba(240,192,64,.5)", lbl: `${CFG.thrAtencao} m atenção` },
-  ]);
-  renderMainChart("chart-t", charts.t, "#4da8f0", null);
+  ], bucketMs);
+  renderMainChart("chart-t", charts.t, "#4da8f0", null, bucketMs);
 }
 
 // ── STATS ─────────────────────────────────────────────────────────────────────
@@ -1060,6 +1139,29 @@ function setAlert(n) {
   }
 }
 
+// P1 — painel "Nível de Alerta" quando o pz selecionado está sem sinal: estado neutro
+// (nunca NORMAL/ATENÇÃO/CRÍTICO com dado ausente) e NÃO mexe em lastLevel — a transição
+// de nível não é avaliada com dado stale (retoma do zero quando a comunicação voltar).
+function setAlertSemSinal(ts) {
+  const temTs = Number.isFinite(ts);
+  const ultimaLeitura = temTs ? formatUltimaLeitura(ts) : null;
+  const icon = `<circle cx="8" cy="8" r="5.5" stroke="#8a90a3" stroke-width="1.5"/><path d="M5 8h6" stroke="#8a90a3" stroke-width="1.5" stroke-linecap="round"/>`;
+
+  document.getElementById("abox").className   = "alert-level-box alb-semsinal";
+  document.getElementById("aicon").className  = "al-icon ali-semsinal";
+  document.getElementById("asvg").innerHTML   = icon;
+  document.getElementById("astate").className = "al-state al-semsinal";
+  document.getElementById("astate").textContent = "SEM SINAL";
+  document.getElementById("adesc").textContent = temTs
+    ? `Instrumento sem reportar ${ultimaLeitura}. Alarme de nível suspenso (dado ausente não é avaliado como normal).`
+    : "Instrumento nunca reportou. Alarme de nível suspenso (dado ausente não é avaliado como normal).";
+  document.getElementById("tby").className = "tb-seg tb-yellow";
+  document.getElementById("tbr").className = "tb-seg tb-red";
+  document.getElementById("ainfo").textContent = temTs
+    ? `Sem comunicação — última leitura ${ultimaLeitura}`
+    : "Sem comunicação — nenhuma leitura recebida";
+}
+
 // ── TABELA DE EVENTOS ─────────────────────────────────────────────────────────
 function addAlertRow(lv, lbl, nivel) {
   const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -1080,6 +1182,45 @@ function addInfoRow(msg) {
   alertHistory.unshift({ lv: "info", lbl: "INFO", msg, nivel: "—", time: t, color: "#4da8f0" });
   if (alertHistory.length > 50) alertHistory.pop();
   renderTable();
+}
+
+// P1 — evento de transição de comunicação (ok↔stale) de QUALQUER piezômetro monitorado
+// (não só o selecionado); dedupe: só dispara na transição, guardando o estado anterior
+// por pz em `pzComm`. Entra na mesma lista de eventos (addInfoRow/addAlertRow).
+function addComunicacaoRow(pzId, estado, ts) {
+  const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if (estado === "stale") {
+    const hhmm = Number.isFinite(ts)
+      ? new Date(ts * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+      : "—";
+    alertHistory.unshift({
+      lv: "semsinal", lbl: "SEM SINAL",
+      msg: `⚠️ ${pzId} sem sinal (última leitura ${hhmm})`,
+      nivel: "—", time: t, color: corPorStatus("semsinal"),
+    });
+  } else {
+    alertHistory.unshift({
+      lv: "info", lbl: "INFO",
+      msg: `Comunicação restabelecida (${pzId})`,
+      nivel: "—", time: t, color: corPorStatus("info"),
+    });
+  }
+  if (alertHistory.length > 50) alertHistory.pop();
+  renderTable();
+}
+
+// Confere o estado de comunicação de TODOS os piezômetros monitorados e dispara
+// addComunicacaoRow() só nas transições reais (dedupe via `pzComm`). Chamado a cada poll.
+function checarTransicoesComunicacao(mapa) {
+  PIEZOMETROS.forEach(pz => {
+    const leitura = mapa[pz.id];
+    const estadoAtual = estadoComunicacao(leitura);
+    const estadoAnterior = pzComm[pz.id];
+    if (estadoAnterior !== undefined && estadoAnterior !== estadoAtual) {
+      addComunicacaoRow(pz.id, estadoAtual, leitura && leitura.ts);
+    }
+    pzComm[pz.id] = estadoAtual;
+  });
 }
 
 function renderTable() {
@@ -1157,11 +1298,40 @@ function atualizarVisaoGeral(mapa) {
   grid.innerHTML = PIEZOMETROS.map(pz => {
     const d = mapa[pz.id];
     const nivel = d && Number.isFinite(d.nivel) ? d.nivel : null;
-    const cls = nivel !== null ? classifyNivel(nivel) : { lv: "info", lbl: "—" };
+    const comm = estadoComunicacao(d);
+    const semSinal = comm === "stale";
+    const cls = !semSinal && nivel !== null ? classifyNivel(nivel) : { lv: "info", lbl: "—" };
     const sel = pz.id === pzSelecionado ? " selected" : "";
     const valorHtml = nivel !== null
       ? `${nivel.toFixed(2)}<span class="pz-card-unit">m</span>`
       : "—";
+
+    // P1 — leitura ausente/stale nunca aparece como normal: badge cinza "SEM SINAL" + cor+texto,
+    // valor esmaecido e "última leitura há X min" (nunca vermelho nem verde — ver docs §2).
+    if (semSinal) {
+      const temTs = d && Number.isFinite(d.ts);
+      const lastSeen = temTs
+        ? `última leitura ${formatUltimaLeitura(d.ts)}`
+        : "nenhuma leitura recebida";
+      return `
+        <div class="pz-card pz-sem-sinal${sel}" data-pz="${pz.id}">
+          <div class="pz-card-top">
+            <span class="pz-card-id">${pz.id}</span>
+            <span class="tbadge tb-semsinal">SEM SINAL</span>
+          </div>
+          <div class="pz-card-name">${pz.nome}</div>
+          <div class="pz-card-value valor-esmaecido">${valorHtml}</div>
+          <div class="pz-card-lastseen">${lastSeen}</div>
+        </div>`;
+    }
+
+    // P3 — chip "variação rápida" quando |taxa| > limiar e o pz está comunicando normalmente
+    const taxa = d && Number.isFinite(d.taxa_m_dia) ? d.taxa_m_dia : null;
+    const taxaRapida = taxa !== null && Math.abs(taxa) > CFG.taxaMaxMDia;
+    const chipHtml = taxaRapida
+      ? `<span class="chip-taxa-rapida" title="Variação rápida — investigar (ref. >0,1 m/dia já é gatilho profissional)">📈 variação rápida</span>`
+      : "";
+
     return `
       <div class="pz-card${sel}" data-pz="${pz.id}">
         <div class="pz-card-top">
@@ -1170,6 +1340,7 @@ function atualizarVisaoGeral(mapa) {
         </div>
         <div class="pz-card-name">${pz.nome}</div>
         <div class="pz-card-value">${valorHtml}</div>
+        ${chipHtml}
       </div>`;
   }).join("");
   grid.querySelectorAll(".pz-card").forEach(card => {
@@ -1216,11 +1387,12 @@ function atualizarMapa(mapa) {
     if (!marker) return;
     const d = mapa[pz.id];
     const nivel = d && Number.isFinite(d.nivel) ? d.nivel : null;
-    const cls = nivel !== null ? classifyNivel(nivel) : { lv: "info", lbl: "—" };
-    const col = corPorStatus(cls.lv);
+    const semSinal = estadoComunicacao(d) === "stale";
+    const cls = !semSinal && nivel !== null ? classifyNivel(nivel) : { lv: "semsinal", lbl: "Sem sinal" };
+    const col = corPorStatus(semSinal ? "semsinal" : cls.lv);
     marker.setStyle({ color: col, fillColor: col, radius: pz.id === pzSelecionado ? 11 : 9 });
     marker.setPopupContent(
-      `<b>${pz.nome}</b><br>Nível: ${nivel !== null ? nivel.toFixed(2) + " m" : "—"}<br>Status: ${cls.lbl}`
+      `<b>${pz.nome}</b><br>Nível: ${!semSinal && nivel !== null ? nivel.toFixed(2) + " m" : "—"}<br>Status: ${cls.lbl}`
     );
   });
 }
@@ -1240,6 +1412,7 @@ function resetPzState() {
     if (mx) mx.textContent = "—";
     if (dl) { dl.textContent = "—"; dl.className = "mstat-val"; }
   });
+  renderTaxa(null); // P3 — limpa o stat TAXA ao trocar de pz/período
   renderReadingsTable();
   redrawCharts();
 }
@@ -1322,8 +1495,28 @@ async function loadHistoryAndStats() {
   redrawCharts();
 }
 
+// ── TAXA DE VARIAÇÃO (P3) ─────────────────────────────────────────────────────
+// Exibe taxa_m_dia no stat "TAXA" do card de nível; destaca em âmbar quando
+// |taxa| > CFG.taxaMaxMDia (ref. ASDSO: >0,1 m/dia já é gatilho de investigação).
+function renderTaxa(taxa) {
+  const el = document.getElementById("n-taxa");
+  if (!el) return;
+  if (!Number.isFinite(taxa)) {
+    el.textContent = "—";
+    el.className = "mstat-val";
+    el.removeAttribute("title");
+    return;
+  }
+  const sinal = taxa >= 0 ? "+" : "";
+  const rapida = Math.abs(taxa) > CFG.taxaMaxMDia;
+  el.textContent = `${rapida ? "📈 " : ""}${sinal}${taxa.toFixed(2)} m/dia`;
+  el.className = "mstat-val" + (rapida ? " warn" : "");
+  if (rapida) el.title = "Variação rápida — investigar (ref. >0,1 m/dia já é gatilho profissional)";
+  else el.removeAttribute("title");
+}
+
 // ── APLICA DADOS DO PIEZÔMETRO SELECIONADO ───────────────────────────────────
-function applyData({ nivel, pressao, temperatura }) {
+function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts }) {
   const safe = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
   nivel       = safe(nivel, 10);      // 1013 hPa no Wokwi ↔ 10 m simulados
   pressao     = safe(pressao, 1013);
@@ -1363,10 +1556,18 @@ function applyData({ nivel, pressao, temperatura }) {
   if (temperatura >= 0 && temperatura <= 50) { bt.className = "mbadge mb-blue";   bt.textContent = "Normal"; }
   else                                        { bt.className = "mbadge mb-yellow"; bt.textContent = "Verificar"; }
 
-  // Tabela de últimas leituras
-  pushReading(nivel);
+  // P3 — taxa de variação (display), independente do estado de comunicação
+  renderTaxa(taxa_m_dia);
 
-  setAlert(nivel);
+  // P1 — dado stale nunca é avaliado como normal: alarme de nível fica suspenso,
+  // o painel mostra o estado neutro "SEM SINAL" e a leitura VELHA não é
+  // re-registrada na tabela como se fosse nova (seria enganoso).
+  if (estadoComunicacao({ ts }) === "stale") {
+    setAlertSemSinal(ts);
+  } else {
+    pushReading(nivel); // tabela de últimas leituras — só com dado fresco
+    setAlert(nivel);
+  }
 }
 
 // ── STATUS ────────────────────────────────────────────────────────────────────
@@ -1433,9 +1634,17 @@ const FonteSimulada = {
     const todos = {};
     Object.keys(b).forEach(pz => {
       const s = b[pz];
+      const nAnterior = s.n;
       s.p = 1013.25 + (s.n - 10) * 10;  // coerente com a escala do firmware (10 hPa/m)
       s.t = clamp(s.t + (Math.random() - 0.5) * 0.3, 15, 40);
-      todos[pz] = { nivel: s.n, pressao: s.p, temperatura: s.t };
+      // taxa_m_dia plausível: extrapola o drift do último passo do poll (CFG.poll ms) para m/dia,
+      // mesma interface de FonteApi — nunca ligada de fato a um "dia" real na simulação.
+      const deltaPoll = s.n - nAnterior;
+      const taxa = parseFloat(((deltaPoll / (CFG.poll / 1000)) * 86400).toFixed(3));
+      todos[pz] = {
+        nivel: s.n, pressao: s.p, temperatura: s.t,
+        ts: Math.floor(Date.now() / 1000), taxa_m_dia: taxa,
+      };
     });
     return todos;
   },
@@ -1502,6 +1711,7 @@ async function poll() {
       setStatus("live", `API conectada — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
     }
 
+    checarTransicoesComunicacao(pzLatest); // P1 — eventos de ok↔stale de todos os pz
     atualizarVisaoGeral(pzLatest);
     atualizarMapa(pzLatest);
     const sel = pzLatest[pzSelecionado];
@@ -1534,6 +1744,8 @@ async function loadConfig() {
       if (Number.isFinite(cfg.limiares.atencao)) CFG.thrAtencao = cfg.limiares.atencao;
       if (Number.isFinite(cfg.limiares.critico)) CFG.thrCritico = cfg.limiares.critico;
     }
+    if (cfg && Number.isFinite(cfg.stale_seg)) CFG.staleSeg = cfg.stale_seg;
+    if (cfg && Number.isFinite(cfg.taxa_max_m_dia)) CFG.taxaMaxMDia = cfg.taxa_max_m_dia;
     if (Array.isArray(cfg && cfg.piezometros) && cfg.piezometros.length) {
       // PIEZOMETROS é const — substitui o conteúdo do array in-place (não reatribui a variável)
       PIEZOMETROS.length = 0;
