@@ -105,6 +105,9 @@ curl https://piezometro-worker.<seu-subdominio>.workers.dev/ultimos
 
 # Série histórica agregada (últimas 24h, buckets de 30min)
 curl "https://piezometro-worker.<seu-subdominio>.workers.dev/dados?pz=PZ-01&range=24h"
+
+# Config (limiares, ranges aceitos e catálogo de piezômetros p/ o dashboard)
+curl https://piezometro-worker.<seu-subdominio>.workers.dev/config
 ```
 
 ## 8. Apontar o firmware e o dashboard para o Worker

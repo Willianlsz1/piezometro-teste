@@ -752,7 +752,9 @@ let periodoSelecionado = "24h";
 const API_URL = "https://piezometro-worker.willianloopes123.workers.dev";
 
 // ── ESTADO ────────────────────────────────────────────────────────────────────
-let lastLevel = null, failCount = 0, simTimer = null, simActive = false;
+// `simActive` é um espelho legado de `fonte.simulada`, mantido só porque algum
+// código ainda pode lê-lo por hábito — é escrito EXCLUSIVAMENTE em trocarFonte().
+let lastLevel = null, failCount = 0, simActive = false;
 let alertHistory = [];
 let readingsHistory = []; // últimas leituras do piezômetro selecionado (mais recente primeiro)
 let pzLatest = {};         // último valor conhecido de cada piezômetro: { "PZ-01": {nivel,pressao,temperatura}, ... }
@@ -810,27 +812,11 @@ async function apiGet(path) {
   } finally { clearTimeout(timer); }
 }
 
-// Busca o último valor de CADA piezômetro — GET /ultimos
-// Resposta: { "PZ-01": {nivel_agua,pressao,temperatura,ts}, ... } (ts em segundos)
-async function fetchLatest() {
-  const json = await apiGet("/ultimos");
-  const ids = Object.keys(json || {});
-  if (!ids.length) throw new Error("Sem dados recentes");
-  const result = {};
-  ids.forEach(id => {
-    const row = json[id] || {};
-    result[id] = { nivel: row.nivel_agua, pressao: row.pressao, temperatura: row.temperatura };
-  });
-  return result;
-}
-
-// Busca o histórico de um campo para o piezômetro e período selecionados
-// GET /dados?pz=PZ-01&range=24h|7d|30d
-// Resposta: { pz, range, pontos: [{ts,nivel_agua,pressao,temperatura}, ...] } (ts em segundos, ordem cronológica)
-async function fetchHistory(field) {
-  const json = await apiGet(`/dados?pz=${encodeURIComponent(pzSelecionado)}&range=${encodeURIComponent(periodoSelecionado)}`);
-  const pontos = json.pontos || [];
-  return pontos
+// Converte um array bruto de "pontos" (como devolvido por FonteApi/FonteSimulada.historico)
+// no formato {label,value,time} que os gráficos/stats/tabela consomem, para um campo específico.
+// Compartilhado pelos dois adapters — garante que real e simulado usem exatamente a mesma forma.
+function pontosParaCampo(pontos, field) {
+  return (pontos || [])
     .filter(p => p[field] !== null && p[field] !== undefined && Number.isFinite(p[field]))
     .map(p => {
       const ms = p.ts * 1000;
@@ -841,6 +827,38 @@ async function fetchHistory(field) {
       };
     });
 }
+
+// ── SEAM: FONTE DE LEITURAS ──────────────────────────────────────────────────
+// Todo o resto do dashboard (poll, loadHistoryAndStats, ...) só conhece a
+// interface abaixo — { simulada, ultimos(), historico(pz, range) } — e nunca
+// sabe se está falando com o Worker de verdade ou com o gerador simulado.
+// Trocar a fonte ativa é só reatribuir a variável `fonte` (feito em trocarFonte()).
+
+// Adapter real: fala com o Cloudflare Worker (+D1) via apiGet().
+const FonteApi = {
+  simulada: false,
+
+  // Último valor de CADA piezômetro — GET /ultimos
+  // Resposta: { "PZ-01": {nivel_agua,pressao,temperatura,ts}, ... } (ts em segundos)
+  async ultimos() {
+    const json = await apiGet("/ultimos");
+    const ids = Object.keys(json || {});
+    if (!ids.length) throw new Error("Sem dados recentes");
+    const result = {};
+    ids.forEach(id => {
+      const row = json[id] || {};
+      result[id] = { nivel: row.nivel_agua, pressao: row.pressao, temperatura: row.temperatura };
+    });
+    return result;
+  },
+
+  // Histórico bruto (todos os campos) de um piezômetro/período — GET /dados?pz=&range=
+  // Resposta: { pz, range, pontos: [{ts,nivel_agua,pressao,temperatura}, ...] } (ts em segundos, ordem cronológica)
+  async historico(pz, range) {
+    const json = await apiGet(`/dados?pz=${encodeURIComponent(pz)}&range=${encodeURIComponent(range)}`);
+    return json.pontos || [];
+  },
+};
 
 // ── SPARKLINE ─────────────────────────────────────────────────────────────────
 function drawSparkline(canvasId, data, color) {
@@ -1051,7 +1069,7 @@ function addAlertRow(lv, lbl, nivel) {
     critico: "ALERTA — nível d'água crítico detectado",
   };
   const colors = { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" };
-  const msg = (msgs[lv] || lbl) + ` (${pzSelecionado})` + (simActive ? " (simulação)" : "");
+  const msg = (msgs[lv] || lbl) + ` (${pzSelecionado})` + (fonte.simulada ? " (simulação)" : "");
   alertHistory.unshift({ lv, lbl, msg, nivel: Number.isFinite(nivel) ? nivel.toFixed(2) : "—", time: t, color: colors[lv] || colors.info });
   if (alertHistory.length > 50) alertHistory.pop();
   renderTable();
@@ -1261,63 +1279,43 @@ function selectPeriodo(p) {
 
 // Carrega histórico do piezômetro/período selecionados (nível + temperatura),
 // semeia stats, tabela de leituras e redesenha os gráficos.
+// Consome só `fonte.historico()` — não sabe (nem precisa saber) se é real ou simulada.
 async function loadHistoryAndStats() {
+  let pontos, viaFallbackLocal = false;
   try {
-    const [hn, ht] = await Promise.all([fetchHistory("nivel_agua"), fetchHistory("temperatura")]);
-
-    if (hn.length) {
-      charts.n.labels = hn.map(h => h.label);
-      charts.n.data   = hn.map(h => h.value);
-      charts.n.times  = hn.map(h => h.time);
-      statsWin.n      = hn.map(h => h.value);
-      updateStats("n", statsWin.n);
-      readingsHistory = hn.slice(-12).reverse().map(h => {
-        const cls = classifyNivel(h.value);
-        return { time: h.label, nivel: h.value, lv: cls.lv, lbl: cls.lbl };
-      });
-      renderReadingsTable();
-      addInfoRow(`Histórico de nível d'água carregado (${hn.length} pontos) — ${pzSelecionado}`);
-    }
-    if (ht.length) {
-      charts.t.labels = ht.map(h => h.label);
-      charts.t.data   = ht.map(h => h.value);
-      charts.t.times  = ht.map(h => h.time);
-      statsWin.t      = ht.map(h => h.value);
-      updateStats("t", statsWin.t);
-      addInfoRow(`Histórico de temperatura carregado (${ht.length} pontos) — ${pzSelecionado}`);
-    }
+    pontos = await fonte.historico(pzSelecionado, periodoSelecionado);
   } catch (e) {
-    // Fallback simulado, coerente com o piezômetro e o período selecionados
-    const baseLevel = { "PZ-01": 10, "PZ-02": 11.5, "PZ-03": 9 }[pzSelecionado] || 10;
-    const fb = {
-      "24h": { count: 48,  stepMs: 30 * 60 * 1000 },
-      "7d":  { count: 84,  stepMs: 2  * 60 * 60 * 1000 },
-      "30d": { count: 120, stepMs: 6  * 60 * 60 * 1000 },
-    }[periodoSelecionado];
-    const now = Date.now();
-    for (let i = fb.count; i >= 0; i--) {
-      const time = now - i * fb.stepMs;
-      const iso = new Date(time).toISOString();
-      const lbl = new Date(time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      charts.n.labels.push(lbl);
-      charts.n.data.push(parseFloat((baseLevel + (Math.random() - 0.5) * 1.6).toFixed(3)));
-      charts.n.times.push(iso);
-      charts.t.labels.push(lbl);
-      charts.t.data.push(parseFloat((22 + Math.random() * 8).toFixed(1)));
-      charts.t.times.push(iso);
-    }
-    statsWin.n = charts.n.data.slice();
-    statsWin.t = charts.t.data.slice();
+    // Fallback só para ESTE carregamento (não mexe na fonte global nem no banner —
+    // isso é responsabilidade exclusiva de trocarFonte(), acionada pelo poll).
+    pontos = await FonteSimulada.historico(pzSelecionado, periodoSelecionado);
+    viaFallbackLocal = true;
+  }
+
+  const hn = pontosParaCampo(pontos, "nivel_agua");
+  const ht = pontosParaCampo(pontos, "temperatura");
+
+  if (hn.length) {
+    charts.n.labels = hn.map(h => h.label);
+    charts.n.data   = hn.map(h => h.value);
+    charts.n.times  = hn.map(h => h.time);
+    statsWin.n      = hn.map(h => h.value);
     updateStats("n", statsWin.n);
-    updateStats("t", statsWin.t);
-    const lastN = Math.min(12, charts.n.data.length);
-    readingsHistory = [];
-    for (let i = charts.n.data.length - 1; i >= charts.n.data.length - lastN; i--) {
-      const v = charts.n.data[i];
-      const cls = classifyNivel(v);
-      readingsHistory.push({ time: charts.n.labels[i], nivel: v, lv: cls.lv, lbl: cls.lbl });
-    }
+    readingsHistory = hn.slice(-12).reverse().map(h => {
+      const cls = classifyNivel(h.value);
+      return { time: h.label, nivel: h.value, lv: cls.lv, lbl: cls.lbl };
+    });
     renderReadingsTable();
+    if (!viaFallbackLocal) addInfoRow(`Histórico de nível d'água carregado (${hn.length} pontos) — ${pzSelecionado}`);
+  }
+  if (ht.length) {
+    charts.t.labels = ht.map(h => h.label);
+    charts.t.data   = ht.map(h => h.value);
+    charts.t.times  = ht.map(h => h.time);
+    statsWin.t      = ht.map(h => h.value);
+    updateStats("t", statsWin.t);
+    if (!viaFallbackLocal) addInfoRow(`Histórico de temperatura carregado (${ht.length} pontos) — ${pzSelecionado}`);
+  }
+  if (viaFallbackLocal) {
     addInfoRow(`Histórico da API indisponível — exibindo histórico simulado (${pzSelecionado})`);
   }
 
@@ -1406,47 +1404,104 @@ function initPeriodPills() {
 }
 
 // ── SIMULAÇÃO ─────────────────────────────────────────────────────────────────
-// Cada piezômetro oscila de forma independente, para a visão geral e o mapa
-// ficarem vivos na demonstração:
+// Adapter simulado: mesma interface de FonteApi ({simulada, ultimos(), historico()}),
+// usado quando a API real está indisponível. Cada piezômetro oscila de forma
+// independente, para a visão geral e o mapa ficarem vivos na demonstração:
 // PZ-01 ~10 m (faixa normal) · PZ-02 ~11,5 m (oscila até a faixa de atenção) · PZ-03 ~9 m (estável)
-const simBase = {
-  "PZ-01": { n: 10.2, p: 1013, t: 24 },
-  "PZ-02": { n: 11.5, p: 1013, t: 24 },
-  "PZ-03": { n: 9.0,  p: 1013, t: 24 },
+const FonteSimulada = {
+  simulada: true,
+
+  // Tabela ÚNICA de bases por piezômetro — usada tanto por ultimos() (drift ao vivo)
+  // quanto por historico() (série simulada). Antes existiam duas tabelas divergentes
+  // (10.2/11.5/9.0 aqui vs. 10/11.5/9 em loadHistoryAndStats); unificar elimina o
+  // desalinhamento entre o "último valor" e o "histórico" mostrados na simulação.
+  base: {
+    "PZ-01": { n: 10.2, p: 1013, t: 24 },
+    "PZ-02": { n: 11.5, p: 1013, t: 24 },
+    "PZ-03": { n: 9.0,  p: 1013, t: 24 },
+  },
+
+  // Gera a leitura "ao vivo" de cada piezômetro (drift + ruído), avançando a base
+  // um passo a cada chamada — é o antigo simTick(), agora chamado pelo poll normal
+  // em vez de rodar num setInterval paralelo.
+  async ultimos() {
+    const b = this.base;
+    b["PZ-01"].n = clamp(b["PZ-01"].n + (Math.random() - 0.48) * 0.25, 8.5, 13.5);
+    b["PZ-02"].n = clamp(b["PZ-02"].n + (Math.random() - 0.5)  * 0.3,  10.5, 13.2);
+    b["PZ-03"].n = clamp(b["PZ-03"].n + (Math.random() - 0.5)  * 0.15, 8.0, 10.2);
+
+    const todos = {};
+    Object.keys(b).forEach(pz => {
+      const s = b[pz];
+      s.p = 1013.25 + (s.n - 10) * 10;  // coerente com a escala do firmware (10 hPa/m)
+      s.t = clamp(s.t + (Math.random() - 0.5) * 0.3, 15, 40);
+      todos[pz] = { nivel: s.n, pressao: s.p, temperatura: s.t };
+    });
+    return todos;
+  },
+
+  // Gera uma série histórica simulada coerente com a base do piezômetro/período pedidos
+  // (mesma tabela `base` usada por ultimos() — ver comentário acima).
+  async historico(pz, range) {
+    const baseLevel = (this.base[pz] && this.base[pz].n) || 10;
+    const fb = {
+      "24h": { count: 48,  stepMs: 30 * 60 * 1000 },
+      "7d":  { count: 84,  stepMs: 2  * 60 * 60 * 1000 },
+      "30d": { count: 120, stepMs: 6  * 60 * 60 * 1000 },
+    }[range] || { count: 48, stepMs: 30 * 60 * 1000 };
+    const now = Date.now();
+    const pontos = [];
+    for (let i = fb.count; i >= 0; i--) {
+      const time = now - i * fb.stepMs;
+      pontos.push({
+        ts: Math.floor(time / 1000),
+        nivel_agua: parseFloat((baseLevel + (Math.random() - 0.5) * 1.6).toFixed(3)),
+        pressao: null,
+        temperatura: parseFloat((22 + Math.random() * 8).toFixed(1)),
+      });
+    }
+    return pontos;
+  },
 };
-function simTick() {
-  simBase["PZ-01"].n = clamp(simBase["PZ-01"].n + (Math.random() - 0.48) * 0.25, 8.5, 13.5);
-  simBase["PZ-02"].n = clamp(simBase["PZ-02"].n + (Math.random() - 0.5)  * 0.3,  10.5, 13.2);
-  simBase["PZ-03"].n = clamp(simBase["PZ-03"].n + (Math.random() - 0.5)  * 0.15, 8.0, 10.2);
 
-  const todos = {};
-  Object.keys(simBase).forEach(pz => {
-    const s = simBase[pz];
-    s.p = 1013.25 + (s.n - 10) * 10;  // coerente com a escala do firmware (10 hPa/m)
-    s.t = clamp(s.t + (Math.random() - 0.5) * 0.3, 15, 40);
-    todos[pz] = { nivel: s.n, pressao: s.p, temperatura: s.t };
-  });
+// Fonte de leituras ativa no momento — troca real↔simulação = trocar esta referência.
+// Todo o resto do dashboard só enxerga a interface comum; ver seam acima (FonteApi/FonteSimulada).
+let fonte = FonteApi;
 
-  pzLatest = todos;
-  atualizarVisaoGeral(todos);
-  atualizarMapa(todos);
-  applyData(todos[pzSelecionado]);
-}
-
-function setSimMode(on) {
-  simActive = on;
-  document.getElementById("sim-banner").classList.toggle("on", on);
+// Único ponto que troca a fonte ativa e sincroniza a UI que depende disso
+// (banner amarelo, espelho `simActive`). Absorve o antigo setSimMode().
+function trocarFonte(novaFonte) {
+  if (fonte === novaFonte) return;
+  fonte = novaFonte;
+  simActive = fonte.simulada;
+  document.getElementById("sim-banner").classList.toggle("on", fonte.simulada);
 }
 
 // ── POLLING ───────────────────────────────────────────────────────────────────
+// Roda a cada CFG.poll (10s), sempre — não existe mais um setInterval paralelo
+// para a simulação. Quando `fonte` é a simulada, fonte.ultimos() devolve os
+// valores gerados e o poll não percebe diferença nenhuma.
 async function poll() {
   try {
-    const dadosTodos = await fetchLatest();
+    const dadosTodos = await fonte.ultimos();
     pzLatest = dadosTodos;
-    if (simTimer) { clearInterval(simTimer); simTimer = null; }
-    setSimMode(false);
-    failCount = 0;
-    setStatus("live", `API conectada — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
+
+    if (fonte.simulada) {
+      // Enquanto em modo simulado, tenta também um ping barato à API real para
+      // detectar quando ela volta e trocar de fonte automaticamente.
+      try {
+        pzLatest = await FonteApi.ultimos();
+        trocarFonte(FonteApi);
+        failCount = 0;
+        setStatus("live", `API conectada — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
+      } catch (_) {
+        setStatus("sim", "Modo simulação ativo — API indisponível");
+      }
+    } else {
+      failCount = 0;
+      setStatus("live", `API conectada — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
+    }
+
     atualizarVisaoGeral(pzLatest);
     atualizarMapa(pzLatest);
     const sel = pzLatest[pzSelecionado];
@@ -1454,17 +1509,40 @@ async function poll() {
     applyData(sel);
   } catch (e) {
     failCount++;
-    console.warn("API:", e.message);
+    console.warn("Fonte de leituras:", e.message);
     if (failCount === 1) {
       setStatus("err", `Falha na API: ${e.message}`);
       addInfoRow("Erro ao conectar na API — ativando simulação");
     }
-    if (failCount >= 2 && !simTimer) {
+    if (failCount >= 2 && !fonte.simulada) {
+      trocarFonte(FonteSimulada);
       setStatus("sim", "Modo simulação ativo — API indisponível");
-      setSimMode(true);
-      simTimer = setInterval(simTick, CFG.poll);
-      simTick();
     }
+  }
+}
+
+// ── CONFIG DINÂMICA (/config) ─────────────────────────────────────────────────
+// O Worker expõe GET /config → { limiares:{atencao,critico}, ranges:[...], piezometros:[...] }.
+// Em caso de sucesso, sobrescreve CFG.thrAtencao/thrCritico e PIEZOMETROS com os
+// valores do servidor. Em caso de falha (endpoint ainda não implantado, rede fora,
+// etc.), mantém os valores hard-coded no topo do arquivo como fallback — o dashboard
+// precisa continuar funcionando mesmo sem esse endpoint.
+async function loadConfig() {
+  try {
+    const cfg = await apiGet("/config");
+    if (cfg && cfg.limiares) {
+      if (Number.isFinite(cfg.limiares.atencao)) CFG.thrAtencao = cfg.limiares.atencao;
+      if (Number.isFinite(cfg.limiares.critico)) CFG.thrCritico = cfg.limiares.critico;
+    }
+    if (Array.isArray(cfg && cfg.piezometros) && cfg.piezometros.length) {
+      // PIEZOMETROS é const — substitui o conteúdo do array in-place (não reatribui a variável)
+      PIEZOMETROS.length = 0;
+      cfg.piezometros.forEach(p => PIEZOMETROS.push({ id: p.id, nome: p.nome, lat: p.lat, lng: p.lng }));
+      // Se o piezômetro selecionado por padrão não existir mais na lista do servidor, usa o primeiro
+      if (!PIEZOMETROS.some(p => p.id === pzSelecionado)) pzSelecionado = PIEZOMETROS[0].id;
+    }
+  } catch (e) {
+    console.warn("Config:", e.message, "— usando limiares/piezômetros hard-coded como fallback");
   }
 }
 
@@ -1472,6 +1550,9 @@ async function poll() {
 (async function init() {
   updateClock();
   setInterval(updateClock, 1000);
+
+  // Antes de montar mapa/grid e iniciar o polling: tenta carregar config do servidor
+  await loadConfig();
 
   initHowto();
   initPeriodPills();

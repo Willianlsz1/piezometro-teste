@@ -412,6 +412,29 @@ async function handleAlerts(env, cfg) {
   });
 }
 
+// GET /config — fonte única de verdade dos contratos que hoje ficam
+// duplicados "na mão" no firmware e no dashboard (limiares de alerta,
+// ranges aceitos por /dados e o catálogo de piezômetros cadastrados). Os
+// níveis de controle (atenção/crítico) são definidos por projeto pelo
+// projetista geotécnico — parametrização é requisito do domínio, não um
+// detalhe de implementação — então o dashboard carrega isso no boot em vez
+// de hard-codar, evitando os três lugares ficarem fora de sincronia.
+function handleConfig(env, cfg) {
+  let piezometros = [];
+  try {
+    const parsed = JSON.parse(env.PIEZOMETROS || "[]");
+    if (Array.isArray(parsed)) piezometros = parsed;
+  } catch {
+    piezometros = [];
+  }
+
+  return json(cfg, 200, {
+    limiares: { atencao: cfg.NIVEL_ATENCAO, critico: cfg.NIVEL_CRITICO },
+    ranges: Object.keys(RANGES),
+    piezometros,
+  });
+}
+
 function handleHealth(cfg) {
   return json(cfg, 200, {
     status: "ok",
@@ -446,6 +469,9 @@ export default {
       }
       if (url.pathname === "/alerts") {
         return await handleAlerts(env, cfg);
+      }
+      if (url.pathname === "/config") {
+        return handleConfig(env, cfg);
       }
       if (url.pathname === "/health") {
         return handleHealth(cfg);

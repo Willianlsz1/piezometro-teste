@@ -62,33 +62,13 @@
  * (ALTURA_SENSOR_CM) e ajuste o define abaixo antes de gravar o firmware.
  * Um erro de 1 cm na medição já desloca o nível calculado em 0,5 m.
  *
- * LÓGICA DE ALERTA (idêntica ao firmware de simulação — nível ALTO = perigo):
- * 🟢 NORMAL   : nível < 12 m           → LED Verde, buzzer OFF
- * 🟡 ATENÇÃO  : 12 m ≤ nível < 15 m    → LED Amarelo, beep lento (2 s)
- * 🔴 CRÍTICO  : nível ≥ 15 m           → LED Vermelho pisca, beep rápido
- *
- * ENVIO: assim como no firmware de simulação, este ESP32 não fala direto
- * com nenhum banco de dados — ele não guarda nenhum segredo de banco,
- * apenas a DEVICE_KEY do Worker. Cada leitura vira um JSON simples, enviado
- * por HTTPS ao endpoint /ingest do Cloudflare Worker; é o Worker quem grava
- * os dados no Cloudflare D1. O JSON aqui só carrega "nivel_agua" (+ "ts"
+ * ENVIO / STORE & FORWARD / ALERTAS / IDENTIFICAÇÃO: ver piezometro_core.h —
+ * este .ino só implementa a parte específica do sensor (JSN-SR04T,
+ * medição por pulseIn() + mediana); todo o resto (WiFi, NTP, buffer, envio
+ * HTTP, LEDs, buzzer, OLED) é do núcleo comum, compartilhado com o firmware
+ * de simulação (sketch.ino). O JSON aqui só carrega "nivel_agua" (+ "ts"
  * quando o NTP sincronizou) — sem pressão/temperatura, pois este protótipo
  * não tem esses sensores; o Worker aceita esses campos ausentes normalmente.
- *
- * STORE & FORWARD ("caixa-preta", conceito AquaSense): idêntico ao firmware
- * de simulação. Cada leitura recebe timestamp via NTP (em SEGUNDOS, campo
- * "ts") e entra em um buffer local. O envio ao Worker despacha o buffer
- * inteiro; se a rede/Worker falhar, os dados ficam retidos e são
- * reenviados no próximo ciclo — nenhuma leitura se perde.
- *
- * ALERTAS ATIVOS (Telegram/SMS): disparados pelo motor de alertas do
- * Cloudflare Worker (Cron Trigger, roda a cada 1 min e consulta o D1) — ver
- * README. No hardware real de campo, um módulo SIM7600 permitiria SMS
- * direto do local, sem depender do backend.
- *
- * IDENTIFICAÇÃO DO INSTRUMENTO: cada placa se identifica com um ID único
- * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), enviado no campo "piezometro"
- * — é esse ID que aparece no dashboard e nos alertas.
  *
  * CONEXÕES NA MAQUETE (ver docs/PROTOTIPO_FISICO.md para a tabela completa):
  * JSN-SR04T: VCC→5V (VIN)  GND→GND  TRIG→GPIO5  ECHO→[divisor 1k/2k]→GPIO18
@@ -100,14 +80,6 @@
  * é necessária para o JSN-SR04T — ele é lido com pulseIn() puro).
  * ============================================================================
  */
-
-#include <Wire.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <WiFiClientSecure.h>
-#include <time.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 
 // ===== CREDENCIAIS (preencha antes de usar!) =====
 #define WIFI_SSID   "SUA-REDE-WIFI"
@@ -130,225 +102,24 @@
 #define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
 #define NIVEL_CRITICO 15.0   // acima disso = CRÍTICO
 
-// ===== DISPLAY OLED =====
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-#define SCREEN_ADDRESS 0x3C
+// O núcleo comum (WiFi, buffer, envio, alertas, OLED) e o struct Leitura
+// vêm do core — este sketch só implementa o adapter do sensor JSN-SR04T.
+#include "piezometro_core.h"
 
-// ===== PINOS =====
-#define LED_VERDE    32
-#define LED_AMARELO  33
-#define LED_VERMELHO 25
-#define BUZZER       26
-
-// ===== INTERVALOS (ms) =====
-#define INTERVALO_LEITURA 1000UL    // leitura local + LEDs + display
-#define INTERVALO_ENVIO   10000UL   // envio ao backend (Cloudflare Worker)
-
-// ===== STORE & FORWARD =====
-#define BUFFER_MAX 120              // ~20 min de leituras retidas sem rede
-
-// ===== OBJETOS =====
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
-// ===== VARIÁVEIS GLOBAIS =====
+// ===== VARIÁVEIS ESPECÍFICAS DO ADAPTER (só para display/serial) =====
 float distanciaCm = 0;   // última distância medida pelo sensor (sensor → água)
 float nivelCm = 0;       // nível real de água dentro do tubo/balde (cm)
-float nivelAgua = 0;     // nível equivalente (m) — o que vai para telemetria/alerta
 
-String nivelAlerta = "NORMAL";
-int corAtual = 0; // 0=Verde, 1=Amarelo, 2=Vermelho
-
-unsigned long ultimoBuzzer  = 0;
-unsigned long ultimaLeitura = 0;
-unsigned long ultimoEnvio   = 0;
-bool estadoBuzzer = false;
-bool wifiOk = false;
-bool ntpOk = false;
-
-String bufferDados[BUFFER_MAX];
-int bufferCount = 0;
-
-// ===== SETUP =====
-void setup() {
+// ===== HOOK: INICIALIZAR SENSOR =====
+void initSensor() {
   Serial.begin(115200);
   delay(1000);
-
-  Serial.println("===========================================");
-  Serial.println("  SAMARCO - NIVEL DE AGUA EM PIEZOMETROS");
-  Serial.println("  Protótipo físico (JSN-SR04T)");
-  Serial.println("  Telemetria + Alertas + Store & Forward");
-  Serial.println("  Instrumento: " PIEZOMETRO_ID);
-  Serial.println("===========================================");
-  Serial.println();
-
-  pinMode(LED_VERDE, OUTPUT);
-  pinMode(LED_AMARELO, OUTPUT);
-  pinMode(LED_VERMELHO, OUTPUT);
-  pinMode(BUZZER, OUTPUT);
 
   pinMode(PIN_TRIG, OUTPUT);
   pinMode(PIN_ECHO, INPUT);
   digitalWrite(PIN_TRIG, LOW);
 
-  Serial.println("Testando LEDs...");
-  testarLEDs();
-
-  Serial.println("Testando buzzer...");
-  testarBuzzer();
-
-  Wire.begin(21, 22);
-
-  Serial.print("Inicializando OLED... ");
-  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println("ERRO!");
-    Serial.println("Display não encontrado!");
-    while (1) {
-      digitalWrite(LED_AMARELO, HIGH);
-      delay(200);
-      digitalWrite(LED_AMARELO, LOW);
-      delay(200);
-    }
-  }
-  Serial.println("OK!");
-  display.setTextColor(SSD1306_WHITE);
-
-  mostrarTelaInicio();
-  conectarWiFi();
-  sincronizarNTP();
-
-  Serial.println();
-  Serial.println("Sistema pronto!");
-  Serial.println("Monitoramento iniciado...");
-  Serial.println("===========================================");
-  Serial.println();
-
-  digitalWrite(LED_VERDE, HIGH);
-}
-
-// ===== LOOP PRINCIPAL (não bloqueante) =====
-void loop() {
-  unsigned long agora = millis();
-
-  // Ciclo local: leitura + alertas + display (a cada 1 s)
-  if (agora - ultimaLeitura >= INTERVALO_LEITURA) {
-    ultimaLeitura = agora;
-    lerSensor();
-    determinarAlerta();
-    atualizarLEDs();
-    mostrarSerial();
-    mostrarDisplay();
-  }
-
-  // Ciclo de telemetria: bufferiza e tenta despachar (a cada 10 s)
-  if (agora - ultimoEnvio >= INTERVALO_ENVIO) {
-    ultimoEnvio = agora;
-    bufferizarLeitura();
-    despacharBuffer();
-  }
-
-  // Buzzer roda a cada passagem para não perder o timing dos beeps
-  atualizarBuzzer();
-}
-
-// ===== FUNÇÃO: CONECTAR WIFI =====
-void conectarWiFi() {
-  Serial.print("Conectando ao WiFi \"" WIFI_SSID "\"");
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  unsigned long inicio = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - inicio < 15000) {
-    delay(500);
-    Serial.print(".");
-  }
-  wifiOk = (WiFi.status() == WL_CONNECTED);
-  if (wifiOk) {
-    Serial.println(" OK!");
-    Serial.print("IP: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println(" FALHOU — sistema segue com alertas locais + buffer.");
-  }
-}
-
-// ===== FUNÇÃO: SINCRONIZAR RELÓGIO (NTP) =====
-// Necessário para o store & forward: cada leitura retida no buffer precisa
-// do SEU timestamp, senão o backend carimbaria tudo com a hora do reenvio.
-void sincronizarNTP() {
-  if (!wifiOk) return;
-  Serial.print("Sincronizando relógio (NTP)");
-  configTime(0, 0, "pool.ntp.org");
-  unsigned long inicio = millis();
-  while (time(nullptr) < 1000000000 && millis() - inicio < 10000) {
-    delay(500);
-    Serial.print(".");
-  }
-  ntpOk = (time(nullptr) >= 1000000000);
-  Serial.println(ntpOk ? " OK!" : " FALHOU — envio sem timestamp local.");
-}
-
-// ===== FUNÇÃO: BUFFERIZAR LEITURA (store & forward) =====
-void bufferizarLeitura() {
-  char item[128];
-
-  if (ntpOk) {
-    // Timestamp em SEGUNDOS
-    long ts = (long)time(nullptr);
-    snprintf(item, sizeof(item),
-             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f,\"ts\":%ld}",
-             nivelAgua, ts);
-  } else {
-    snprintf(item, sizeof(item),
-             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f}",
-             nivelAgua);
-  }
-
-  if (bufferCount >= BUFFER_MAX) {
-    // Buffer cheio: descarta a leitura mais ANTIGA (política ring buffer)
-    for (int i = 1; i < BUFFER_MAX; i++) bufferDados[i - 1] = bufferDados[i];
-    bufferCount = BUFFER_MAX - 1;
-    Serial.println("⚠️ Buffer cheio — leitura mais antiga descartada");
-  }
-  bufferDados[bufferCount++] = String(item);
-}
-
-// ===== FUNÇÃO: DESPACHAR BUFFER AO SERVIDOR =====
-void despacharBuffer() {
-  if (bufferCount == 0) return;
-
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.printf("📡 WiFi offline — %d leitura(s) retidas no buffer\n", bufferCount);
-    WiFi.reconnect();
-    return;
-  }
-  if (!ntpOk) sincronizarNTP();  // tenta recuperar o relógio quando a rede volta
-
-  // Monta um único JSON com todas as leituras retidas
-  String body = "{\"leituras\":[";
-  for (int i = 0; i < bufferCount; i++) {
-    body += bufferDados[i];
-    if (i < bufferCount - 1) body += ",";
-  }
-  body += "]}";
-
-  WiFiClientSecure client;
-  client.setInsecure(); // protótipo; em produção use certificado CA
-
-  HTTPClient http;
-  http.begin(client, SERVER_URL);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-Device-Key", DEVICE_KEY);
-  http.setTimeout(8000);
-
-  int code = http.POST(body);
-  if (code == 204) {
-    Serial.printf("📡 Servidor: %d leitura(s) enviadas (HTTP 204)\n", bufferCount);
-    bufferCount = 0;  // sucesso — esvazia o buffer
-  } else {
-    Serial.printf("📡 Servidor: falha (HTTP %d) — %d leitura(s) retidas\n",
-                  code, bufferCount);
-  }
-  http.end();
+  Serial.println("Sensor ultrassônico JSN-SR04T pronto (TRIG/ECHO configurados).");
 }
 
 // ===== FUNÇÃO: UMA MEDIÇÃO BRUTA DO SENSOR (cm) =====
@@ -398,102 +169,48 @@ float medirDistanciaMedianaCm() {
   return leituras[n / 2];
 }
 
-// ===== FUNÇÃO: LER SENSOR =====
-void lerSensor() {
+// ===== HOOK: LER SENSOR =====
+Leitura lerSensor() {
   float distancia = medirDistanciaMedianaCm();
 
   if (distancia < 0) {
     // Sem leitura válida nesta rodada: mantém o ÚLTIMO nível conhecido
     // (não zera! um alarme falso de "nível zero" seria pior que atrasar).
     Serial.println("⚠️ Leitura ultrassônica inválida (sem eco confiável) — mantendo último nível");
-    return;
+    return leituraAtual;
   }
 
   distanciaCm = distancia;
 
   float nivel_cm = ALTURA_SENSOR_CM - distanciaCm;
   if (nivel_cm < 0) nivel_cm = 0;
-
   nivelCm = nivel_cm;
-  nivelAgua = nivelCm * ESCALA_M_POR_CM; // nível equivalente (m) — vai para telemetria/alerta
+
+  Leitura l;
+  l.nivel = nivelCm * ESCALA_M_POR_CM; // nível equivalente (m) — vai para telemetria/alerta
+  l.pressao = 0;
+  l.temperatura = 0;
+  l.temPressao = false;
+  l.temTemperatura = false;
+  return l;
 }
 
-// ===== FUNÇÃO: DETERMINAR NÍVEL DE ALERTA =====
-// Lógica correta de piezômetro: nível d'água ALTO = perigo (saturação).
-void determinarAlerta() {
-  if (nivelAgua < NIVEL_ATENCAO) {
-    nivelAlerta = "NORMAL";
-    corAtual = 0; // Verde
-  }
-  else if (nivelAgua < NIVEL_CRITICO) {
-    nivelAlerta = "ATENCAO";
-    corAtual = 1; // Amarelo
-  }
-  else {
-    nivelAlerta = "CRITICO";
-    corAtual = 2; // Vermelho
-  }
+// ===== HOOK: LINHAS EXTRAS NO DISPLAY OLED =====
+void linhasExtrasDisplay(Adafruit_SSD1306 &d) {
+  d.setCursor(0, 25);
+  d.print("Tubo: ");
+  d.print(nivelCm, 1);
+  d.print("cm");
+
+  d.setCursor(0, 35);
+  d.print("Dist: ");
+  d.print(distanciaCm, 1);
+  d.print("cm ");
+  d.print(wifiOk ? "WiFi:OK" : "WiFi:--");
 }
 
-// ===== FUNÇÃO: ATUALIZAR LEDS =====
-void atualizarLEDs() {
-  digitalWrite(LED_VERDE, LOW);
-  digitalWrite(LED_AMARELO, LOW);
-  digitalWrite(LED_VERMELHO, LOW);
-
-  if (corAtual == 0) {
-    digitalWrite(LED_VERDE, HIGH);          // NORMAL — verde fixo
-  }
-  else if (corAtual == 1) {
-    digitalWrite(LED_AMARELO, HIGH);        // ATENÇÃO — amarelo fixo
-  }
-  else {
-    // CRÍTICO — vermelho piscando (alterna a cada ciclo de 1 s)
-    static bool estadoVermelho = false;
-    estadoVermelho = !estadoVermelho;
-    digitalWrite(LED_VERMELHO, estadoVermelho);
-  }
-}
-
-// ===== FUNÇÃO: ATUALIZAR BUZZER (não bloqueante) =====
-// Obs.: em buzzer passivo real, troque digitalWrite por
-// tone(BUZZER, 2000) / noTone(BUZZER).
-void atualizarBuzzer() {
-  unsigned long agora = millis();
-
-  if (corAtual == 0) {
-    digitalWrite(BUZZER, LOW);
-    estadoBuzzer = false;
-  }
-  else if (corAtual == 1) {
-    // ATENÇÃO — beep curto (100 ms) a cada 2 segundos, sem delay()
-    if (!estadoBuzzer && agora - ultimoBuzzer >= 2000) {
-      digitalWrite(BUZZER, HIGH);
-      estadoBuzzer = true;
-      ultimoBuzzer = agora;
-    }
-    else if (estadoBuzzer && agora - ultimoBuzzer >= 100) {
-      digitalWrite(BUZZER, LOW);
-      estadoBuzzer = false;
-    }
-  }
-  else {
-    // CRÍTICO — alterna a cada 500 ms
-    if (agora - ultimoBuzzer >= 500) {
-      estadoBuzzer = !estadoBuzzer;
-      digitalWrite(BUZZER, estadoBuzzer);
-      ultimoBuzzer = agora;
-    }
-  }
-}
-
-// ===== FUNÇÃO: MOSTRAR NO SERIAL =====
-void mostrarSerial() {
-  Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  Serial.print("💧 Nível d'água:  ");
-  Serial.print(nivelAgua, 2);
-  Serial.println(" m (equivalente)");
-
+// ===== HOOK: LINHAS EXTRAS NO SERIAL =====
+void linhasExtrasSerial() {
   Serial.print("📏 Nível no tubo: ");
   Serial.print(nivelCm, 1);
   Serial.println(" cm");
@@ -501,130 +218,16 @@ void mostrarSerial() {
   Serial.print("📡 Distância medida: ");
   Serial.print(distanciaCm, 1);
   Serial.println(" cm");
-
-  Serial.print("💾 Buffer:        ");
-  Serial.print(bufferCount);
-  Serial.println(" leitura(s) pendente(s)");
-
-  Serial.println();
-
-  if (nivelAlerta == "NORMAL") {
-    Serial.println("🟢 STATUS: NORMAL");
-    Serial.println("   → Nível dentro da faixa segura");
-  }
-  else if (nivelAlerta == "ATENCAO") {
-    Serial.println("🟡 STATUS: ATENÇÃO!");
-    Serial.println("   → Nível d'água subindo");
-    Serial.println("   → Intensificar monitoramento");
-  }
-  else {
-    Serial.println("🔴 STATUS: CRÍTICO!!!");
-    Serial.println("   → ALERTA MÁXIMO ATIVADO!");
-    Serial.println("   → Nível acima do limite de segurança");
-    Serial.println("   → Acionar equipe de geotecnia imediatamente!");
-  }
-
-  Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  Serial.println();
 }
 
-// ===== FUNÇÃO: MOSTRAR NO DISPLAY OLED =====
-void mostrarDisplay() {
-  display.clearDisplay();
-
-  display.setTextSize(1);
-  display.setCursor(0, 0);
-  display.print("SAMARCO PIEZOMETRO");
-  display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
-
-  display.setCursor(0, 15);
-  display.print("Nivel: ");
-  display.print(nivelAgua, 2);
-  display.print(" m");
-
-  display.setCursor(0, 25);
-  display.print("Tubo: ");
-  display.print(nivelCm, 1);
-  display.print("cm");
-
-  display.setCursor(0, 35);
-  display.print("Dist: ");
-  display.print(distanciaCm, 1);
-  display.print("cm ");
-  display.print(wifiOk ? "WiFi:OK" : "WiFi:--");
-
-  display.drawLine(0, 45, 128, 45, SSD1306_WHITE);
-
-  display.setTextSize(2);
-  display.setCursor(0, 50);
-
-  if (nivelAlerta == "NORMAL") {
-    display.print("NORMAL");
-  }
-  else if (nivelAlerta == "ATENCAO") {
-    if ((millis() / 500) % 2 == 0) display.print("ATENCAO");
-  }
-  else {
-    if ((millis() / 250) % 2 == 0) display.print("CRITICO!");
-  }
-
-  display.display();
+// ===== SETUP / LOOP =====
+void setup() {
+  initSensor();
+  coreSetup();
 }
 
-// ===== FUNÇÃO: TELA DE INICIALIZAÇÃO =====
-void mostrarTelaInicio() {
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setCursor(10, 5);
-  display.println("SAMARCO");
-
-  display.setTextSize(1);
-  display.setCursor(8, 30);
-  display.println("Nivel de agua em");
-  display.setCursor(18, 42);
-  display.println("piezometros");
-
-  display.setCursor(10, 55);
-  display.println("Iniciando...");
-
-  display.display();
-  delay(2000);
-}
-
-// ===== FUNÇÃO: TESTAR LEDS =====
-void testarLEDs() {
-  digitalWrite(LED_VERDE, HIGH);
-  delay(300);
-  digitalWrite(LED_VERDE, LOW);
-
-  digitalWrite(LED_AMARELO, HIGH);
-  delay(300);
-  digitalWrite(LED_AMARELO, LOW);
-
-  digitalWrite(LED_VERMELHO, HIGH);
-  delay(300);
-  digitalWrite(LED_VERMELHO, LOW);
-
-  digitalWrite(LED_VERDE, HIGH);
-  digitalWrite(LED_AMARELO, HIGH);
-  digitalWrite(LED_VERMELHO, HIGH);
-  delay(300);
-  digitalWrite(LED_VERDE, LOW);
-  digitalWrite(LED_AMARELO, LOW);
-  digitalWrite(LED_VERMELHO, LOW);
-
-  Serial.println("✅ LEDs OK!");
-}
-
-// ===== FUNÇÃO: TESTAR BUZZER =====
-void testarBuzzer() {
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(BUZZER, HIGH);
-    delay(100);
-    digitalWrite(BUZZER, LOW);
-    delay(100);
-  }
-  Serial.println("✅ Buzzer OK!");
+void loop() {
+  coreLoop();
 }
 
 /*

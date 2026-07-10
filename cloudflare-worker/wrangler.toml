@@ -48,6 +48,11 @@ ALERT_REPEAT_MIN   = "15"
 TWILIO_FROM        = ""
 TWILIO_TO          = ""
 
+# Catálogo de instrumentos exibido no dashboard (mapa/seletor de piezômetro):
+# id, nome amigável e coordenadas de cada piezômetro cadastrado. Servido em
+# GET /config para o dashboard carregar no boot em vez de hard-codar a lista.
+PIEZOMETROS = '[{"id":"PZ-01","nome":"Dique Norte","lat":-20.1975,"lng":-43.4653},{"id":"PZ-02","nome":"Galeria Sul","lat":-20.2043,"lng":-43.4590},{"id":"PZ-03","nome":"Talude Leste","lat":-20.2001,"lng":-43.4521}]'
+
 # ── SEGREDOS (definir com `wrangler secret put <NOME>`) ──────────────────────
 # DEVICE_KEY           → chave compartilhada da placa ESP32 (header x-device-key)
 # TELEGRAM_BOT_TOKEN   → token do bot do Telegram (@BotFather)
