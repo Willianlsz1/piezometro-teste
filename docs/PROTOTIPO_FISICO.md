@@ -1,6 +1,6 @@
 # 🧱 Protótipo Físico — Guia de Montagem da Maquete
 
-Guia completo para transformar a simulação Wokwi (`firmware/sketch.ino`, com o BMP180 como *stand-in*) em uma **maquete física real**: ESP32 de verdade, sensor ultrassônico JSN-SR04T medindo o nível de água de verdade dentro de um tubo/balde, e o mesmo backend (Render + InfluxDB + Telegram/SMS) já usado na simulação.
+Guia completo para transformar a simulação Wokwi (`firmware/sketch.ino`, com o BMP180 como *stand-in*) em uma **maquete física real**: ESP32 de verdade, sensor ultrassônico JSN-SR04T medindo o nível de água de verdade dentro de um tubo/balde, e o mesmo backend (Cloudflare Worker + D1 + Telegram/SMS) já usado na simulação.
 
 > ⚠️ **Antes de começar:** o firmware desta maquete é o `firmware/sketch_fisico_jsn_sr04t.ino` — **não** use o `firmware/sketch.ino` (esse é só para o Wokwi, com BMP180). São dois firmwares diferentes para dois cenários diferentes.
 
@@ -95,7 +95,7 @@ Conta da régua: `V_saída = 5V × R2/(R1+R2) = 5V × 2k/3k ≈ 3,3V` — seguro
    ```cpp
    #define ALTURA_SENSOR_CM 60.0   // troque pelo valor medido na montagem
    ```
-2. Preencha `WIFI_SSID`, `WIFI_PASS`, `SERVER_URL` e `DEVICE_KEY` (a mesma configurada no servidor/Render).
+2. Preencha `WIFI_SSID`, `WIFI_PASS`, `SERVER_URL` (o `/ingest` do Worker, ex.: `https://piezometro-worker.SEU-SUBDOMINIO.workers.dev/ingest`) e `DEVICE_KEY` (a mesma definida no Worker via `wrangler secret put DEVICE_KEY`).
 3. Grave o firmware e abra o Serial Monitor (115200 baud).
 4. **Teste a seco** (tubo vazio): a distância medida deve bater com `ALTURA_SENSOR_CM` (±1–2 cm) e o nível deve aparecer próximo de 0 m. Se não bater, corrija o `ALTURA_SENSOR_CM` ou refaça a fixação do sensor (pode estar torto).
 5. **Teste com água subindo**: despeje água aos poucos e confira no Serial/OLED que o nível sobe conforme a régua marcada no tubo — 24 cm de água deve mostrar ATENÇÃO (LED amarelo + beep a cada 2s), 30 cm deve mostrar CRÍTICO (LED vermelho piscando + beep rápido).
@@ -122,7 +122,7 @@ Roteiro de **~3 minutos**, pensado para deixar claro o fluxo completo (sensor �
 | Leitura errática mesmo fora da zona morta | Sensor torto (não perpendicular à água) ou eco nas paredes de um tubo estreito | Nivele o sensor; use tubo de diâmetro ≥ 75 mm |
 | Display OLED em branco / não inicializa | Endereço I2C incorreto (alguns módulos usam `0x3D`, não `0x3C`) | Rode um scanner I2C ou troque `SCREEN_ADDRESS` para `0x3D` no firmware |
 | WiFi não conecta | SSID/senha errados, ou rede 5 GHz (ESP32 só conecta em 2,4 GHz) | Confirme `WIFI_SSID`/`WIFI_PASS` e use uma rede 2,4 GHz |
-| Servidor responde "HTTP 401" | `DEVICE_KEY` do firmware diferente da variável de ambiente `DEVICE_KEY` no Render | Confirme que as duas chaves são idênticas (copie e cole, evite digitar) |
+| Servidor responde "HTTP 401" | `DEVICE_KEY` do firmware diferente do segredo `DEVICE_KEY` do Worker (`wrangler secret put`) | Confirme que as duas chaves são idênticas (copie e cole, evite digitar) |
 | ESP32 não aparece na porta serial | Cabo USB é só de carga, não de dados | Troque por um cabo micro-USB de dados |
 | Distância medida sempre menor que a real | Objeto/parede refletindo o eco antes da água (respingos, condensação na parede do tubo) | Seque o interior do tubo antes do teste; afaste o sensor de obstruções |
 
