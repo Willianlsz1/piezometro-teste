@@ -74,7 +74,7 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 |--------|-----------|
 | Firmware | C++ (Arduino), ESP32, BMP180, store & forward com NTP |
 | Simulação | [Wokwi](https://wokwi.com) |
-| Banco de dados | [InfluxDB Cloud](https://cloud2.influxdata.com) (Flux) |
+| Banco de dados | [InfluxDB Cloud](https://cloud2.influxdata.com) (InfluxQL) |
 | Proxy / Backend | Node.js puro (sem frameworks) + motor de alertas |
 | Notificações | Telegram Bot API (gratuito) e Twilio SMS (opcional) |
 | Hospedagem backend | [Render.com](https://render.com) (plano gratuito) |
@@ -247,6 +247,8 @@ O sistema monitora **múltiplos piezômetros**: cada leitura carrega o identific
 ---
 
 ## Arquitetura alternativa: sem servidor
+
+> ⚠️ Contas novas do InfluxDB Cloud são "Serverless" e não respondem a consultas Flux (`/api/v2/query`) — o sistema usa o endpoint v1 `/query` com InfluxQL, compatível com os dois tipos de conta.
 
 Além da arquitetura padrão (com o `server.js` como proxy no Render), o projeto também suporta um modo **sem servidor**, em que o navegador conversa direto com o InfluxDB Cloud:
 
