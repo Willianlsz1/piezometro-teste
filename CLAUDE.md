@@ -42,14 +42,18 @@ Dashboard (GitHub Pages, index.html) → GET /ultimos, /dados?pz&range
 
 | Caminho | Papel |
 |---|---|
-| `cloudflare-worker/src/index.js` | Backend inteiro: ingestão, consultas, motor de alertas |
+| `cloudflare-worker/src/` | Backend em 7 módulos ES: `index.js` (roteador), `config`, `http`, `db` (todas as queries), `alertas` (motor 3 camadas + KV), `notificacoes`, `rotas` |
 | `cloudflare-worker/wrangler.toml` | Config (cron, bindings D1/KV, vars não sensíveis) |
 | `cloudflare-worker/schema.sql` | Tabela `leituras` + índice |
-| `index.html` | Dashboard single-file (HTML+CSS+JS, ~1800 linhas) — GitHub Pages |
-| `firmware/sketch.ino` | Firmware da simulação Wokwi (BMP180 como stand-in) |
-| `firmware/sketch_fisico_jsn_sr04t.ino` | Firmware do protótipo físico (JSN-SR04T) |
-| `docs/BASE_DE_CONHECIMENTO.md` | Pesquisa consolidada (piezômetros, barragens, mercados) |
-| `docs/PROTOTIPO_FISICO.md` | Guia da maquete física |
+| `index.html` | Só a estrutura HTML do dashboard (~280 l.) — GitHub Pages |
+| `assets/styles.css` + `assets/js/*` | CSS e os 8 módulos JS do dashboard (`config`, `util`, `fontes`, `estado`, `graficos`, `paineis`, `exportar`, `app`), carregados por `<script src>` em ordem de dependência — **sem bundler** |
+| `firmware/piezometro_core.h` | Núcleo comum do firmware (WiFi/buffer/envio/alertas/OLED) |
+| `firmware/sketch*.ino` | Adapters de sensor (BMP180 simulação; JSN-SR04T físico) |
+| `docs/` | Base de conhecimento, pesquisa de dashboards, planos e guia da maquete |
+
+**Guarda anti-godfile (permanente):** ≤ ~300 linhas por arquivo (exceção: `paineis.js` até ~450),
+1 responsabilidade por arquivo, nome = responsabilidade. Função nova entra no arquivo cujo nome a
+descreve; se engordar além do limite, dividir antes de commitar.
 
 ## Convenções e invariantes
 

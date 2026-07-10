@@ -231,19 +231,41 @@ O sistema classifica o **nível d'água** em três faixas — a mesma lógica no
 ```
 piezometro-teste/
 ├── firmware/
-│   ├── sketch.ino                    # Firmware da SIMULAÇÃO no Wokwi (BMP180 como stand-in)
-│   ├── sketch_fisico_jsn_sr04t.ino   # Firmware do PROTÓTIPO FÍSICO (JSN-SR04T medindo água real)
+│   ├── piezometro_core.h             # Núcleo comum (WiFi, NTP, buffer, envio, alertas, OLED)
+│   ├── sketch.ino                    # Adapter do sensor da SIMULAÇÃO (BMP180 como stand-in)
+│   ├── sketch_fisico_jsn_sr04t.ino   # Adapter do sensor do PROTÓTIPO FÍSICO (JSN-SR04T)
 │   └── diagram.json                  # Circuito do Wokwi (ESP32 + BMP180 + OLED + LEDs + buzzer)
 ├── docs/
-│   ├── MAPEAMENTO_DEMANDA_E_MERCADO.md  # Demanda SAGA × mercado real × regulação (fontes citadas)
-│   └── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e roteiro de demo
-├── cloudflare-worker/  # Backend: ingestão (/ingest), leitura (/ultimos, /dados) e motor de alertas (cron)
-│   ├── src/index.js    # Código do Worker
-│   ├── schema.sql      # Schema da tabela `leituras` (D1)
-│   ├── wrangler.toml   # Config do Worker (vars, D1, KV, cron)
-│   └── README.md       # Guia de deploy passo a passo
-├── index.html       # Dashboard web (GitHub Pages)
-└── readme.md         # Este arquivo
+│   ├── MAPEAMENTO_DEMANDA_E_MERCADO.md  # Demanda SAGA × mercado real × regulação
+│   ├── BASE_DE_CONHECIMENTO.md          # Piezômetros, barragens, legislação e mercados (fontes)
+│   ├── DASHBOARD_PROFISSIONAL.md        # Padrões ISA-101/18.2 e plano de melhorias P1–P8
+│   ├── PLANO_REFATORACAO.md             # Plano anti-godfile (executado)
+│   └── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e demo
+├── cloudflare-worker/       # Backend (deploy: ver README da pasta)
+│   ├── src/
+│   │   ├── index.js         # Roteador (fetch + scheduled) — só orquestra
+│   │   ├── config.js        # getConfig, ranges e constantes
+│   │   ├── http.js          # CORS, respostas JSON, limites de payload
+│   │   ├── db.js            # Todas as queries do D1
+│   │   ├── alertas.js       # Motor de alertas (nível + comunicação + taxa) e estado no KV
+│   │   ├── notificacoes.js  # Telegram e SMS (Twilio)
+│   │   └── rotas.js         # Handlers dos endpoints
+│   ├── schema.sql           # Schema da tabela `leituras` (D1)
+│   ├── wrangler.toml        # Config (vars, D1, KV, cron)
+│   └── README.md            # Guia de deploy passo a passo
+├── assets/
+│   ├── styles.css           # Todo o CSS do dashboard
+│   └── js/                  # Dashboard em módulos (carregados em ordem de dependência)
+│       ├── config.js        # API_URL, CFG, catálogo, loadConfig (/config)
+│       ├── util.js          # Funções puras (classificação, histerese, formatação)
+│       ├── fontes.js        # Seam de dados: FonteApi / FonteSimulada / trocarFonte
+│       ├── estado.js        # Estado do painel (séries, stats, alarmes/eventos)
+│       ├── graficos.js      # Canvas: sparklines e gráfico principal (média + máx)
+│       ├── paineis.js       # Cards, mapa, painel de alerta, tabelas
+│       ├── exportar.js      # Export CSV
+│       └── app.js           # Orquestração: poll, seleção, boot
+├── index.html               # Dashboard web — só a estrutura HTML (GitHub Pages)
+└── readme.md                # Este arquivo
 ```
 
 > 🧱 **Vai montar a maquete física?** Siga o guia completo em [`docs/PROTOTIPO_FISICO.md`](docs/PROTOTIPO_FISICO.md) — lista de compras (~R$ 150–220), esquema de ligação do JSN-SR04T (com o divisor de tensão obrigatório no ECHO), calibração e roteiro de demonstração para a banca.
