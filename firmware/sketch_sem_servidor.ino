@@ -1,7 +1,8 @@
 /*
  * ============================================================================
  * SAMARCO — MONITORAMENTO ONLINE DO NÍVEL DE ÁGUA EM PIEZÔMETROS
- * ESP32 + BMP180 (stand-in) + OLED + LEDS + BUZZER + SERVIDOR (JSON) + STORE&FORWARD
+ * ESP32 + BMP180 (stand-in) + OLED + LEDS + BUZZER — VERSÃO "SEM SERVIDOR"
+ * (placa → InfluxDB Cloud direto · placa → Telegram direto · STORE&FORWARD)
  * ============================================================================
  *
  * ⚠️ NOTA CONCEITUAL (para o TCC):
@@ -23,26 +24,71 @@
  *   1013 hPa → 10,0 m (normal) · 1035 hPa → 12,2 m (atenção)
  *   1065 hPa → 15,2 m (CRÍTICO)
  *
- * ENVIO: o firmware NÃO fala mais direto com o InfluxDB — ele não guarda
- * nenhum token do banco, apenas a DEVICE_KEY do NOSSO servidor. Cada leitura
- * vira um JSON simples, que é enviado por HTTPS ao endpoint /ingest do
- * server.js (rodando no Render); é o servidor quem repassa os dados ao
- * InfluxDB, com a chave de verdade guardada só lá.
+ * ARQUITETURA "SEM SERVIDOR" — QUAL A DIFERENÇA PARA sketch.ino?
+ * O sketch.ino (versão "com servidor") manda um JSON para o endpoint /ingest
+ * do server.js (rodando no Render), que é quem fala com o InfluxDB e com o
+ * Telegram — o firmware nunca guarda tokens de verdade, só a DEVICE_KEY.
+ * ESTE arquivo (sketch_sem_servidor.ino) elimina o servidor: a própria placa
+ * grava direto no InfluxDB Cloud (line protocol) e dispara o Telegram direto,
+ * sem nenhum intermediário.
+ *
+ *        ┌───────────┐        ┌─────────────────────┐
+ *        │   ESP32    │──────▶│   InfluxDB Cloud      │◀────┐
+ *        │ (BMP180 +  │ HTTPS │  (bucket PIEZOMETRO)  │      │ token
+ *        │ OLED/LED/  │ write │                       │      │ leitura
+ *        │  buzzer)   │       └─────────────────────┘      │
+ *        │            │                                     │
+ *        │            │──────▶┌─────────────────────┐      │
+ *        └───────────┘ HTTPS  │   Telegram Bot API    │  ┌───────────┐
+ *                      sendMsg└─────────────────────┘  │ index.html │
+ *                                                        │ (dashboard)│
+ *                                                        └───────────┘
+ *
+ * TRADE-OFFS HONESTOS (documentar no TCC):
+ *   + Não depende do Render "hibernando" (free tier dorme após inatividade,
+ *     causando atraso na 1ª requisição) — a placa fala direto com o Influx.
+ *   + Menos peças móveis: um serviço a menos no ar, uma dependência a menos.
+ *   − O TOKEN DE ESCRITA do InfluxDB fica gravado no firmware. Qualquer
+ *     pessoa com acesso físico/ao código do ESP32 pode extraí-lo e escrever
+ *     lixo no bucket. Por isso: crie um token de escrita EXCLUSIVO para este
+ *     dispositivo, restrito ao bucket PIEZOMETRO, e revogue-o se suspeitar de
+ *     vazamento (InfluxDB → Load Data → API Tokens).
+ *   − Os alertas do Telegram só disparam enquanto a placa está ligada e com
+ *     WiFi — não há um "vigia" 24h olhando o banco como o server.js fazia.
+ *     Se o ESP32 cair, ninguém é avisado até ele voltar (ou nunca, se a queda
+ *     for definitiva).
+ *   − Cada ESP32 do projeto precisaria do seu próprio token de escrita — não
+ *     escala tão bem quanto centralizar no servidor.
+ *
+ * QUANDO USAR CADA ARQUIVO:
+ *   • sketch.ino              → produção/demo "de verdade": token de escrita
+ *     fica só no servidor, alertas rodam 24h mesmo com a placa desligada,
+ *     mais fácil trocar de dispositivo sem tocar em tokens.
+ *   • sketch_sem_servidor.ino → protótipo rápido, aula, ou quando não se quer
+ *     manter/pagar um servidor: tudo roda só com a placa e as nuvens de
+ *     terceiros (InfluxDB Cloud + Telegram).
+ *
+ * COMO CRIAR OS TOKENS NO INFLUXDB (Load Data → API Tokens):
+ *   1. Token de ESCRITA (write-only no bucket PIEZOMETRO) → cole em
+ *      INFLUXDB_TOKEN, abaixo. É este token que fica na placa.
+ *   2. Token de SOMENTE LEITURA (read-only no bucket PIEZOMETRO) → usado no
+ *      index.html do dashboard, para consultar os dados sem poder escrever.
+ *   NUNCA use o mesmo token nos dois lugares.
  *
  * STORE & FORWARD ("caixa-preta", conceito AquaSense):
- * Cada leitura recebe timestamp via NTP (em SEGUNDOS, campo "ts") e entra em
- * um buffer local. O envio ao servidor despacha o buffer inteiro; se a
- * rede/servidor falhar, os dados ficam retidos e são reenviados no próximo
- * ciclo — nenhuma leitura se perde. O servidor converte o "ts" de segundos
- * para nanossegundos antes de gravar no InfluxDB.
+ * Cada leitura recebe timestamp via NTP (em segundos) e entra em um buffer
+ * local já em LINE PROTOCOL (formato nativo do InfluxDB). O envio despacha o
+ * buffer inteiro; se a rede ou o InfluxDB falharem, os dados ficam retidos e
+ * são reenviados no próximo ciclo — nenhuma leitura se perde.
  *
- * ALERTAS ATIVOS (Telegram/SMS): enviados pelo servidor (server.js), que
- * vigia o InfluxDB — ver README. No hardware real, um módulo SIM7600
- * permitiria SMS direto do campo, sem depender do servidor.
+ * ALERTAS ATIVOS (Telegram): disparados pela PRÓPRIA placa nas transições de
+ * faixa (NORMAL↔ATENÇÃO↔CRÍTICO), com reenvio a cada 15 min enquanto o nível
+ * permanecer CRÍTICO. Deixe TELEGRAM_BOT_TOKEN vazio para desativar.
  *
  * IDENTIFICAÇÃO DO INSTRUMENTO: cada placa se identifica com um ID único
- * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), enviado como tag "piezometro"
- * ao InfluxDB — é esse ID que aparece no dashboard e nos alertas.
+ * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), gravado como tag "piezometro"
+ * no line protocol do InfluxDB — é esse ID que aparece no dashboard e nos
+ * alertas do Telegram.
  *
  * CONEXÕES NO WOKWI (ver firmware/diagram.json):
  * BMP180:  VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
@@ -64,12 +110,18 @@
 #include <Adafruit_SSD1306.h>
 
 // ===== CREDENCIAIS (preencha antes de usar!) =====
-#define WIFI_SSID   "Wokwi-GUEST"
-#define WIFI_PASS   ""
-#define SERVER_URL  "https://SEU-APP.onrender.com/ingest"  // endpoint /ingest do server.js
-#define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY do servidor
-#define MEASUREMENT "telemetria_samarco"                   // (info) measurement gravado pelo servidor
-#define PIEZOMETRO_ID "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
+#define WIFI_SSID       "Wokwi-GUEST"
+#define WIFI_PASS       ""
+// InfluxDB Cloud — dados do cluster do projeto (já preenchidos)
+#define INFLUXDB_URL    "https://us-east-1-1.aws.cloud2.influxdata.com"
+#define INFLUXDB_ORG    "a6d8947f7ea6219b"
+#define INFLUXDB_BUCKET "PIEZOMETRO"
+#define INFLUXDB_TOKEN  "COLE-AQUI-SEU-TOKEN-DE-ESCRITA"   // token com permissão de ESCRITA no bucket
+#define MEASUREMENT     "telemetria_samarco"
+#define PIEZOMETRO_ID   "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
+// Telegram (opcional): deixe o token vazio para desativar os alertas
+#define TELEGRAM_BOT_TOKEN ""    // ex.: "123456:ABC-DEF..." (criar com @BotFather)
+#define TELEGRAM_CHAT_ID   ""    // ex.: "-100123456789"
 
 // ===== CONVERSÃO PRESSÃO → NÍVEL D'ÁGUA (simulação) =====
 // nivel = NIVEL_REF + (pressao_hPa − PRESSAO_REF) / SIM_ESCALA
@@ -97,10 +149,13 @@
 
 // ===== INTERVALOS (ms) =====
 #define INTERVALO_LEITURA 1000UL    // leitura local + LEDs + display
-#define INTERVALO_ENVIO   10000UL   // envio ao servidor (Render)
+#define INTERVALO_ENVIO   10000UL   // envio ao InfluxDB + verificação de alerta
 
 // ===== STORE & FORWARD =====
 #define BUFFER_MAX 120              // ~20 min de leituras retidas sem rede
+
+// ===== ALERTAS (Telegram) =====
+#define ALERT_REPEAT_MS (15UL * 60UL * 1000UL)  // reenvia CRÍTICO a cada 15 min
 
 // ===== OBJETOS =====
 Adafruit_BMP085 bmp;
@@ -124,6 +179,10 @@ bool ntpOk = false;
 String bufferDados[BUFFER_MAX];
 int bufferCount = 0;
 
+// Anti-spam do Telegram: "" = ainda não notificado (boot) — não avisa NORMAL
+String ultimoNivelNotificado = "";
+unsigned long ultimoCriticoNotificado = 0;
+
 // ===== SETUP =====
 void setup() {
   Serial.begin(115200);
@@ -131,7 +190,8 @@ void setup() {
 
   Serial.println("===========================================");
   Serial.println("  SAMARCO - NIVEL DE AGUA EM PIEZOMETROS");
-  Serial.println("  Telemetria + Alertas + Store & Forward");
+  Serial.println("  Telemetria + Alertas SEM SERVIDOR");
+  Serial.println("  (placa -> InfluxDB direto + Telegram direto)");
   Serial.println("  Instrumento: " PIEZOMETRO_ID);
   Serial.println("===========================================");
   Serial.println();
@@ -203,11 +263,12 @@ void loop() {
     mostrarDisplay();
   }
 
-  // Ciclo de telemetria: bufferiza e tenta despachar (a cada 10 s)
+  // Ciclo de telemetria: bufferiza, despacha ao InfluxDB e checa alerta Telegram (a cada 10 s)
   if (agora - ultimoEnvio >= INTERVALO_ENVIO) {
     ultimoEnvio = agora;
     bufferizarLeitura();
     despacharBuffer();
+    checarAlertaTelegram();
   }
 
   // Buzzer roda a cada passagem para não perder o timing dos beeps
@@ -249,20 +310,21 @@ void sincronizarNTP() {
   Serial.println(ntpOk ? " OK!" : " FALHOU — envio sem timestamp local.");
 }
 
-// ===== FUNÇÃO: BUFFERIZAR LEITURA (store & forward) =====
+// ===== FUNÇÃO: BUFFERIZAR LEITURA (store & forward, em LINE PROTOCOL) =====
 void bufferizarLeitura() {
-  char item[128];
+  String linha = String(MEASUREMENT) + ",piezometro=" + PIEZOMETRO_ID +
+                 " nivel_agua=" + String(nivelAgua, 3) +
+                 ",pressao=" + String(pressao, 3) +
+                 ",temperatura=" + String(temperatura, 2);
 
   if (ntpOk) {
-    // Timestamp em SEGUNDOS — o servidor converte para nanossegundos
+    // Timestamp em nanossegundos, montado como string a partir dos segundos
+    // (epoch) para não perder precisão — mesmo truque do server.js.
     long ts = (long)time(nullptr);
-    snprintf(item, sizeof(item),
-             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f,\"pressao\":%.3f,\"temperatura\":%.2f,\"ts\":%ld}",
-             nivelAgua, pressao, temperatura, ts);
-  } else {
-    snprintf(item, sizeof(item),
-             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f,\"pressao\":%.3f,\"temperatura\":%.2f}",
-             nivelAgua, pressao, temperatura);
+    char tsBuf[24];
+    snprintf(tsBuf, sizeof(tsBuf), "%ld000000000", ts);
+    linha += " ";
+    linha += tsBuf;
   }
 
   if (bufferCount >= BUFFER_MAX) {
@@ -271,10 +333,10 @@ void bufferizarLeitura() {
     bufferCount = BUFFER_MAX - 1;
     Serial.println("⚠️ Buffer cheio — leitura mais antiga descartada");
   }
-  bufferDados[bufferCount++] = String(item);
+  bufferDados[bufferCount++] = linha;
 }
 
-// ===== FUNÇÃO: DESPACHAR BUFFER AO SERVIDOR =====
+// ===== FUNÇÃO: DESPACHAR BUFFER DIRETO AO INFLUXDB =====
 void despacharBuffer() {
   if (bufferCount == 0) return;
 
@@ -285,32 +347,102 @@ void despacharBuffer() {
   }
   if (!ntpOk) sincronizarNTP();  // tenta recuperar o relógio quando a rede volta
 
-  // Monta um único JSON com todas as leituras retidas
-  String body = "{\"leituras\":[";
+  // Monta um único corpo em line protocol com todas as leituras retidas
+  String body = "";
   for (int i = 0; i < bufferCount; i++) {
     body += bufferDados[i];
-    if (i < bufferCount - 1) body += ",";
+    if (i < bufferCount - 1) body += "\n";
   }
-  body += "]}";
 
   WiFiClientSecure client;
   client.setInsecure(); // simulação/protótipo; em produção use certificado CA
 
   HTTPClient http;
-  http.begin(client, SERVER_URL);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-Device-Key", DEVICE_KEY);
+  String url = String(INFLUXDB_URL) + "/api/v2/write?org=" + INFLUXDB_ORG +
+               "&bucket=" + INFLUXDB_BUCKET + "&precision=ns";
+  http.begin(client, url);
+  http.addHeader("Authorization", String("Token ") + INFLUXDB_TOKEN);
+  http.addHeader("Content-Type", "text/plain; charset=utf-8");
   http.setTimeout(8000);
 
   int code = http.POST(body);
   if (code == 204) {
-    Serial.printf("📡 Servidor: %d leitura(s) enviadas (HTTP 204)\n", bufferCount);
+    Serial.printf("📡 InfluxDB: %d leitura(s) gravadas (HTTP 204)\n", bufferCount);
     bufferCount = 0;  // sucesso — esvazia o buffer
   } else {
-    Serial.printf("📡 Servidor: falha (HTTP %d) — %d leitura(s) retidas\n",
+    Serial.printf("📡 InfluxDB: falha (HTTP %d) — %d leitura(s) retidas\n",
                   code, bufferCount);
   }
   http.end();
+}
+
+// ===== FUNÇÃO: NOTIFICAR TELEGRAM (direto do firmware) =====
+void notificarTelegram(String texto) {
+  if (String(TELEGRAM_BOT_TOKEN).length() == 0) return;  // alertas desativados
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("🔔 Telegram: WiFi offline — alerta não enviado");
+    return;
+  }
+
+  // Escapa aspas e quebras de linha para não quebrar o JSON
+  String escapado = texto;
+  escapado.replace("\\", "\\\\");
+  escapado.replace("\"", "\\\"");
+  escapado.replace("\n", "\\n");
+
+  String payload = "{\"chat_id\":\"" + String(TELEGRAM_CHAT_ID) +
+                    "\",\"text\":\"" + escapado + "\"}";
+
+  WiFiClientSecure client;
+  client.setInsecure(); // simulação/protótipo; em produção use certificado CA
+
+  HTTPClient http;
+  String url = String("https://api.telegram.org/bot") + TELEGRAM_BOT_TOKEN + "/sendMessage";
+  http.begin(client, url);
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(8000);
+
+  int code = http.POST(payload);
+  Serial.printf("🔔 Telegram: %s (HTTP %d)\n", (code == 200 ? "enviado" : "falha"), code);
+  http.end();
+}
+
+// ===== FUNÇÃO: CHECAR E DISPARAR ALERTA TELEGRAM (a cada ciclo de 10 s) =====
+// Mesma lógica do notificar() do server.js, só que rodando na própria placa:
+// dispara na TRANSIÇÃO de faixa e reenvia CRÍTICO a cada ALERT_REPEAT_MS.
+void checarAlertaTelegram() {
+  unsigned long agora = millis();
+  bool mudouDeFaixa   = (nivelAlerta != ultimoNivelNotificado);
+  bool repetirCritico = (nivelAlerta == "CRITICO") &&
+                        (agora - ultimoCriticoNotificado >= ALERT_REPEAT_MS);
+
+  if (!mudouDeFaixa && !repetirCritico) return;
+
+  // No boot (ultimoNivelNotificado == ""), só notifica se já começar fora do normal
+  bool primeiroCiclo = (ultimoNivelNotificado == "");
+  if (primeiroCiclo && nivelAlerta == "NORMAL") {
+    ultimoNivelNotificado = nivelAlerta;
+    return;
+  }
+
+  String emoji = (nivelAlerta == "NORMAL")  ? "🟢" :
+                 (nivelAlerta == "ATENCAO") ? "🟡" : "🔴";
+  String acao;
+  if (nivelAlerta == "NORMAL") {
+    acao = "Nível retornou à faixa segura.";
+  } else if (nivelAlerta == "ATENCAO") {
+    acao = "Nível acima de " + String(NIVEL_ATENCAO, 0) + " m — intensificar monitoramento.";
+  } else {
+    acao = "Nível acima de " + String(NIVEL_CRITICO, 0) + " m — ACIONAR EQUIPE DE GEOTECNIA!";
+  }
+
+  String texto = emoji + " SAMARCO PIEZÔMETRO — " + nivelAlerta + "\n" +
+                 "Nível d'água: " + String(nivelAgua, 2) + " m\n" + acao;
+
+  notificarTelegram(texto);
+
+  ultimoNivelNotificado = nivelAlerta;
+  if (nivelAlerta == "CRITICO") ultimoCriticoNotificado = agora;
 }
 
 // ===== FUNÇÃO: LER SENSOR =====
@@ -542,12 +674,15 @@ void testarBuzzer() {
  * 2. ATENÇÃO (amarelo):  1035 hPa → nível 12,2 m  (beep a cada 2 s)
  * 3. CRÍTICO (vermelho): 1065 hPa → nível 15,2 m  (LED pisca + beep rápido)
  *
- * O dashboard usa os MESMOS limiares (12 m / 15 m) e o servidor dispara
- * Telegram/SMS nas transições de nível — veja o README.
+ * O dashboard (index.html) consulta o InfluxDB direto com um token SOMENTE
+ * LEITURA e usa os MESMOS limiares (12 m / 15 m). Os alertas do Telegram, ao
+ * contrário da versão com servidor, saem direto desta placa — sem token de
+ * Telegram configurado (TELEGRAM_BOT_TOKEN vazio), eles simplesmente não
+ * disparam e o resto do sistema (LEDs, buzzer, OLED, InfluxDB) segue normal.
  *
  * TESTE DO STORE & FORWARD: pause a simulação por ~1 min (ou desligue o
  * WiFi) e observe no Serial o buffer acumulando; ao reconectar, todas as
- * leituras retidas são enviadas de uma vez (JSON) ao servidor, com seus
- * timestamps originais, que por sua vez grava tudo no InfluxDB.
+ * leituras retidas são enviadas de uma vez (line protocol) direto ao
+ * InfluxDB, com seus timestamps originais.
  * ============================================================================
  */

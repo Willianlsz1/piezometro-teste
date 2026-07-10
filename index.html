@@ -6,6 +6,8 @@
 <title>Controle de Piezômetro — Samarco</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -135,14 +137,91 @@ header {
 }
 .sim-banner.on { display: flex; }
 
+/* ── COMO LER ESTE PAINEL ── */
+.howto-bar {
+  padding: 7px 20px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border2);
+}
+.howto-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.howto-toggle:hover { border-color: #333847; color: var(--text-1); }
+.howto-content {
+  display: none;
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  gap: 8px;
+}
+.howto-content.open { display: grid; }
+.howto-item { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.howto-item b { color: var(--text-1); }
+
+/* ── SUBTÍTULOS DE PAINEL ── */
+.panel-sub { font-size: 10px; color: var(--text-3); margin-top: -4px; }
+
 /* ── LAYOUT ── */
 .root {
   flex: 1;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto auto auto 1fr;
   gap: 12px;
   padding: 14px 16px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── VISÃO GERAL + MAPA ── */
+.overview-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
+}
+.pz-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pz-card {
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 4px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.pz-card:hover { border-color: #333847; }
+.pz-card.selected { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue-bd) inset; }
+.pz-card-top { display: flex; align-items: center; justify-content: space-between; }
+.pz-card-id { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text-2); }
+.pz-card-name { font-size: 11px; color: var(--text-2); }
+.pz-card-value {
+  font-family: var(--mono); font-size: 24px; font-weight: 600; color: var(--text-1);
+  display: flex; align-items: baseline; gap: 3px;
+}
+.pz-card-unit { font-size: 12px; opacity: .6; }
+
+.pz-detail-label { font-size: 11px; color: var(--text-2); }
+.pz-detail-label b { color: var(--text-1); }
+
+.map-area { position: relative; height: 200px; border-radius: 8px; overflow: hidden; }
+#pz-map { width: 100%; height: 100%; background: var(--bg-card2); }
+.map-fallback {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; color: var(--text-3); font-size: 12px; text-align: center; padding: 12px;
 }
 
 /* ── METRIC CARDS ── */
@@ -246,6 +325,7 @@ header {
 .panel-hdr {
   display: flex; align-items: center; justify-content: space-between;
 }
+.panel-hdr-actions { display: flex; align-items: center; gap: 8px; }
 .panel-title {
   font-size: 11px;
   font-weight: 600;
@@ -270,10 +350,29 @@ header {
 }
 .chart-area canvas { display: block; }
 
+/* ── SELETOR DE PERÍODO ── */
+.period-pills { display: flex; gap: 3px; background: var(--bg-card2); border: 1px solid var(--border); border-radius: 6px; padding: 2px; }
+.period-pill {
+  font-family: var(--mono); font-size: 11px; color: var(--text-2);
+  background: transparent; border: none; border-radius: 4px;
+  padding: 4px 10px; cursor: pointer; transition: background .15s, color .15s;
+}
+.period-pill:hover { color: var(--text-1); }
+.period-pill.active { background: var(--blue-bg); color: var(--blue); }
+
+.btn-export {
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  color: var(--text-2); background: var(--bg-card2);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 10px; cursor: pointer; transition: border-color .2s, color .2s;
+  white-space: nowrap;
+}
+.btn-export:hover { border-color: var(--green-bd); color: var(--green); }
+
 /* ── BOTTOM ROW ── */
 .bottom-row {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 340px 1fr 1fr;
   gap: 10px;
 }
 
@@ -338,7 +437,7 @@ header {
   line-height: 1.6;
 }
 
-/* ── ALERT TABLE ── */
+/* ── TABELAS (eventos / leituras) ── */
 .alert-table-wrap { overflow-y: auto; flex: 1; max-height: 200px; }
 .alert-table-wrap::-webkit-scrollbar { width: 4px; }
 .alert-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -423,7 +522,33 @@ tbody td {
   ⚠ Modo simulação — dados fictícios para demonstração (sensor/InfluxDB indisponível)
 </div>
 
+<div class="howto-bar">
+  <button class="howto-toggle" id="howto-toggle" type="button">❓ Como ler este painel</button>
+  <div class="howto-content" id="howto-content">
+    <div class="howto-item">💧 <b>Nível d'água:</b> altura da água dentro do tubo do piezômetro, em metros. Quanto mais alto, maior a pressão da água dentro da barragem.</div>
+    <div class="howto-item">🟢🟡🔴 <b>Faixas:</b> Normal (abaixo de 12 m) = operação segura · Atenção (12–15 m) = observar de perto · Crítico (acima de 15 m) = acionar a equipe de geotecnia imediatamente.</div>
+    <div class="howto-item">📈 <b>Gráficos:</b> mostram como o nível variou ao longo do tempo — linhas tracejadas marcam os limites de segurança.</div>
+    <div class="howto-item">🔔 <b>Alertas:</b> quando o nível cruza um limite, o sistema avisa sozinho por Telegram/SMS — ninguém precisa estar olhando a tela.</div>
+  </div>
+</div>
+
 <div class="root">
+
+  <!-- VISÃO GERAL + MAPA -->
+  <div class="overview-row">
+    <div class="panel">
+      <div class="panel-hdr"><span class="panel-title">Visão Geral dos Piezômetros</span></div>
+      <div class="panel-sub">Clique em um piezômetro para ver seus detalhes</div>
+      <div class="pz-grid" id="pz-grid"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hdr"><span class="panel-title">Localização</span></div>
+      <div class="panel-sub">Coordenadas ilustrativas — Complexo de Germano, Mariana/MG</div>
+      <div class="map-area"><div id="pz-map"></div></div>
+    </div>
+  </div>
+
+  <div class="pz-detail-label" id="pz-detail-label">Detalhes de: <b>PZ-01 — Dique Norte</b></div>
 
   <!-- MÉTRICAS -->
   <div class="metrics-row">
@@ -438,8 +563,8 @@ tbody td {
       </div>
       <div class="sparkline-wrap"><canvas id="spark-n"></canvas></div>
       <div class="mcard-stats">
-        <div class="mstat"><span class="mstat-lbl">Mín 24h</span><span class="mstat-val" id="n-min">—</span></div>
-        <div class="mstat"><span class="mstat-lbl">Máx 24h</span><span class="mstat-val" id="n-max">—</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="n-min">—</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="n-max">—</span></div>
         <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="n-delta">—</span></div>
       </div>
     </div>
@@ -455,8 +580,8 @@ tbody td {
       </div>
       <div class="sparkline-wrap"><canvas id="spark-p"></canvas></div>
       <div class="mcard-stats">
-        <div class="mstat"><span class="mstat-lbl">Mín 24h</span><span class="mstat-val" id="p-min">—</span></div>
-        <div class="mstat"><span class="mstat-lbl">Máx 24h</span><span class="mstat-val" id="p-max">—</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="p-min">—</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="p-max">—</span></div>
         <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="p-delta">—</span></div>
       </div>
     </div>
@@ -472,8 +597,8 @@ tbody td {
       </div>
       <div class="sparkline-wrap"><canvas id="spark-t"></canvas></div>
       <div class="mcard-stats">
-        <div class="mstat"><span class="mstat-lbl">Mín 24h</span><span class="mstat-val" id="t-min">—</span></div>
-        <div class="mstat"><span class="mstat-lbl">Máx 24h</span><span class="mstat-val" id="t-max">—</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="t-min">—</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="t-max">—</span></div>
         <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="t-delta">—</span></div>
       </div>
     </div>
@@ -484,24 +609,35 @@ tbody td {
     <div class="panel">
       <div class="panel-hdr">
         <span class="panel-title">Histórico de Nível d'água</span>
-        <span class="panel-tag">24h</span>
+        <div class="panel-hdr-actions">
+          <div class="period-pills">
+            <button class="period-pill active" data-range="24h" type="button">24h</button>
+            <button class="period-pill" data-range="7d" type="button">7d</button>
+            <button class="period-pill" data-range="30d" type="button">30d</button>
+          </div>
+          <button class="btn-export" id="btn-export" type="button">📥 Exportar CSV</button>
+        </div>
       </div>
       <div class="chart-area"><canvas id="chart-n"></canvas></div>
     </div>
     <div class="panel">
       <div class="panel-hdr">
         <span class="panel-title">Histórico de Temperatura</span>
-        <span class="panel-tag">24h</span>
+        <span class="panel-tag" id="temp-period-tag">24h</span>
       </div>
       <div class="chart-area"><canvas id="chart-t"></canvas></div>
     </div>
   </div>
 
-  <!-- ALERTA + TABELA -->
+  <!-- ALERTA + LEITURAS + EVENTOS -->
   <div class="bottom-row">
     <!-- Alerta -->
     <div class="panel">
-      <div class="panel-hdr"><span class="panel-title">Nível de Alerta</span></div>
+      <div class="panel-hdr">
+        <span class="panel-title">Nível de Alerta</span>
+        <span class="panel-tag" id="alert-pz-tag">PZ-01</span>
+      </div>
+      <div class="panel-sub">Situação atual do piezômetro selecionado</div>
 
       <div class="alert-level-box alb-normal" id="abox">
         <div class="al-icon ali-normal" id="aicon">
@@ -525,10 +661,36 @@ tbody td {
       <div class="al-info" id="ainfo">Monitoramento contínuo ativo.</div>
     </div>
 
-    <!-- Tabela de alertas -->
+    <!-- Últimas leituras -->
     <div class="panel">
       <div class="panel-hdr">
-        <span class="panel-title">Histórico de Eventos</span>
+        <span class="panel-title">Últimas Leituras</span>
+        <span class="panel-tag" id="pz-tag-readings">PZ-01</span>
+      </div>
+      <div class="alert-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Nível d'água</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="readings-tbody">
+            <tr>
+              <td colspan="3" style="color:var(--text-3);text-align:center;padding:16px">
+                Aguardando dados...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tabela de eventos -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <span class="panel-title" id="events-title">Histórico de Eventos</span>
         <span class="panel-tag" id="ev-count">0 eventos</span>
       </div>
       <div class="alert-table-wrap">
@@ -569,30 +731,74 @@ const CFG = {
   thrCritico: 15.0,
 };
 
+// Piezômetros monitorados (coordenadas ilustrativas — Complexo de Germano, Mariana/MG)
+const PIEZOMETROS = [
+  { id: "PZ-01", nome: "Dique Norte",   lat: -20.1975, lng: -43.4653 },
+  { id: "PZ-02", nome: "Galeria Sul",   lat: -20.2043, lng: -43.4590 },
+  { id: "PZ-03", nome: "Talude Leste",  lat: -20.2001, lng: -43.4521 },
+];
+let pzSelecionado = "PZ-01";
+
+// Períodos disponíveis para os gráficos / stats / tabela / export
+const PERIODOS = {
+  "24h": { range: "-24h", every: "30m", label: "24h" },
+  "7d":  { range: "-7d",  every: "2h",  label: "7 dias" },
+  "30d": { range: "-30d", every: "6h",  label: "30 dias" },
+};
+let periodoSelecionado = "24h";
+
+// ── MODO DE CONEXÃO ──────────────────────────────────────────────────────────
+// COM SERVIDOR (padrão): deixe INFLUX_DIRECT.token = "" — o dashboard consulta
+// o InfluxDB através do proxy (PROXY_URL), que esconde o token no Render.
+// SEM SERVIDOR: preencha token com um token SOMENTE LEITURA do bucket
+// PIEZOMETRO (InfluxDB → Load Data → API Tokens). O token fica visível no
+// HTML publicado — por isso ele deve ser apenas de leitura, nunca o de escrita!
+const INFLUX_DIRECT = {
+  url:   "https://us-east-1-1.aws.cloud2.influxdata.com",
+  org:   "a6d8947f7ea6219b",
+  token: "JzaG2NTZrGPTVrI9HEQLgWLFHps_MWcvvRCit5J_hAINymVSdxgiN9lZCu3rbIM8o9tzQ6DdKEyYBy_Y9LCfpQ==",   // preenchido → dispensa o Render
+};
+
 const PROXY_URL = "https://piezometro-teste.onrender.com/query";
 
 // ── ESTADO ────────────────────────────────────────────────────────────────────
 let lastLevel = null, failCount = 0, simTimer = null, simActive = false;
 let alertHistory = [];
+let readingsHistory = []; // últimas leituras do piezômetro selecionado (mais recente primeiro)
+let pzLatest = {};         // último valor conhecido de cada piezômetro: { "PZ-01": {nivel,pressao,temperatura}, ... }
+let leafletMap = null;
+const pzMarkers = {};      // marcadores do mapa por id de piezômetro
+
+const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
+
+// Classifica um nível d'água (m) nas 3 faixas do desafio SAGA
+function classifyNivel(n) {
+  if (n < CFG.thrAtencao) return { lv: "normal",  lbl: "Normal" };
+  if (n < CFG.thrCritico) return { lv: "atencao", lbl: "Atenção" };
+  return { lv: "critico", lbl: "Crítico" };
+}
+function corPorStatus(lv) {
+  return { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" }[lv] || "#4da8f0";
+}
 
 // Histórico de sparklines (últimos 20 pontos)
 const sparks = { n: [], p: [], t: [] };
 
-// Histórico de gráficos (24h)
+// Histórico de gráficos (período selecionado)
 const charts = {
-  n: { labels: [], data: [] },
-  t: { labels: [], data: [] },
+  n: { labels: [], data: [], times: [] },
+  t: { labels: [], data: [], times: [] },
 };
 
-// Stats 24h
+// Stats do período selecionado
 const stats = {
   n: { min: null, max: null },
   p: { min: null, max: null },
   t: { min: null, max: null },
 };
 
-// Janela de estatísticas 24h: semeada pelo histórico do InfluxDB e
-// alimentada pelo polling (24h ÷ 10s = 8640 pontos no máximo).
+// Janela de estatísticas do período: semeada pelo histórico do InfluxDB e
+// alimentada pelo polling.
 // (Os gráficos exibem só os últimos 60 pontos, mas mín/máx/variação
 //  são calculados sobre esta janela completa.)
 const statsWin = { n: [], p: [], t: [] };
@@ -607,12 +813,23 @@ async function influxQuery(flux) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
-    const r = await fetch(PROXY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/vnd.flux" },
-      body: flux,
-      signal: ctrl.signal,
-    });
+    const r = INFLUX_DIRECT.token
+      ? await fetch(`${INFLUX_DIRECT.url}/api/v2/query?org=${encodeURIComponent(INFLUX_DIRECT.org)}`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Token ${INFLUX_DIRECT.token}`,
+            "Content-Type": "application/vnd.flux",
+            "Accept": "application/csv",
+          },
+          body: flux,
+          signal: ctrl.signal,
+        })
+      : await fetch(PROXY_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/vnd.flux" },
+          body: flux,
+          signal: ctrl.signal,
+        });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.text();
   } finally { clearTimeout(timer); }
@@ -632,38 +849,57 @@ function parseCSV(csv) {
   }
   const h = split(lines[0]);
   const iF = h.indexOf("_field"), iV = h.indexOf("_value"), iT = h.indexOf("_time");
+  const iPz = h.indexOf("piezometro");
   if (iF < 0 || iV < 0 || iT < 0) return [];
   return lines.slice(1).map(l => {
     const c = split(l);
-    return { field: c[iF], value: parseFloat(c[iV]), time: c[iT] };
+    return {
+      field: c[iF],
+      value: parseFloat(c[iV]),
+      time: c[iT],
+      piezometro: (iPz >= 0 && c[iPz]) ? c[iPz] : "PZ-01",
+    };
   }).filter(r => !isNaN(r.value));
 }
 
+// Busca o último valor de CADA piezômetro (agrupado pela tag "piezometro")
 async function fetchLatest() {
   const flux = `
 from(bucket: "${CFG.bucket}")
   |> range(start: -2m)
   |> filter(fn: (r) => r._measurement == "${CFG.meas}")
   |> filter(fn: (r) => r._field == "nivel_agua" or r._field == "pressao" or r._field == "temperatura")
+  |> group(columns: ["piezometro"])
   |> last()`;
   const rows = parseCSV(await influxQuery(flux));
+  if (!rows.length) throw new Error("Sem dados recentes");
   const out = {};
-  rows.forEach(r => { out[r.field] = r.value; });
-  if (!Number.isFinite(out.nivel_agua)) throw new Error("Sem dados recentes");
-  return { nivel: out.nivel_agua, pressao: out.pressao, temperatura: out.temperatura };
+  rows.forEach(r => {
+    if (!out[r.piezometro]) out[r.piezometro] = {};
+    out[r.piezometro][r.field] = r.value;
+  });
+  const result = {};
+  Object.keys(out).forEach(pz => {
+    result[pz] = { nivel: out[pz].nivel_agua, pressao: out[pz].pressao, temperatura: out[pz].temperatura };
+  });
+  return result;
 }
 
+// Busca o histórico de um campo para o piezômetro e período selecionados
 async function fetchHistory(field) {
+  const per = PERIODOS[periodoSelecionado];
   const flux = `
 from(bucket: "${CFG.bucket}")
-  |> range(start: -24h)
+  |> range(start: ${per.range})
   |> filter(fn: (r) => r._measurement == "${CFG.meas}")
   |> filter(fn: (r) => r._field == "${field}")
-  |> aggregateWindow(every: 30m, fn: mean, createEmpty: false)`;
+  |> filter(fn: (r) => r.piezometro == "${pzSelecionado}")
+  |> aggregateWindow(every: ${per.every}, fn: mean, createEmpty: false)`;
   const rows = parseCSV(await influxQuery(flux));
   return rows.map(r => ({
     label: new Date(r.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-    value: parseFloat(r.value.toFixed(3))
+    value: parseFloat(r.value.toFixed(3)),
+    time: r.time,
   }));
 }
 
@@ -710,7 +946,7 @@ function renderMainChart(canvasId, state, color, thresholds) {
   cv.style.width = W + "px"; cv.style.height = H + "px";
   const c = cv.getContext("2d");
   const { labels, data } = state;
-  if (!data.length) return;
+  if (!data.length) { c.clearRect(0, 0, W, H); return; }
 
   const PAD = { top: 10, right: 16, bottom: 28, left: 46 };
   const cw = W - PAD.left - PAD.right;
@@ -787,11 +1023,12 @@ function renderMainChart(canvasId, state, color, thresholds) {
   c.fillText(data[data.length-1].toFixed(2), lx - 10, ly - 9);
 }
 
-function pushChart(key, label, value) {
+function pushChart(key, label, value, time) {
   charts[key].labels.push(label);
   charts[key].data.push(value);
+  charts[key].times.push(time || new Date().toISOString());
   if (charts[key].labels.length > 60) {
-    charts[key].labels.shift(); charts[key].data.shift();
+    charts[key].labels.shift(); charts[key].data.shift(); charts[key].times.shift();
   }
 }
 
@@ -818,20 +1055,31 @@ function updateStats(key, arr) {
   dEl.className = "mstat-val " + (delta > 1 ? (key === "n" ? "down" : "up") : "");
 }
 
+// Atualiza os rótulos "Mín/Máx" dos cartões conforme o período selecionado
+function updatePeriodLabels() {
+  const lbl = PERIODOS[periodoSelecionado].label;
+  document.querySelectorAll(".lbl-min").forEach(el => el.textContent = "Mín " + lbl);
+  document.querySelectorAll(".lbl-max").forEach(el => el.textContent = "Máx " + lbl);
+  const tt = document.getElementById("temp-period-tag");
+  if (tt) tt.textContent = lbl;
+}
+
 // ── ALERTA ────────────────────────────────────────────────────────────────────
 // Lógica de piezômetro: nível d'água ALTO = perigo (saturação do maciço)
 function setAlert(n) {
-  let lv, lbl, desc, icon;
-  if (n < CFG.thrAtencao) {
-    lv = "normal"; lbl = "NORMAL"; desc = `Nível d'água na faixa segura (< ${CFG.thrAtencao} m)`;
+  const { lv } = classifyNivel(n);
+  let desc, icon;
+  if (lv === "normal") {
+    desc = `Nível d'água na faixa segura (< ${CFG.thrAtencao} m) — operação normal, sem ação necessária`;
     icon = `<circle cx="8" cy="8" r="5.5" stroke="#3ecf7a" stroke-width="1.5"/><path d="M5.5 8l2 2 3.5-3.5" stroke="#3ecf7a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-  } else if (n < CFG.thrCritico) {
-    lv = "atencao"; lbl = "ATENÇÃO"; desc = `Nível acima de ${CFG.thrAtencao} m — intensificar monitoramento`;
+  } else if (lv === "atencao") {
+    desc = `Nível entre ${CFG.thrAtencao} e ${CFG.thrCritico} m — observar de perto e intensificar o monitoramento`;
     icon = `<path d="M8 2L14.5 13.5H1.5L8 2Z" stroke="#f0c040" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5V9.5" stroke="#f0c040" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r=".75" fill="#f0c040"/>`;
   } else {
-    lv = "critico"; lbl = "CRÍTICO"; desc = `Nível acima de ${CFG.thrCritico} m — ALERTA MÁXIMO (risco de saturação)`;
+    desc = `Nível acima de ${CFG.thrCritico} m — ACIONAR EQUIPE DE GEOTECNIA IMEDIATAMENTE`;
     icon = `<circle cx="8" cy="8" r="5.5" stroke="#f04848" stroke-width="1.5"/><path d="M8 5v3.5" stroke="#f04848" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r=".75" fill="#f04848"/>`;
   }
+  const upperLbl = { normal: "NORMAL", atencao: "ATENÇÃO", critico: "CRÍTICO" }[lv];
 
   const bn = document.getElementById("badge-n");
   const vn = document.getElementById("val-n");
@@ -843,14 +1091,14 @@ function setAlert(n) {
   document.getElementById("aicon").className  = `al-icon ali-${lv}`;
   document.getElementById("asvg").innerHTML   = icon;
   document.getElementById("astate").className = `al-state al-${lv}`;
-  document.getElementById("astate").textContent = lbl;
+  document.getElementById("astate").textContent = upperLbl;
   document.getElementById("adesc").textContent  = desc;
   document.getElementById("tby").className = lv !== "normal"  ? "tb-seg tb-yellow on" : "tb-seg tb-yellow";
   document.getElementById("tbr").className = lv === "critico" ? "tb-seg tb-red on"    : "tb-seg tb-red";
   document.getElementById("ainfo").textContent = `Nível atual ${n.toFixed(2)} m · Monitoramento ativo`;
 
   if (lv !== lastLevel) {
-    addAlertRow(lv, lbl, n);
+    addAlertRow(lv, upperLbl, n);
     lastLevel = lv;
   }
 }
@@ -864,7 +1112,7 @@ function addAlertRow(lv, lbl, nivel) {
     critico: "ALERTA — nível d'água crítico detectado",
   };
   const colors = { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" };
-  const msg = (msgs[lv] || lbl) + (simActive ? " (simulação)" : "");
+  const msg = (msgs[lv] || lbl) + ` (${pzSelecionado})` + (simActive ? " (simulação)" : "");
   alertHistory.unshift({ lv, lbl, msg, nivel: Number.isFinite(nivel) ? nivel.toFixed(2) : "—", time: t, color: colors[lv] || colors.info });
   if (alertHistory.length > 50) alertHistory.pop();
   renderTable();
@@ -898,7 +1146,246 @@ function renderTable() {
   });
 }
 
-// ── APLICA DADOS ──────────────────────────────────────────────────────────────
+// ── TABELA DE ÚLTIMAS LEITURAS ────────────────────────────────────────────────
+function pushReading(nivel) {
+  const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const cls = classifyNivel(nivel);
+  readingsHistory.unshift({ time: t, nivel, lv: cls.lv, lbl: cls.lbl });
+  if (readingsHistory.length > 12) readingsHistory.pop();
+  renderReadingsTable();
+}
+
+function renderReadingsTable() {
+  const tbody = document.getElementById("readings-tbody");
+  if (!tbody) return;
+  if (!readingsHistory.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="color:var(--text-3);text-align:center;padding:16px">Aguardando dados...</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = readingsHistory.map(r => `
+    <tr>
+      <td class="td-time">${r.time}</td>
+      <td class="td-val">${r.nivel.toFixed(2)} m</td>
+      <td class="td-badge"><span class="tbadge tb-${r.lv}">${r.lbl}</span></td>
+    </tr>`).join("");
+}
+
+// ── EXPORTAR CSV (Excel pt-BR) ────────────────────────────────────────────────
+function exportCSV() {
+  const rows = charts.n.data.map((v, i) => {
+    const iso = charts.n.times[i];
+    const dt = iso ? new Date(iso) : new Date();
+    const dataHora = dt.toLocaleString("pt-BR");
+    const status = classifyNivel(v).lbl;
+    const nivelFmt = String(v.toFixed(2)).replace(".", ",");
+    return [dataHora, pzSelecionado, nivelFmt, status].join(";");
+  });
+  const header = ["Data/Hora", "Piezômetro", "Nível (m)", "Status"].join(";");
+  const content = "﻿" + [header, ...rows].join("\r\n");
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `piezometro_${pzSelecionado}_${periodoSelecionado}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ── VISÃO GERAL DOS PIEZÔMETROS ───────────────────────────────────────────────
+function atualizarVisaoGeral(mapa) {
+  const grid = document.getElementById("pz-grid");
+  if (!grid) return;
+  grid.innerHTML = PIEZOMETROS.map(pz => {
+    const d = mapa[pz.id];
+    const nivel = d && Number.isFinite(d.nivel) ? d.nivel : null;
+    const cls = nivel !== null ? classifyNivel(nivel) : { lv: "info", lbl: "—" };
+    const sel = pz.id === pzSelecionado ? " selected" : "";
+    const valorHtml = nivel !== null
+      ? `${nivel.toFixed(2)}<span class="pz-card-unit">m</span>`
+      : "—";
+    return `
+      <div class="pz-card${sel}" data-pz="${pz.id}">
+        <div class="pz-card-top">
+          <span class="pz-card-id">${pz.id}</span>
+          <span class="tbadge tb-${cls.lv}">${cls.lbl}</span>
+        </div>
+        <div class="pz-card-name">${pz.nome}</div>
+        <div class="pz-card-value">${valorHtml}</div>
+      </div>`;
+  }).join("");
+  grid.querySelectorAll(".pz-card").forEach(card => {
+    card.addEventListener("click", () => selectPiezometro(card.dataset.pz));
+  });
+}
+
+// ── MAPA ──────────────────────────────────────────────────────────────────────
+function initMap() {
+  const mapEl = document.getElementById("pz-map");
+  if (!mapEl) return;
+  if (typeof L === "undefined") {
+    mapEl.innerHTML = '<div class="map-fallback">Mapa indisponível (sem conexão ao CDN)</div>';
+    return;
+  }
+  try {
+    const centerLat = PIEZOMETROS.reduce((s, p) => s + p.lat, 0) / PIEZOMETROS.length;
+    const centerLng = PIEZOMETROS.reduce((s, p) => s + p.lng, 0) / PIEZOMETROS.length;
+    leafletMap = L.map(mapEl).setView([centerLat, centerLng], 14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(leafletMap);
+
+    PIEZOMETROS.forEach(pz => {
+      const marker = L.circleMarker([pz.lat, pz.lng], {
+        radius: 9, weight: 2, color: "#3ecf7a", fillColor: "#3ecf7a", fillOpacity: .85,
+      }).addTo(leafletMap);
+      marker.bindPopup(`<b>${pz.nome}</b>`);
+      marker.on("click", () => selectPiezometro(pz.id));
+      pzMarkers[pz.id] = marker;
+    });
+  } catch (e) {
+    console.warn("Leaflet:", e.message);
+    mapEl.innerHTML = '<div class="map-fallback">Mapa indisponível (sem conexão ao CDN)</div>';
+    leafletMap = null;
+  }
+}
+
+function atualizarMapa(mapa) {
+  if (typeof L === "undefined" || !leafletMap) return;
+  PIEZOMETROS.forEach(pz => {
+    const marker = pzMarkers[pz.id];
+    if (!marker) return;
+    const d = mapa[pz.id];
+    const nivel = d && Number.isFinite(d.nivel) ? d.nivel : null;
+    const cls = nivel !== null ? classifyNivel(nivel) : { lv: "info", lbl: "—" };
+    const col = corPorStatus(cls.lv);
+    marker.setStyle({ color: col, fillColor: col, radius: pz.id === pzSelecionado ? 11 : 9 });
+    marker.setPopupContent(
+      `<b>${pz.nome}</b><br>Nível: ${nivel !== null ? nivel.toFixed(2) + " m" : "—"}<br>Status: ${cls.lbl}`
+    );
+  });
+}
+
+// ── SELEÇÃO DE PIEZÔMETRO / PERÍODO ───────────────────────────────────────────
+function resetPzState() {
+  sparks.n = []; sparks.p = []; sparks.t = [];
+  charts.n = { labels: [], data: [], times: [] };
+  charts.t = { labels: [], data: [], times: [] };
+  statsWin.n = []; statsWin.p = []; statsWin.t = [];
+  readingsHistory = [];
+  lastLevel = null;
+  ["n", "p", "t"].forEach(k => {
+    const mn = document.getElementById(k + "-min"), mx = document.getElementById(k + "-max");
+    const dl = document.getElementById(k + "-delta");
+    if (mn) mn.textContent = "—";
+    if (mx) mx.textContent = "—";
+    if (dl) { dl.textContent = "—"; dl.className = "mstat-val"; }
+  });
+  renderReadingsTable();
+  redrawCharts();
+}
+
+function updatePzLabels() {
+  const pz = PIEZOMETROS.find(p => p.id === pzSelecionado);
+  const nome = pz ? pz.nome : "";
+  const dl = document.getElementById("pz-detail-label");
+  if (dl) dl.innerHTML = `Detalhes de: <b>${pzSelecionado}${nome ? " — " + nome : ""}</b>`;
+  const at = document.getElementById("alert-pz-tag");
+  if (at) at.textContent = pzSelecionado;
+  const rt = document.getElementById("pz-tag-readings");
+  if (rt) rt.textContent = pzSelecionado;
+  const et = document.getElementById("events-title");
+  if (et) et.textContent = `Histórico de Eventos (${pzSelecionado})`;
+}
+
+function selectPiezometro(id) {
+  if (!PIEZOMETROS.some(p => p.id === id) || id === pzSelecionado) return;
+  pzSelecionado = id;
+  resetPzState();
+  updatePzLabels();
+  atualizarVisaoGeral(pzLatest);
+  atualizarMapa(pzLatest);
+  loadHistoryAndStats();
+  if (pzLatest[id]) applyData(pzLatest[id]);
+}
+
+function selectPeriodo(p) {
+  if (!PERIODOS[p] || p === periodoSelecionado) return;
+  periodoSelecionado = p;
+  document.querySelectorAll(".period-pill").forEach(btn => btn.classList.toggle("active", btn.dataset.range === p));
+  updatePeriodLabels();
+  resetPzState();
+  loadHistoryAndStats();
+}
+
+// Carrega histórico do piezômetro/período selecionados (nível + temperatura),
+// semeia stats, tabela de leituras e redesenha os gráficos.
+async function loadHistoryAndStats() {
+  try {
+    const [hn, ht] = await Promise.all([fetchHistory("nivel_agua"), fetchHistory("temperatura")]);
+
+    if (hn.length) {
+      charts.n.labels = hn.map(h => h.label);
+      charts.n.data   = hn.map(h => h.value);
+      charts.n.times  = hn.map(h => h.time);
+      statsWin.n      = hn.map(h => h.value);
+      updateStats("n", statsWin.n);
+      readingsHistory = hn.slice(-12).reverse().map(h => {
+        const cls = classifyNivel(h.value);
+        return { time: h.label, nivel: h.value, lv: cls.lv, lbl: cls.lbl };
+      });
+      renderReadingsTable();
+      addInfoRow(`Histórico de nível d'água carregado (${hn.length} pontos) — ${pzSelecionado}`);
+    }
+    if (ht.length) {
+      charts.t.labels = ht.map(h => h.label);
+      charts.t.data   = ht.map(h => h.value);
+      charts.t.times  = ht.map(h => h.time);
+      statsWin.t      = ht.map(h => h.value);
+      updateStats("t", statsWin.t);
+      addInfoRow(`Histórico de temperatura carregado (${ht.length} pontos) — ${pzSelecionado}`);
+    }
+  } catch (e) {
+    // Fallback simulado, coerente com o piezômetro e o período selecionados
+    const baseLevel = { "PZ-01": 10, "PZ-02": 11.5, "PZ-03": 9 }[pzSelecionado] || 10;
+    const fb = {
+      "24h": { count: 48,  stepMs: 30 * 60 * 1000 },
+      "7d":  { count: 84,  stepMs: 2  * 60 * 60 * 1000 },
+      "30d": { count: 120, stepMs: 6  * 60 * 60 * 1000 },
+    }[periodoSelecionado];
+    const now = Date.now();
+    for (let i = fb.count; i >= 0; i--) {
+      const time = now - i * fb.stepMs;
+      const iso = new Date(time).toISOString();
+      const lbl = new Date(time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      charts.n.labels.push(lbl);
+      charts.n.data.push(parseFloat((baseLevel + (Math.random() - 0.5) * 1.6).toFixed(3)));
+      charts.n.times.push(iso);
+      charts.t.labels.push(lbl);
+      charts.t.data.push(parseFloat((22 + Math.random() * 8).toFixed(1)));
+      charts.t.times.push(iso);
+    }
+    statsWin.n = charts.n.data.slice();
+    statsWin.t = charts.t.data.slice();
+    updateStats("n", statsWin.n);
+    updateStats("t", statsWin.t);
+    const lastN = Math.min(12, charts.n.data.length);
+    readingsHistory = [];
+    for (let i = charts.n.data.length - 1; i >= charts.n.data.length - lastN; i--) {
+      const v = charts.n.data[i];
+      const cls = classifyNivel(v);
+      readingsHistory.push({ time: charts.n.labels[i], nivel: v, lv: cls.lv, lbl: cls.lbl });
+    }
+    renderReadingsTable();
+    addInfoRow(`Histórico do InfluxDB indisponível — exibindo histórico simulado (${pzSelecionado})`);
+  }
+
+  redrawCharts();
+}
+
+// ── APLICA DADOS DO PIEZÔMETRO SELECIONADO ───────────────────────────────────
 function applyData({ nivel, pressao, temperatura }) {
   const safe = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
   nivel       = safe(nivel, 10);      // 1013 hPa no Wokwi ↔ 10 m simulados
@@ -921,11 +1408,12 @@ function applyData({ nivel, pressao, temperatura }) {
 
   // Charts
   const lbl = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  pushChart("n", lbl, nivel);
-  pushChart("t", lbl, temperatura);
+  const iso = new Date().toISOString();
+  pushChart("n", lbl, nivel, iso);
+  pushChart("t", lbl, temperatura, iso);
   redrawCharts();
 
-  // Stats (janela completa de até 24h, não só os pontos visíveis no gráfico)
+  // Stats (janela completa do período, não só os pontos visíveis no gráfico)
   pushStats("n", nivel);
   pushStats("p", pressao);
   pushStats("t", temperatura);
@@ -937,6 +1425,9 @@ function applyData({ nivel, pressao, temperatura }) {
   const bt = document.getElementById("badge-t");
   if (temperatura >= 0 && temperatura <= 50) { bt.className = "mbadge mb-blue";   bt.textContent = "Normal"; }
   else                                        { bt.className = "mbadge mb-yellow"; bt.textContent = "Verificar"; }
+
+  // Tabela de últimas leituras
+  pushReading(nivel);
 
   setAlert(nivel);
 }
@@ -958,15 +1449,49 @@ function updateClock() {
   document.getElementById("live-time").textContent = `Ao vivo · ${dd} ${mm} ${n.getFullYear()} ${hh}:${mi}:${ss}`;
 }
 
+// ── COMO LER ESTE PAINEL (recolhível) ────────────────────────────────────────
+function initHowto() {
+  const btn = document.getElementById("howto-toggle");
+  const content = document.getElementById("howto-content");
+  if (!btn || !content) return;
+  btn.addEventListener("click", () => {
+    const open = content.classList.toggle("open");
+    btn.textContent = open ? "❓ Ocultar explicação" : "❓ Como ler este painel";
+  });
+}
+
+function initPeriodPills() {
+  document.querySelectorAll(".period-pill").forEach(btn => {
+    btn.addEventListener("click", () => selectPeriodo(btn.dataset.range));
+  });
+}
+
 // ── SIMULAÇÃO ─────────────────────────────────────────────────────────────────
-// Nível oscila em torno de 10 m (faixa normal), com incursões ocasionais
-// à faixa de atenção para demonstrar o sistema de alertas.
-let sN = 10.2, sP = 1013, sT = 24;
+// Cada piezômetro oscila de forma independente, para a visão geral e o mapa
+// ficarem vivos na demonstração:
+// PZ-01 ~10 m (faixa normal) · PZ-02 ~11,5 m (oscila até a faixa de atenção) · PZ-03 ~9 m (estável)
+const simBase = {
+  "PZ-01": { n: 10.2, p: 1013, t: 24 },
+  "PZ-02": { n: 11.5, p: 1013, t: 24 },
+  "PZ-03": { n: 9.0,  p: 1013, t: 24 },
+};
 function simTick() {
-  sN = Math.max(8.5, Math.min(13.5, sN + (Math.random() - 0.48) * 0.25));
-  sP = 1013.25 + (sN - 10) * 10;  // coerente com a escala do firmware (10 hPa/m)
-  sT = Math.max(15, Math.min(40, sT + (Math.random() - 0.5) * 0.3));
-  applyData({ nivel: sN, pressao: sP, temperatura: sT });
+  simBase["PZ-01"].n = clamp(simBase["PZ-01"].n + (Math.random() - 0.48) * 0.25, 8.5, 13.5);
+  simBase["PZ-02"].n = clamp(simBase["PZ-02"].n + (Math.random() - 0.5)  * 0.3,  10.5, 13.2);
+  simBase["PZ-03"].n = clamp(simBase["PZ-03"].n + (Math.random() - 0.5)  * 0.15, 8.0, 10.2);
+
+  const todos = {};
+  Object.keys(simBase).forEach(pz => {
+    const s = simBase[pz];
+    s.p = 1013.25 + (s.n - 10) * 10;  // coerente com a escala do firmware (10 hPa/m)
+    s.t = clamp(s.t + (Math.random() - 0.5) * 0.3, 15, 40);
+    todos[pz] = { nivel: s.n, pressao: s.p, temperatura: s.t };
+  });
+
+  pzLatest = todos;
+  atualizarVisaoGeral(todos);
+  atualizarMapa(todos);
+  applyData(todos[pzSelecionado]);
 }
 
 function setSimMode(on) {
@@ -977,12 +1502,18 @@ function setSimMode(on) {
 // ── POLLING ───────────────────────────────────────────────────────────────────
 async function poll() {
   try {
-    const data = await fetchLatest();
+    const dadosTodos = await fetchLatest();
+    pzLatest = dadosTodos;
     if (simTimer) { clearInterval(simTimer); simTimer = null; }
     setSimMode(false);
     failCount = 0;
-    setStatus("live", `InfluxDB conectado — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
-    applyData(data);
+    const modo = INFLUX_DIRECT.token ? "InfluxDB conectado (direto)" : "InfluxDB conectado (via servidor)";
+    setStatus("live", `${modo} — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
+    atualizarVisaoGeral(pzLatest);
+    atualizarMapa(pzLatest);
+    const sel = pzLatest[pzSelecionado];
+    if (!sel || !Number.isFinite(sel.nivel)) throw new Error(`Sem dados recentes para ${pzSelecionado}`);
+    applyData(sel);
   } catch (e) {
     failCount++;
     console.warn("InfluxDB:", e.message);
@@ -1004,46 +1535,24 @@ async function poll() {
   updateClock();
   setInterval(updateClock, 1000);
 
-  // Carrega histórico 24h
-  try {
-    const [hn, ht] = await Promise.all([fetchHistory("nivel_agua"), fetchHistory("temperatura")]);
+  initHowto();
+  initPeriodPills();
+  updatePeriodLabels();
+  updatePzLabels();
+  initMap();
 
-    if (hn.length) {
-      charts.n.labels = hn.map(h => h.label);
-      charts.n.data   = hn.map(h => h.value);
-      statsWin.n      = hn.map(h => h.value);   // semeia a janela 24h
-      updateStats("n", statsWin.n);
-      addInfoRow(`Histórico de nível d'água carregado (${hn.length} pontos)`);
-    }
-    if (ht.length) {
-      charts.t.labels = ht.map(h => h.label);
-      charts.t.data   = ht.map(h => h.value);
-      statsWin.t      = ht.map(h => h.value);
-      updateStats("t", statsWin.t);
-      addInfoRow(`Histórico de temperatura carregado (${ht.length} pontos)`);
-    }
-  } catch (e) {
-    // Fallback simulado (nível em torno de 10 m, faixa normal)
-    const now = Date.now();
-    for (let i = 48; i >= 0; i--) {
-      const lbl = new Date(now - i * 30 * 60 * 1000)
-        .toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      charts.n.labels.push(lbl); charts.n.data.push(parseFloat((10 + (Math.random() - 0.5) * 1.6).toFixed(3)));
-      charts.t.labels.push(lbl); charts.t.data.push(parseFloat((22 + Math.random() * 8).toFixed(1)));
-    }
-    statsWin.n = charts.n.data.slice();
-    statsWin.t = charts.t.data.slice();
-    updateStats("n", statsWin.n);
-    updateStats("t", statsWin.t);
-    addInfoRow("Histórico do InfluxDB indisponível — exibindo histórico simulado");
-  }
+  const exportBtn = document.getElementById("btn-export");
+  if (exportBtn) exportBtn.addEventListener("click", exportCSV);
 
-  redrawCharts();
-  window.addEventListener("resize", redrawCharts);
+  atualizarVisaoGeral(pzLatest);
+  atualizarMapa(pzLatest);
+
+  // Carrega histórico do período/piezômetro selecionados
+  await loadHistoryAndStats();
 
   window.addEventListener("resize", () => {
-    renderChart();
-    renderDpdtChart();
+    redrawCharts();
+    if (leafletMap) leafletMap.invalidateSize();
   });
 
   await poll();

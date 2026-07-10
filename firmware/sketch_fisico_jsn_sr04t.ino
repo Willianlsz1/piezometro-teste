@@ -1,56 +1,103 @@
 /*
  * ============================================================================
  * SAMARCO — MONITORAMENTO ONLINE DO NÍVEL DE ÁGUA EM PIEZÔMETROS
- * ESP32 + BMP180 (stand-in) + OLED + LEDS + BUZZER + SERVIDOR (JSON) + STORE&FORWARD
+ * ESP32 + JSN-SR04T (ultrassônico) + OLED + LEDS + BUZZER + SERVIDOR (JSON)
+ * + STORE&FORWARD  —  FIRMWARE PARA HARDWARE REAL (protótipo físico)
  * ============================================================================
  *
- * ⚠️ NOTA CONCEITUAL (para o TCC):
- * O desafio SAGA pede monitoramento do NÍVEL DE ÁGUA (metros de coluna
- * d'água). O Wokwi não possui transdutor piezométrico, então usamos o BMP180
- * (barômetro) como *stand-in*: a pressão do slider é convertida em um nível
- * d'água SIMULADO pela escala didática SIM_ESCALA (10 hPa = 1 m). No hardware
- * real (Fase 2), o nível virá de um transdutor de pressão submersível
- * 4–20 mA lido por um ADC ADS1115 — e a conversão passa a ser física real
- * (1 mH2O ≈ 98,07 hPa), calibrada na instalação.
+ * ⚠️ ESTE ARQUIVO É PARA A MAQUETE FÍSICA (ESP32 real + sensor real).
+ * A simulação no Wokwi continua usando firmware/sketch.ino (com o BMP180
+ * como stand-in de pressão). Aqui o "stand-in" sai de cena: o nível d'água
+ * vem de um sensor ultrassônico JSN-SR04T medindo a distância até a água
+ * dentro de um tubo de PVC (ou balde) — uma maquete em escala reduzida do
+ * piezômetro real.
  *
- * LÓGICA DE ALERTA (correta para piezômetro: nível ALTO = perigo):
+ * MONTAGEM FÍSICA (ver docs/PROTOTIPO_FISICO.md para o passo a passo):
+ * O sensor fica fixado no TOPO do tubo/balde, apontando para baixo, para a
+ * superfície da água. Ele mede a distância até a água; quanto MAIS a água
+ * sobe, MENOR a distância medida — por isso o nível é calculado por
+ * subtração: nivel_cm = ALTURA_SENSOR_CM - distancia_medida_cm.
+ *
+ *        ┌────────────┐  ← sensor JSN-SR04T (topo do tubo, apontando p/ baixo)
+ *        │   TRIG/ECHO │
+ *        └──────┬─────┘
+ *               │  distancia (medida)
+ *               │
+ *        ╔══════▼══════╗  ← ALTURA_SENSOR_CM (distância do sensor ao FUNDO)
+ *        ║             ║
+ *        ║  ~~~~~~~~~~ ║  ← superfície da água (nivel_cm = altura - distancia)
+ *        ║             ║
+ *        ╚═════════════╝  ← fundo do tubo/balde
+ *
+ * ⚠️ DIVISOR DE TENSÃO NO ECHO: o JSN-SR04T opera em 5V e o pino ECHO
+ * devolve um pulso em 5V — mas as GPIOs do ESP32 só toleram 3,3V! É
+ * OBRIGATÓRIO usar um divisor resistivo entre o ECHO do sensor e o GPIO18:
+ *   ECHO (5V) ──[ 1kΩ ]──┬── GPIO18 (ESP32)
+ *                        │
+ *                      [ 2kΩ ]
+ *                        │
+ *                       GND
+ * Isso reduz o pulso de 5V para ~3,3V (regra do divisor: 5V × 2k/(1k+2k) ≈
+ * 3,3V). TRIG pode ir direto ao GPIO5 (o ESP32 já manda 3,3V, e o sensor
+ * reconhece HIGH acima de ~2V).
+ *
+ * ⚠️ ZONA MORTA DO JSN-SR04T: o sensor não mede distâncias menores que
+ * ~20–25 cm de forma confiável (a onda ainda não "descolou" do transdutor).
+ * Por isso o sensor DEVE ficar montado a pelo menos 25 cm de altura acima
+ * do nível MÁXIMO de água esperado no tubo — senão, quando a água estiver
+ * alta, as leituras ficam erráticas ou somem. É por isso que descartamos
+ * (na mediana) qualquer leitura < 25 cm.
+ *
+ * ESCALA DA MAQUETE: como o tubo/balde é pequeno, aplicamos um fator de
+ * escala didático (ESCALA_M_POR_CM) para que poucos centímetros de água no
+ * tubo representem metros de coluna d'água na "barragem" simulada — os
+ * MESMOS limiares de alerta do sistema real (12 m / 15 m) continuam
+ * valendo, só a régua física é que é menor:
+ *   20 cm de água no tubo → 10,0 m equivalentes (NORMAL)
+ *   24 cm de água no tubo → 12,0 m equivalentes (ATENÇÃO)
+ *   30 cm de água no tubo → 15,0 m equivalentes (CRÍTICO)
+ *
+ * PASSO DE CALIBRAÇÃO (fazer sempre que remontar o sensor no tubo): meça
+ * com uma régua/trena a distância real do sensor até o FUNDO do tubo
+ * (ALTURA_SENSOR_CM) e ajuste o define abaixo antes de gravar o firmware.
+ * Um erro de 1 cm na medição já desloca o nível calculado em 0,5 m.
+ *
+ * LÓGICA DE ALERTA (idêntica ao firmware de simulação — nível ALTO = perigo):
  * 🟢 NORMAL   : nível < 12 m           → LED Verde, buzzer OFF
  * 🟡 ATENÇÃO  : 12 m ≤ nível < 15 m    → LED Amarelo, beep lento (2 s)
  * 🔴 CRÍTICO  : nível ≥ 15 m           → LED Vermelho pisca, beep rápido
  *
- * Com o padrão do Wokwi (1013,25 hPa) o nível simulado é 10,0 m (NORMAL).
- * Durante a simulação, clique no BMP180 e suba a pressão no slider:
- *   1013 hPa → 10,0 m (normal) · 1035 hPa → 12,2 m (atenção)
- *   1065 hPa → 15,2 m (CRÍTICO)
+ * ENVIO: assim como no firmware de simulação, este ESP32 NÃO fala direto
+ * com o InfluxDB — ele não guarda nenhum token do banco, apenas a
+ * DEVICE_KEY do NOSSO servidor. Cada leitura vira um JSON simples, enviado
+ * por HTTPS ao endpoint /ingest do server.js (rodando no Render); é o
+ * servidor quem repassa os dados ao InfluxDB. O JSON aqui só carrega
+ * "nivel_agua" (+ "ts" quando o NTP sincronizou) — sem pressão/temperatura,
+ * pois este protótipo não tem esses sensores; o servidor aceita esses
+ * campos ausentes normalmente.
  *
- * ENVIO: o firmware NÃO fala mais direto com o InfluxDB — ele não guarda
- * nenhum token do banco, apenas a DEVICE_KEY do NOSSO servidor. Cada leitura
- * vira um JSON simples, que é enviado por HTTPS ao endpoint /ingest do
- * server.js (rodando no Render); é o servidor quem repassa os dados ao
- * InfluxDB, com a chave de verdade guardada só lá.
- *
- * STORE & FORWARD ("caixa-preta", conceito AquaSense):
- * Cada leitura recebe timestamp via NTP (em SEGUNDOS, campo "ts") e entra em
- * um buffer local. O envio ao servidor despacha o buffer inteiro; se a
- * rede/servidor falhar, os dados ficam retidos e são reenviados no próximo
- * ciclo — nenhuma leitura se perde. O servidor converte o "ts" de segundos
- * para nanossegundos antes de gravar no InfluxDB.
+ * STORE & FORWARD ("caixa-preta", conceito AquaSense): idêntico ao firmware
+ * de simulação. Cada leitura recebe timestamp via NTP (em SEGUNDOS, campo
+ * "ts") e entra em um buffer local. O envio ao servidor despacha o buffer
+ * inteiro; se a rede/servidor falhar, os dados ficam retidos e são
+ * reenviados no próximo ciclo — nenhuma leitura se perde.
  *
  * ALERTAS ATIVOS (Telegram/SMS): enviados pelo servidor (server.js), que
- * vigia o InfluxDB — ver README. No hardware real, um módulo SIM7600
- * permitiria SMS direto do campo, sem depender do servidor.
+ * vigia o InfluxDB — ver README. No hardware real de campo, um módulo
+ * SIM7600 permitiria SMS direto do local, sem depender do servidor.
  *
  * IDENTIFICAÇÃO DO INSTRUMENTO: cada placa se identifica com um ID único
  * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), enviado como tag "piezometro"
  * ao InfluxDB — é esse ID que aparece no dashboard e nos alertas.
  *
- * CONEXÕES NO WOKWI (ver firmware/diagram.json):
- * BMP180:  VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
- * OLED:    VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
+ * CONEXÕES NA MAQUETE (ver docs/PROTOTIPO_FISICO.md para a tabela completa):
+ * JSN-SR04T: VCC→5V (VIN)  GND→GND  TRIG→GPIO5  ECHO→[divisor 1k/2k]→GPIO18
+ * OLED:      VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
  * LEDs (resistor 220Ω): Verde→GPIO32  Amarelo→GPIO33  Vermelho→GPIO25
- * BUZZER:  (+)→GPIO26  (−)→GND
+ * BUZZER:    (+)→GPIO26  (−)→GND
  *
- * Bibliotecas: Adafruit BMP085 Library, Adafruit SSD1306, Adafruit GFX Library
+ * Bibliotecas: Adafruit SSD1306, Adafruit GFX Library (nenhuma lib externa
+ * é necessária para o JSN-SR04T — ele é lido com pulseIn() puro).
  * ============================================================================
  */
 
@@ -59,25 +106,25 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <time.h>
-#include <Adafruit_BMP085.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
 // ===== CREDENCIAIS (preencha antes de usar!) =====
-#define WIFI_SSID   "Wokwi-GUEST"
-#define WIFI_PASS   ""
+#define WIFI_SSID   "SUA-REDE-WIFI"
+#define WIFI_PASS   "SUA-SENHA-WIFI"
 #define SERVER_URL  "https://SEU-APP.onrender.com/ingest"  // endpoint /ingest do server.js
 #define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY do servidor
 #define MEASUREMENT "telemetria_samarco"                   // (info) measurement gravado pelo servidor
 #define PIEZOMETRO_ID "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
 
-// ===== CONVERSÃO PRESSÃO → NÍVEL D'ÁGUA (simulação) =====
-// nivel = NIVEL_REF + (pressao_hPa − PRESSAO_REF) / SIM_ESCALA
-// Escala didática: 10 hPa por metro, para o slider do Wokwi varrer os 3 níveis.
-// No hardware real: nivel = (P_transdutor − P_atmosferica) / 98.07 (mH2O).
-#define PRESSAO_REF 1013.25  // hPa — padrão do BMP180 no Wokwi
-#define NIVEL_REF   10.0     // m  — nível no ponto de referência
-#define SIM_ESCALA  10.0     // hPa por metro (didático)
+// ===== SENSOR ULTRASSÔNICO JSN-SR04T =====
+#define PIN_TRIG 5
+#define PIN_ECHO 18   // ⚠️ via divisor de tensão (echo é 5V; ESP32 é 3,3V!)
+// Montagem física (maquete): sensor fixado no TOPO do tubo, apontando para a água
+#define ALTURA_SENSOR_CM 60.0   // distância do sensor ao FUNDO do tubo (medir na montagem!)
+#define ESCALA_M_POR_CM  0.5    // maquete em escala: 1 cm no tubo = 0,5 m na barragem
+// Com a escala padrão: 20 cm de água → 10 m (normal) · 24 cm → 12 m (atenção)
+// · 30 cm → 15 m (crítico) — os mesmos limiares de sempre, ver abaixo.
 
 // ===== LIMIARES DE NÍVEL (m) — espelhados em index.html e server.js =====
 #define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
@@ -103,13 +150,12 @@
 #define BUFFER_MAX 120              // ~20 min de leituras retidas sem rede
 
 // ===== OBJETOS =====
-Adafruit_BMP085 bmp;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // ===== VARIÁVEIS GLOBAIS =====
-float temperatura = 0;
-float pressao = 0;
-float nivelAgua = 0;
+float distanciaCm = 0;   // última distância medida pelo sensor (sensor → água)
+float nivelCm = 0;       // nível real de água dentro do tubo/balde (cm)
+float nivelAgua = 0;     // nível equivalente (m) — o que vai para telemetria/alerta
 
 String nivelAlerta = "NORMAL";
 int corAtual = 0; // 0=Verde, 1=Amarelo, 2=Vermelho
@@ -131,6 +177,7 @@ void setup() {
 
   Serial.println("===========================================");
   Serial.println("  SAMARCO - NIVEL DE AGUA EM PIEZOMETROS");
+  Serial.println("  Protótipo físico (JSN-SR04T)");
   Serial.println("  Telemetria + Alertas + Store & Forward");
   Serial.println("  Instrumento: " PIEZOMETRO_ID);
   Serial.println("===========================================");
@@ -141,6 +188,10 @@ void setup() {
   pinMode(LED_VERMELHO, OUTPUT);
   pinMode(BUZZER, OUTPUT);
 
+  pinMode(PIN_TRIG, OUTPUT);
+  pinMode(PIN_ECHO, INPUT);
+  digitalWrite(PIN_TRIG, LOW);
+
   Serial.println("Testando LEDs...");
   testarLEDs();
 
@@ -148,19 +199,6 @@ void setup() {
   testarBuzzer();
 
   Wire.begin(21, 22);
-
-  Serial.print("Inicializando BMP180... ");
-  if (!bmp.begin()) {
-    Serial.println("ERRO!");
-    Serial.println("Sensor não encontrado!");
-    while (1) {
-      digitalWrite(LED_VERMELHO, HIGH);
-      delay(200);
-      digitalWrite(LED_VERMELHO, LOW);
-      delay(200);
-    }
-  }
-  Serial.println("OK!");
 
   Serial.print("Inicializando OLED... ");
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -257,12 +295,12 @@ void bufferizarLeitura() {
     // Timestamp em SEGUNDOS — o servidor converte para nanossegundos
     long ts = (long)time(nullptr);
     snprintf(item, sizeof(item),
-             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f,\"pressao\":%.3f,\"temperatura\":%.2f,\"ts\":%ld}",
-             nivelAgua, pressao, temperatura, ts);
+             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f,\"ts\":%ld}",
+             nivelAgua, ts);
   } else {
     snprintf(item, sizeof(item),
-             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f,\"pressao\":%.3f,\"temperatura\":%.2f}",
-             nivelAgua, pressao, temperatura);
+             "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f}",
+             nivelAgua);
   }
 
   if (bufferCount >= BUFFER_MAX) {
@@ -294,7 +332,7 @@ void despacharBuffer() {
   body += "]}";
 
   WiFiClientSecure client;
-  client.setInsecure(); // simulação/protótipo; em produção use certificado CA
+  client.setInsecure(); // protótipo; em produção use certificado CA
 
   HTTPClient http;
   http.begin(client, SERVER_URL);
@@ -313,13 +351,71 @@ void despacharBuffer() {
   http.end();
 }
 
+// ===== FUNÇÃO: UMA MEDIÇÃO BRUTA DO SENSOR (cm) =====
+// Dispara um pulso de 10 µs no TRIG e mede a largura do pulso de retorno
+// no ECHO. Retorna 0 se estourar o timeout (sem eco — nada refletindo).
+float medirDistanciaCm() {
+  digitalWrite(PIN_TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(PIN_TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(PIN_TRIG, LOW);
+
+  unsigned long duracao = pulseIn(PIN_ECHO, HIGH, 30000UL); // timeout 30 ms
+  if (duracao == 0) return 0; // sem eco dentro do timeout
+  return duracao / 58.0;      // µs → cm (velocidade do som no ar)
+}
+
+// ===== FUNÇÃO: DISTÂNCIA POR MEDIANA (mais robusta a ruído/eco espúrio) =====
+// Faz 5 medições espaçadas de 30 ms, descarta as fora da faixa útil
+// (< 25 cm = zona morta do JSN-SR04T; > 450 cm = fora de alcance/ruído) e
+// retorna a mediana das leituras válidas. Se nenhuma sobrar, retorna -1.
+float medirDistanciaMedianaCm() {
+  float leituras[5];
+  int n = 0;
+
+  for (int i = 0; i < 5; i++) {
+    float d = medirDistanciaCm();
+    if (d >= 25.0 && d <= 450.0) {
+      leituras[n++] = d;
+    }
+    delay(30);
+  }
+
+  if (n == 0) return -1.0; // nenhuma leitura válida nesta rodada
+
+  // Ordena (insertion sort — n é pequeno) e pega o elemento do meio
+  for (int i = 1; i < n; i++) {
+    float chave = leituras[i];
+    int j = i - 1;
+    while (j >= 0 && leituras[j] > chave) {
+      leituras[j + 1] = leituras[j];
+      j--;
+    }
+    leituras[j + 1] = chave;
+  }
+
+  return leituras[n / 2];
+}
+
 // ===== FUNÇÃO: LER SENSOR =====
 void lerSensor() {
-  temperatura = bmp.readTemperature();
-  pressao = bmp.readPressure() / 100.0;
-  // Conversão simulada pressão → nível d'água (ver nota no topo)
-  nivelAgua = NIVEL_REF + (pressao - PRESSAO_REF) / SIM_ESCALA;
-  if (nivelAgua < 0) nivelAgua = 0;
+  float distancia = medirDistanciaMedianaCm();
+
+  if (distancia < 0) {
+    // Sem leitura válida nesta rodada: mantém o ÚLTIMO nível conhecido
+    // (não zera! um alarme falso de "nível zero" seria pior que atrasar).
+    Serial.println("⚠️ Leitura ultrassônica inválida (sem eco confiável) — mantendo último nível");
+    return;
+  }
+
+  distanciaCm = distancia;
+
+  float nivel_cm = ALTURA_SENSOR_CM - distanciaCm;
+  if (nivel_cm < 0) nivel_cm = 0;
+
+  nivelCm = nivel_cm;
+  nivelAgua = nivelCm * ESCALA_M_POR_CM; // nível equivalente (m) — vai para telemetria/alerta
 }
 
 // ===== FUNÇÃO: DETERMINAR NÍVEL DE ALERTA =====
@@ -360,8 +456,8 @@ void atualizarLEDs() {
 }
 
 // ===== FUNÇÃO: ATUALIZAR BUZZER (não bloqueante) =====
-// Obs.: digitalWrite funciona com o buzzer do Wokwi e buzzers ativos.
-// Em buzzer passivo real, troque por tone(BUZZER, 2000) / noTone(BUZZER).
+// Obs.: em buzzer passivo real, troque digitalWrite por
+// tone(BUZZER, 2000) / noTone(BUZZER).
 void atualizarBuzzer() {
   unsigned long agora = millis();
 
@@ -394,19 +490,19 @@ void atualizarBuzzer() {
 // ===== FUNÇÃO: MOSTRAR NO SERIAL =====
 void mostrarSerial() {
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  Serial.print("💧 Nível d'água: ");
+  Serial.print("💧 Nível d'água:  ");
   Serial.print(nivelAgua, 2);
-  Serial.println(" m");
+  Serial.println(" m (equivalente)");
 
-  Serial.print("📊 Pressão:      ");
-  Serial.print(pressao, 1);
-  Serial.println(" hPa");
+  Serial.print("📏 Nível no tubo: ");
+  Serial.print(nivelCm, 1);
+  Serial.println(" cm");
 
-  Serial.print("📊 Temperatura:  ");
-  Serial.print(temperatura, 1);
-  Serial.println(" °C");
+  Serial.print("📡 Distância medida: ");
+  Serial.print(distanciaCm, 1);
+  Serial.println(" cm");
 
-  Serial.print("💾 Buffer:       ");
+  Serial.print("💾 Buffer:        ");
   Serial.print(bufferCount);
   Serial.println(" leitura(s) pendente(s)");
 
@@ -447,14 +543,14 @@ void mostrarDisplay() {
   display.print(" m");
 
   display.setCursor(0, 25);
-  display.print("Press: ");
-  display.print(pressao, 1);
-  display.print(" hPa");
+  display.print("Tubo: ");
+  display.print(nivelCm, 1);
+  display.print("cm");
 
   display.setCursor(0, 35);
-  display.print("Temp: ");
-  display.print(temperatura, 1);
-  display.print(" C  ");
+  display.print("Dist: ");
+  display.print(distanciaCm, 1);
+  display.print("cm ");
   display.print(wifiOk ? "WiFi:OK" : "WiFi:--");
 
   display.drawLine(0, 45, 128, 45, SSD1306_WHITE);
@@ -533,21 +629,23 @@ void testarBuzzer() {
 
 /*
  * ============================================================================
- * COMO TESTAR NO WOKWI:
+ * COMO TESTAR NA MAQUETE FÍSICA:
  * ============================================================================
- * Clique no BMP180 durante a simulação e mova o slider de PRESSÃO
- * (a escala didática converte 10 hPa em 1 m de nível d'água):
+ * 1. Meça com uma régua a distância real do sensor ao fundo do tubo/balde e
+ *    ajuste ALTURA_SENSOR_CM antes de gravar o firmware.
+ * 2. Com o tubo VAZIO, o Serial deve mostrar distância ≈ ALTURA_SENSOR_CM e
+ *    nível ≈ 0 m (confere a calibração).
+ * 3. Despeje água aos poucos (jarra/copo) e observe no Serial/OLED:
+ *    - até ~20 cm de água no tubo → nível 10,0 m (NORMAL, verde)
+ *    - a partir de 24 cm de água  → nível 12,0 m (ATENÇÃO, amarelo, beep 2s)
+ *    - a partir de 30 cm de água  → nível 15,0 m (CRÍTICO, vermelho pisca,
+ *      beep rápido, e o servidor dispara Telegram/SMS)
+ * 4. O dashboard usa os MESMOS limiares (12 m / 15 m) do firmware de
+ *    simulação — não é preciso mudar nada no servidor nem no index.html.
  *
- * 1. NORMAL  (verde):    1013 hPa → nível 10,0 m
- * 2. ATENÇÃO (amarelo):  1035 hPa → nível 12,2 m  (beep a cada 2 s)
- * 3. CRÍTICO (vermelho): 1065 hPa → nível 15,2 m  (LED pisca + beep rápido)
- *
- * O dashboard usa os MESMOS limiares (12 m / 15 m) e o servidor dispara
- * Telegram/SMS nas transições de nível — veja o README.
- *
- * TESTE DO STORE & FORWARD: pause a simulação por ~1 min (ou desligue o
- * WiFi) e observe no Serial o buffer acumulando; ao reconectar, todas as
- * leituras retidas são enviadas de uma vez (JSON) ao servidor, com seus
- * timestamps originais, que por sua vez grava tudo no InfluxDB.
+ * TESTE DO STORE & FORWARD: desligue o WiFi do roteador/celular por ~1 min
+ * e observe no Serial o buffer acumulando; ao reconectar, todas as leituras
+ * retidas são enviadas de uma vez (JSON) ao servidor, com seus timestamps
+ * originais, que por sua vez grava tudo no InfluxDB.
  * ============================================================================
  */
