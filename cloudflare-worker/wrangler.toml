@@ -1,0 +1,56 @@
+name = "piezometro-worker"
+main = "src/index.js"
+compatibility_date = "2026-01-15"
+
+# ── CRON ──────────────────────────────────────────────────────────────────────
+# Roda o motor de alertas (scheduled()) a cada 1 minuto — equivalente ao
+# setInterval(checkAlerts, ALERT_POLL_SEC * 1000) do server.js original.
+[triggers]
+crons = ["* * * * *"]
+
+# ── KV NAMESPACE (estado do motor de alertas) ────────────────────────────────
+# Substitui as variáveis em memória do server.js (lastNotifiedLevel,
+# lastCriticalNotify, alertLog), que não sobrevivem entre invocações no
+# Workers. Crie o namespace com:
+#
+#   wrangler kv namespace create ALERT_STATE
+#
+# e cole o "id" retornado no lugar de "COLOQUE_O_ID_AQUI" abaixo.
+[[kv_namespaces]]
+binding = "ALERT_STATE"
+id = "c8b05f6bf47f48fd80754250c26c54db"
+
+# ── D1 DATABASE (leituras dos piezômetros) ───────────────────────────────────
+# Substitui o InfluxDB: todas as leituras ficam numa tabela SQLite gerenciada
+# pela Cloudflare. Crie o banco com:
+#
+#   wrangler d1 create piezometro-db
+#
+# e cole o "database_id" retornado no lugar de "COLOQUE_O_ID_AQUI" abaixo.
+# Depois aplique o schema (ver schema.sql) com:
+#
+#   wrangler d1 execute piezometro-db --remote --file=schema.sql
+#
+[[d1_databases]]
+binding = "DB"
+database_name = "piezometro-db"
+database_id = "COLOQUE_O_ID_AQUI"  # de: wrangler d1 create piezometro-db
+
+# ── VARIÁVEIS NÃO SENSÍVEIS ───────────────────────────────────────────────────
+# Mesmos nomes e defaults do server.js (ver readme.md, seção "Variáveis de
+# Ambiente"). Os segredos (tokens/chaves) NÃO ficam aqui — vão via
+# `wrangler secret put`, listados no comentário abaixo.
+[vars]
+ALLOWED_ORIGIN     = "*"
+NIVEL_ATENCAO      = "12"
+NIVEL_CRITICO      = "15"
+ALERT_REPEAT_MIN   = "15"
+TWILIO_FROM        = ""
+TWILIO_TO          = ""
+
+# ── SEGREDOS (definir com `wrangler secret put <NOME>`) ──────────────────────
+# DEVICE_KEY           → chave compartilhada da placa ESP32 (header x-device-key)
+# TELEGRAM_BOT_TOKEN   → token do bot do Telegram (@BotFather)
+# TELEGRAM_CHAT_ID     → chat/grupo que recebe os alertas
+# TWILIO_ACCOUNT_SID   → SID da conta Twilio (SMS, opcional)
+# TWILIO_AUTH_TOKEN    → token de autenticação Twilio (SMS, opcional)

@@ -67,28 +67,28 @@
  * 🟡 ATENÇÃO  : 12 m ≤ nível < 15 m    → LED Amarelo, beep lento (2 s)
  * 🔴 CRÍTICO  : nível ≥ 15 m           → LED Vermelho pisca, beep rápido
  *
- * ENVIO: assim como no firmware de simulação, este ESP32 NÃO fala direto
- * com o InfluxDB — ele não guarda nenhum token do banco, apenas a
- * DEVICE_KEY do NOSSO servidor. Cada leitura vira um JSON simples, enviado
- * por HTTPS ao endpoint /ingest do server.js (rodando no Render); é o
- * servidor quem repassa os dados ao InfluxDB. O JSON aqui só carrega
- * "nivel_agua" (+ "ts" quando o NTP sincronizou) — sem pressão/temperatura,
- * pois este protótipo não tem esses sensores; o servidor aceita esses
- * campos ausentes normalmente.
+ * ENVIO: assim como no firmware de simulação, este ESP32 não fala direto
+ * com nenhum banco de dados — ele não guarda nenhum segredo de banco,
+ * apenas a DEVICE_KEY do Worker. Cada leitura vira um JSON simples, enviado
+ * por HTTPS ao endpoint /ingest do Cloudflare Worker; é o Worker quem grava
+ * os dados no Cloudflare D1. O JSON aqui só carrega "nivel_agua" (+ "ts"
+ * quando o NTP sincronizou) — sem pressão/temperatura, pois este protótipo
+ * não tem esses sensores; o Worker aceita esses campos ausentes normalmente.
  *
  * STORE & FORWARD ("caixa-preta", conceito AquaSense): idêntico ao firmware
  * de simulação. Cada leitura recebe timestamp via NTP (em SEGUNDOS, campo
- * "ts") e entra em um buffer local. O envio ao servidor despacha o buffer
- * inteiro; se a rede/servidor falhar, os dados ficam retidos e são
+ * "ts") e entra em um buffer local. O envio ao Worker despacha o buffer
+ * inteiro; se a rede/Worker falhar, os dados ficam retidos e são
  * reenviados no próximo ciclo — nenhuma leitura se perde.
  *
- * ALERTAS ATIVOS (Telegram/SMS): enviados pelo servidor (server.js), que
- * vigia o InfluxDB — ver README. No hardware real de campo, um módulo
- * SIM7600 permitiria SMS direto do local, sem depender do servidor.
+ * ALERTAS ATIVOS (Telegram/SMS): disparados pelo motor de alertas do
+ * Cloudflare Worker (Cron Trigger, roda a cada 1 min e consulta o D1) — ver
+ * README. No hardware real de campo, um módulo SIM7600 permitiria SMS
+ * direto do local, sem depender do backend.
  *
  * IDENTIFICAÇÃO DO INSTRUMENTO: cada placa se identifica com um ID único
- * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), enviado como tag "piezometro"
- * ao InfluxDB — é esse ID que aparece no dashboard e nos alertas.
+ * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), enviado no campo "piezometro"
+ * — é esse ID que aparece no dashboard e nos alertas.
  *
  * CONEXÕES NA MAQUETE (ver docs/PROTOTIPO_FISICO.md para a tabela completa):
  * JSN-SR04T: VCC→5V (VIN)  GND→GND  TRIG→GPIO5  ECHO→[divisor 1k/2k]→GPIO18
@@ -112,9 +112,9 @@
 // ===== CREDENCIAIS (preencha antes de usar!) =====
 #define WIFI_SSID   "SUA-REDE-WIFI"
 #define WIFI_PASS   "SUA-SENHA-WIFI"
-#define SERVER_URL  "https://SEU-APP.onrender.com/ingest"  // endpoint /ingest do server.js
-#define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY do servidor
-#define MEASUREMENT "telemetria_samarco"                   // (info) measurement gravado pelo servidor
+#define SERVER_URL  "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev/ingest"  // endpoint /ingest do Cloudflare Worker
+#define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY definida como secret no Worker
+#define MEASUREMENT "telemetria_samarco"                   // (info) rótulo interno das leituras
 #define PIEZOMETRO_ID "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
 
 // ===== SENSOR ULTRASSÔNICO JSN-SR04T =====
@@ -126,7 +126,7 @@
 // Com a escala padrão: 20 cm de água → 10 m (normal) · 24 cm → 12 m (atenção)
 // · 30 cm → 15 m (crítico) — os mesmos limiares de sempre, ver abaixo.
 
-// ===== LIMIARES DE NÍVEL (m) — espelhados em index.html e server.js =====
+// ===== LIMIARES DE NÍVEL (m) — espelhados em index.html e no Cloudflare Worker =====
 #define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
 #define NIVEL_CRITICO 15.0   // acima disso = CRÍTICO
 
@@ -144,7 +144,7 @@
 
 // ===== INTERVALOS (ms) =====
 #define INTERVALO_LEITURA 1000UL    // leitura local + LEDs + display
-#define INTERVALO_ENVIO   10000UL   // envio ao servidor (Render)
+#define INTERVALO_ENVIO   10000UL   // envio ao backend (Cloudflare Worker)
 
 // ===== STORE & FORWARD =====
 #define BUFFER_MAX 120              // ~20 min de leituras retidas sem rede
@@ -273,7 +273,7 @@ void conectarWiFi() {
 
 // ===== FUNÇÃO: SINCRONIZAR RELÓGIO (NTP) =====
 // Necessário para o store & forward: cada leitura retida no buffer precisa
-// do SEU timestamp, senão o InfluxDB carimbaria tudo com a hora do reenvio.
+// do SEU timestamp, senão o backend carimbaria tudo com a hora do reenvio.
 void sincronizarNTP() {
   if (!wifiOk) return;
   Serial.print("Sincronizando relógio (NTP)");
@@ -292,7 +292,7 @@ void bufferizarLeitura() {
   char item[128];
 
   if (ntpOk) {
-    // Timestamp em SEGUNDOS — o servidor converte para nanossegundos
+    // Timestamp em SEGUNDOS
     long ts = (long)time(nullptr);
     snprintf(item, sizeof(item),
              "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f,\"ts\":%ld}",
@@ -639,13 +639,13 @@ void testarBuzzer() {
  *    - até ~20 cm de água no tubo → nível 10,0 m (NORMAL, verde)
  *    - a partir de 24 cm de água  → nível 12,0 m (ATENÇÃO, amarelo, beep 2s)
  *    - a partir de 30 cm de água  → nível 15,0 m (CRÍTICO, vermelho pisca,
- *      beep rápido, e o servidor dispara Telegram/SMS)
+ *      beep rápido, e o motor de alertas do Worker dispara Telegram/SMS)
  * 4. O dashboard usa os MESMOS limiares (12 m / 15 m) do firmware de
- *    simulação — não é preciso mudar nada no servidor nem no index.html.
+ *    simulação — não é preciso mudar nada no Worker nem no index.html.
  *
  * TESTE DO STORE & FORWARD: desligue o WiFi do roteador/celular por ~1 min
  * e observe no Serial o buffer acumulando; ao reconectar, todas as leituras
- * retidas são enviadas de uma vez (JSON) ao servidor, com seus timestamps
- * originais, que por sua vez grava tudo no InfluxDB.
+ * retidas são enviadas de uma vez (JSON) ao Worker, com seus timestamps
+ * originais, que por sua vez grava tudo no D1.
  * ============================================================================
  */

@@ -515,11 +515,11 @@ tbody td {
 
 <div class="statusbar">
   <span class="sdot s-err" id="sdot"></span>
-  <span id="stext">Conectando ao InfluxDB...</span>
+  <span id="stext">Conectando à API...</span>
 </div>
 
 <div class="sim-banner" id="sim-banner">
-  ⚠ Modo simulação — dados fictícios para demonstração (sensor/InfluxDB indisponível)
+  ⚠ Modo simulação — dados fictícios para demonstração (sensor/API indisponível)
 </div>
 
 <div class="howto-bar">
@@ -721,8 +721,6 @@ tbody td {
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const CFG = {
-  bucket:     "PIEZOMETRO",
-  meas:       "telemetria_samarco",
   poll:       10000,
   // Limiares de NÍVEL D'ÁGUA (m), espelhados no firmware e no server.js:
   // NORMAL < 12 m · ATENÇÃO 12–15 m · CRÍTICO ≥ 15 m
@@ -740,31 +738,18 @@ const PIEZOMETROS = [
 let pzSelecionado = "PZ-01";
 
 // Períodos disponíveis para os gráficos / stats / tabela / export
+// (a chave já é o valor aceito pelo parâmetro `range` da API — /dados?range=24h|7d|30d)
 const PERIODOS = {
-  "24h": { range: "-24h", every: "30m", label: "24h" },
-  "7d":  { range: "-7d",  every: "2h",  label: "7 dias" },
-  "30d": { range: "-30d", every: "6h",  label: "30 dias" },
+  "24h": { label: "24h" },
+  "7d":  { label: "7 dias" },
+  "30d": { label: "30 dias" },
 };
 let periodoSelecionado = "24h";
 
-// ── MODO DE CONEXÃO ──────────────────────────────────────────────────────────
-// COM SERVIDOR (padrão): deixe INFLUX_DIRECT.token = "" — o dashboard consulta
-// o InfluxDB através do proxy (PROXY_URL_QL), que esconde o token no Render.
-// SEM SERVIDOR: preencha token com um token SOMENTE LEITURA do bucket
-// PIEZOMETRO (InfluxDB → Load Data → API Tokens). O token fica visível no
-// HTML publicado — por isso ele deve ser apenas de leitura, nunca o de escrita!
-// As consultas usam o endpoint v1 (/query, linguagem InfluxQL), compatível
-// tanto com contas Cloud TSM quanto com contas Cloud Serverless — o endpoint
-// Flux (/api/v2/query) não funciona no Serverless, mas a escrita v2 continua
-// funcionando normalmente.
-const INFLUX_DIRECT = {
-  url:   "https://us-east-1-1.aws.cloud2.influxdata.com",
-  org:   "a6d8947f7ea6219b",
-  token: "JzaG2NTZrGPTVrI9HEQLgWLFHps_MWcvvRCit5J_hAINymVSdxgiN9lZCu3rbIM8o9tzQ6DdKEyYBy_Y9LCfpQ==",   // preenchido → dispensa o Render
-};
-
-const PROXY_URL = "https://piezometro-teste.onrender.com/query";
-const PROXY_URL_QL = "https://piezometro-teste.onrender.com/queryql";
+// ── API ───────────────────────────────────────────────────────────────────────
+// Dashboard consome a API do Cloudflare Worker (+ D1) diretamente.
+// Troque pelo subdomínio real do seu Worker (Cloudflare → Workers & Pages).
+const API_URL = "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev";
 
 // ── ESTADO ────────────────────────────────────────────────────────────────────
 let lastLevel = null, failCount = 0, simTimer = null, simActive = false;
@@ -802,7 +787,7 @@ const stats = {
   t: { min: null, max: null },
 };
 
-// Janela de estatísticas do período: semeada pelo histórico do InfluxDB e
+// Janela de estatísticas do período: semeada pelo histórico da API e
 // alimentada pelo polling.
 // (Os gráficos exibem só os últimos 60 pontos, mas mín/máx/variação
 //  são calculados sobre esta janela completa.)
@@ -813,65 +798,48 @@ function pushStats(key, val) {
   if (statsWin[key].length > STATS_MAX) statsWin[key].shift();
 }
 
-// ── INFLUXDB ──────────────────────────────────────────────────────────────────
-// Consulta InfluxQL pelo endpoint v1 (/query) — compatível com InfluxDB Cloud
-// TSM E Serverless (o endpoint Flux /api/v2/query não existe no Serverless).
-// Retorna o JSON já parseado da resposta.
-async function influxQL(q) {
+// ── API (Cloudflare Worker + D1) ─────────────────────────────────────────────
+// Wrapper simples de fetch com timeout, usado pelos dois endpoints abaixo.
+async function apiGet(path) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
-    let r;
-    if (INFLUX_DIRECT.token) {
-      const url = `${INFLUX_DIRECT.url}/query?db=${encodeURIComponent(CFG.bucket)}&q=${encodeURIComponent(q)}`;
-      r = await fetch(url, { headers: { "Authorization": `Token ${INFLUX_DIRECT.token}` }, signal: ctrl.signal });
-    } else {
-      r = await fetch(PROXY_URL_QL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q }),
-        signal: ctrl.signal,
-      });
-    }
+    const r = await fetch(`${API_URL}${path}`, { signal: ctrl.signal });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   } finally { clearTimeout(timer); }
 }
 
-// Busca o último valor de CADA piezômetro (agrupado pela tag "piezometro")
+// Busca o último valor de CADA piezômetro — GET /ultimos
+// Resposta: { "PZ-01": {nivel_agua,pressao,temperatura,ts}, ... } (ts em segundos)
 async function fetchLatest() {
-  const q = `SELECT last("nivel_agua") AS nivel_agua, last("pressao") AS pressao, last("temperatura") AS temperatura FROM "${CFG.meas}" WHERE time >= now() - 2m GROUP BY "piezometro"`;
-  const json = await influxQL(q);
-  const series = (json.results && json.results[0] && json.results[0].series) || [];
-  if (!series.length) throw new Error("Sem dados recentes");
+  const json = await apiGet("/ultimos");
+  const ids = Object.keys(json || {});
+  if (!ids.length) throw new Error("Sem dados recentes");
   const result = {};
-  series.forEach(serie => {
-    const id = (serie.tags && serie.tags.piezometro) || "PZ-01";
-    const cols = serie.columns || [];
-    const vals = (serie.values && serie.values[0]) || [];
-    const row = {};
-    cols.forEach((col, i) => { row[col] = vals[i]; });
+  ids.forEach(id => {
+    const row = json[id] || {};
     result[id] = { nivel: row.nivel_agua, pressao: row.pressao, temperatura: row.temperatura };
   });
   return result;
 }
 
 // Busca o histórico de um campo para o piezômetro e período selecionados
+// GET /dados?pz=PZ-01&range=24h|7d|30d
+// Resposta: { pz, range, pontos: [{ts,nivel_agua,pressao,temperatura}, ...] } (ts em segundos, ordem cronológica)
 async function fetchHistory(field) {
-  const per = PERIODOS[periodoSelecionado];
-  const rangeQL = per.range.replace(/^-/, "");
-  const q = `SELECT mean("${field}") AS valor FROM "${CFG.meas}" WHERE time >= now() - ${rangeQL} AND "piezometro" = '${pzSelecionado}' GROUP BY time(${per.every}) fill(none)`;
-  const json = await influxQL(q);
-  const series = (json.results && json.results[0] && json.results[0].series) || [];
-  if (!series.length) return [];
-  const values = series[0].values || [];
-  return values
-    .filter(v => v[1] !== null && v[1] !== undefined && Number.isFinite(v[1]))
-    .map(v => ({
-      label: new Date(v[0]).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-      value: parseFloat(Number(v[1]).toFixed(3)),
-      time: v[0],
-    }));
+  const json = await apiGet(`/dados?pz=${encodeURIComponent(pzSelecionado)}&range=${encodeURIComponent(periodoSelecionado)}`);
+  const pontos = json.pontos || [];
+  return pontos
+    .filter(p => p[field] !== null && p[field] !== undefined && Number.isFinite(p[field]))
+    .map(p => {
+      const ms = p.ts * 1000;
+      return {
+        label: new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        value: parseFloat(Number(p[field]).toFixed(3)),
+        time: ms,
+      };
+    });
 }
 
 // ── SPARKLINE ─────────────────────────────────────────────────────────────────
@@ -1350,7 +1318,7 @@ async function loadHistoryAndStats() {
       readingsHistory.push({ time: charts.n.labels[i], nivel: v, lv: cls.lv, lbl: cls.lbl });
     }
     renderReadingsTable();
-    addInfoRow(`Histórico do InfluxDB indisponível — exibindo histórico simulado (${pzSelecionado})`);
+    addInfoRow(`Histórico da API indisponível — exibindo histórico simulado (${pzSelecionado})`);
   }
 
   redrawCharts();
@@ -1478,8 +1446,7 @@ async function poll() {
     if (simTimer) { clearInterval(simTimer); simTimer = null; }
     setSimMode(false);
     failCount = 0;
-    const modo = INFLUX_DIRECT.token ? "InfluxDB conectado (direto)" : "InfluxDB conectado (via servidor)";
-    setStatus("live", `${modo} — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
+    setStatus("live", `API conectada — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
     atualizarVisaoGeral(pzLatest);
     atualizarMapa(pzLatest);
     const sel = pzLatest[pzSelecionado];
@@ -1487,13 +1454,13 @@ async function poll() {
     applyData(sel);
   } catch (e) {
     failCount++;
-    console.warn("InfluxDB:", e.message);
+    console.warn("API:", e.message);
     if (failCount === 1) {
-      setStatus("err", `Falha InfluxDB: ${e.message}`);
-      addInfoRow("Erro ao conectar no InfluxDB — ativando simulação");
+      setStatus("err", `Falha na API: ${e.message}`);
+      addInfoRow("Erro ao conectar na API — ativando simulação");
     }
     if (failCount >= 2 && !simTimer) {
-      setStatus("sim", "Modo simulação ativo — InfluxDB indisponível");
+      setStatus("sim", "Modo simulação ativo — API indisponível");
       setSimMode(true);
       simTimer = setInterval(simTick, CFG.poll);
       simTick();

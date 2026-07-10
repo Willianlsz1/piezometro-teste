@@ -1,6 +1,6 @@
 # 🟢 Samarco — Sistema de Monitoramento de Piezômetro
 
-Sistema online de **monitoramento do nível de água em piezômetros** (desafio SAGA SENAI / Samarco): sensores automáticos no ESP32, transmissão em tempo real para o InfluxDB Cloud, dashboard interativo no GitHub Pages e **alertas preventivos por Telegram e SMS** disparados pelo servidor.
+Sistema online de **monitoramento do nível de água em piezômetros** (desafio SAGA SENAI / Samarco): sensores automáticos no ESP32, transmissão em tempo real para o Cloudflare Worker (com armazenamento em D1), dashboard interativo no GitHub Pages e **alertas preventivos por Telegram e SMS** disparados pelo motor de alertas do Worker (cron trigger).
 
 ---
 
@@ -11,25 +11,24 @@ Sistema online de **monitoramento do nível de água em piezômetros** (desafio 
 - [Tecnologias Utilizadas](#tecnologias-utilizadas)
 - [Pré-requisitos](#pré-requisitos)
 - [Configuração e Deploy](#configuração-e-deploy)
-  - [1. InfluxDB Cloud](#1-influxdb-cloud)
+  - [1. Backend (Cloudflare Worker + D1)](#1-backend-cloudflare-worker--d1)
   - [2. Firmware ESP32 (Wokwi)](#2-firmware-esp32-wokwi)
-  - [3. Servidor Proxy (Render)](#3-servidor-proxy-render)
-  - [4. Dashboard (GitHub Pages)](#4-dashboard-github-pages)
+  - [3. Dashboard (GitHub Pages)](#3-dashboard-github-pages)
 - [Variáveis de Ambiente](#variáveis-de-ambiente)
 - [Alertas por Telegram e SMS](#alertas-por-telegram-e-sms)
-- [Arquitetura alternativa: sem servidor](#arquitetura-alternativa-sem-servidor)
 - [Níveis de Alerta](#níveis-de-alerta)
 - [Estrutura do Projeto](#estrutura-do-projeto)
+- [Histórico de Arquitetura](#histórico-de-arquitetura)
 
 ---
 
 ## Visão Geral
 
-O sistema monitora continuamente um piezômetro simulado via ESP32, enviando **nível d'água (m)**, pressão e temperatura para o InfluxDB Cloud a cada 10 segundos — com *store & forward*: leituras feitas sem rede ficam retidas em buffer local (com timestamp NTP) e são reenviadas quando a conexão volta, sem perda de dados.
+O sistema monitora continuamente um piezômetro simulado via ESP32, enviando **nível d'água (m)**, pressão e temperatura para o Cloudflare Worker a cada 10 segundos — com *store & forward*: leituras feitas sem rede ficam retidas em buffer local (com timestamp NTP) e são reenviadas quando a conexão volta, sem perda de dados.
 
-Um dashboard web exibe os dados em tempo real com histórico de 24 horas, indicadores visuais de alerta e registro de eventos. Em paralelo, o **motor de alertas do servidor** vigia o InfluxDB e dispara notificações por **Telegram** (gratuito) e/ou **SMS via Twilio** quando o nível muda de faixa — o alerta chega mesmo sem ninguém olhando o dashboard, cumprindo o requisito de "alertas preventivos" da demanda.
+Um dashboard web exibe os dados em tempo real com histórico de 24 horas, indicadores visuais de alerta e registro de eventos. Em paralelo, o **motor de alertas** do Worker (executado por *cron trigger*, a cada 1 minuto) vigia o D1 e dispara notificações por **Telegram** (gratuito) e/ou **SMS via Twilio** quando o nível muda de faixa — o alerta chega mesmo sem ninguém olhando o dashboard, cumprindo o requisito de "alertas preventivos" da demanda. Diferente de um servidor tradicional, o Worker não hiberna: o motor de alertas roda 24/7 sem depender de nenhum ping externo para "acordar".
 
-Quando o InfluxDB não está acessível, o dashboard ativa automaticamente um **modo de simulação** para demonstração — sinalizado por um banner amarelo e pela marcação "(simulação)" nos eventos, para que dados fictícios nunca sejam confundidos com leituras reais.
+Quando o backend não está acessível, o dashboard ativa automaticamente um **modo de simulação** para demonstração — sinalizado por um banner amarelo e pela marcação "(simulação)" nos eventos, para que dados fictícios nunca sejam confundidos com leituras reais.
 
 > ⚠️ **Limitações do protótipo (Fase 1):**
 > - O **BMP180 é um sensor barométrico** usado apenas como *stand-in* no Wokwi — ele não mede coluna d'água. O firmware converte a pressão do slider em um **nível d'água simulado** pela escala didática de **10 hPa = 1 m** (`SIM_ESCALA`). No hardware real (Fase 2), o sinal virá de um **transdutor piezométrico submersível 4–20 mA** lido por um ADC ADS1115, e a conversão passa a ser física real (1 mH₂O ≈ 98,07 hPa), calibrada na instalação.
@@ -45,26 +44,26 @@ Quando o InfluxDB não está acessível, o dashboard ativa automaticamente um **
 │   (Wokwi Sim.)  │
 └────────┬────────┘
          │
-  POST /ingest (JSON)
+  POST /ingest (JSON, x-device-key)
          │
 ┌────────▼───────────────┐      ┌──────────────┐
-│   Render.com            │─────▶│ 🔔 Telegram  │
-│   server.js             │      │ 📱 SMS Twilio│
-│   (ingestão + proxy +   │      └──────────────┘
-│    motor de alertas)    │
+│   Cloudflare Worker     │─────▶│ 🔔 Telegram  │
+│   (ingestão + /ultimos  │      │ 📱 SMS Twilio│
+│    + /dados + cron de   │      └──────────────┘
+│    alertas a cada 1 min)│
 └─────┬──────────────┬────┘
       │              │
- Flux Write/Query   HTTP /query
+  INSERT (D1)   GET /ultimos, /dados
       │              │
 ┌─────▼────────┐ ┌───▼───────────────┐
-│ InfluxDB      │ │   GitHub Pages     │
-│ Cloud         │ │   index.html       │
-│ (us-east-1)   │ │   (Dashboard)     │
+│ Cloudflare D1 │ │   GitHub Pages     │
+│ (SQLite)      │ │   index.html       │
+│               │ │   (Dashboard)     │
 └───────────────┘ └───────────────────┘
 ```
 
-**Por que o proxy?**
-O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O `server.js` no Render atua como intermediário — recebe as queries do dashboard e as repassa ao InfluxDB com o token seguro via variável de ambiente. Agora a placa também fala com o InfluxDB através dele: o ESP32 posta as leituras em `/ingest`, e é o `server.js` quem grava usando o token de escrita. Assim, **nenhum token do InfluxDB fica no firmware** — a placa só carrega a `DEVICE_KEY`, uma chave de dispositivo sem acesso direto ao banco.
+**Por que o Worker no meio?**
+O ESP32 nunca fala direto com o banco: ele posta as leituras em `/ingest`, autenticando com a `DEVICE_KEY` no header `x-device-key`. É o Worker quem grava no D1. O dashboard, por sua vez, só lê — via `GET /ultimos` (última leitura de cada piezômetro) e `GET /dados` (série histórica agregada para os gráficos). Nenhum segredo de banco fica exposto no firmware nem no HTML público: o Worker guarda tudo em *secrets* do Cloudflare, fora do repositório.
 
 ---
 
@@ -74,10 +73,10 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 |--------|-----------|
 | Firmware | C++ (Arduino), ESP32, BMP180, store & forward com NTP |
 | Simulação | [Wokwi](https://wokwi.com) |
-| Banco de dados | [InfluxDB Cloud](https://cloud2.influxdata.com) (InfluxQL) |
-| Proxy / Backend | Node.js puro (sem frameworks) + motor de alertas |
+| Backend | [Cloudflare Workers](https://workers.cloudflare.com) (ingestão + leitura + motor de alertas via Cron Trigger) |
+| Banco de dados | [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite gerenciado) |
+| Estado do motor de alertas | [Cloudflare Workers KV](https://developers.cloudflare.com/kv/) |
 | Notificações | Telegram Bot API (gratuito) e Twilio SMS (opcional) |
-| Hospedagem backend | [Render.com](https://render.com) (plano gratuito) |
 | Dashboard / Frontend | HTML + CSS + Canvas API |
 | Hospedagem frontend | [GitHub Pages](https://pages.github.com) |
 
@@ -85,8 +84,8 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 
 ## Pré-requisitos
 
-- Conta no [InfluxDB Cloud](https://cloud2.influxdata.com) com bucket `PIEZOMETRO` criado
-- Conta no [Render.com](https://render.com) conectada ao GitHub
+- Conta na [Cloudflare](https://dash.cloudflare.com) (plano gratuito) com Workers, D1 e KV habilitados
+- [wrangler](https://developers.cloudflare.com/workers/wrangler/) instalado (`npm i -g wrangler`)
 - GitHub Pages habilitado no repositório
 - (Opcional) Conta no [Wokwi](https://wokwi.com) para simular o ESP32
 
@@ -94,15 +93,16 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 
 ## Configuração e Deploy
 
-### 1. InfluxDB Cloud
+### 1. Backend (Cloudflare Worker + D1)
 
-1. Acesse [cloud2.influxdata.com](https://cloud2.influxdata.com) e crie uma conta
-2. Crie um **bucket** com o nome `PIEZOMETRO`
-3. Crie um **token de acesso** com permissão de leitura e escrita no bucket
-4. Anote os valores de:
-   - **URL** do cluster (ex: `https://us-east-1-1.aws.cloud2.influxdata.com`)
-   - **Token** gerado
-   - **Organization** (nome da sua organização)
+O backend inteiro (ingestão, leitura para o dashboard e motor de alertas) roda em [`cloudflare-worker/`](cloudflare-worker/). Resumo do fluxo — o passo a passo completo, com todos os comandos, está no [`cloudflare-worker/README.md`](cloudflare-worker/README.md):
+
+1. `wrangler login`
+2. Criar o namespace KV do motor de alertas (`wrangler kv namespace create ALERT_STATE`) e colar o `id` em `wrangler.toml`
+3. Criar o banco D1 (`wrangler d1 create piezometro-db`), colar o `database_id` em `wrangler.toml` e aplicar `schema.sql`
+4. Definir os segredos com `wrangler secret put` (`DEVICE_KEY`, e opcionalmente `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`)
+5. Ajustar as variáveis não sensíveis em `[vars]` (ver [tabela abaixo](#variáveis-de-ambiente))
+6. `wrangler deploy` — a URL pública fica algo como `https://piezometro-worker.SEU-SUBDOMINIO.workers.dev`
 
 ---
 
@@ -121,11 +121,11 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 ```cpp
 #define WIFI_SSID   "Wokwi-GUEST"
 #define WIFI_PASS   ""
-#define SERVER_URL  "https://SEU-APP.onrender.com/ingest"
+#define SERVER_URL  "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev/ingest"
 #define DEVICE_KEY  "troque-esta-chave"
 ```
 
-> A placa não fala mais direto com o InfluxDB — ela posta as leituras (JSON) no `/ingest` do `server.js` no Render, autenticando com `DEVICE_KEY` no header `x-device-key`. As credenciais do InfluxDB (`INFLUX_URL`, `INFLUX_WRITE_TOKEN`, `INFLUX_ORG`) ficam só nas variáveis de ambiente do Render — nunca no firmware.
+> A placa posta as leituras (JSON) no `/ingest` do Cloudflare Worker, autenticando com `DEVICE_KEY` no header `x-device-key`. O Worker grava no D1 usando essa mesma chave para validar a origem — nenhum segredo de banco fica no firmware.
 
 5. O firmware converte a pressão do BMP180 em nível d'água simulado (10 hPa = 1 m) e classifica pelos limiares de **nível**:
 
@@ -135,55 +135,21 @@ O token do InfluxDB nunca pode ficar exposto no HTML (visível no navegador). O 
 #define NIVEL_CRITICO 15.0   // m — acima disso = CRÍTICO
 ```
 
-> Estes valores devem ser **os mesmos** do `CFG` em `index.html` (`thrAtencao`/`thrCritico`) e do servidor (`NIVEL_ATENCAO`/`NIVEL_CRITICO`), para dashboard e notificações espelharem exatamente o firmware.
+> Estes valores devem ser **os mesmos** do `CFG` em `index.html` (`thrAtencao`/`thrCritico`) e do Worker (`NIVEL_ATENCAO`/`NIVEL_CRITICO` em `wrangler.toml`), para dashboard e notificações espelharem exatamente o firmware.
 
 6. Clique em **Start Simulation** — o ESP32 enviará dados a cada 10 segundos. Para testar os alertas, clique no BMP180 e mova o slider de pressão:
    - **1013 hPa → 10,0 m** 🟢 normal
    - **1035 hPa → 12,2 m** 🟡 atenção
-   - **1065 hPa → 15,2 m** 🔴 crítico (e o servidor dispara Telegram/SMS)
+   - **1065 hPa → 15,2 m** 🔴 crítico (e o Worker dispara Telegram/SMS no próximo ciclo do cron, até 1 min depois)
 
 ---
 
-### 3. Servidor Proxy (Render)
+### 3. Dashboard (GitHub Pages)
 
-1. Acesse [render.com](https://render.com) e faça login com sua conta GitHub
-2. Clique em **New → Web Service**
-3. Selecione o repositório `piezometro-teste`
-4. Configure:
-   - **Runtime:** Node
-   - **Build Command:** `npm install`
-   - **Start Command:** `node server.js`
-   - **Instance Type:** Free
-5. Em **Environment Variables**, adicione:
-
-```
-INFLUX_URL         = https://SEU-CLUSTER.influxdata.com
-INFLUX_TOKEN       = SEU-TOKEN-SOMENTE-LEITURA
-INFLUX_WRITE_TOKEN = SEU-TOKEN-DE-ESCRITA
-INFLUX_ORG         = SUA-ORG
-ALLOWED_ORIGIN     = https://SEU-USUARIO.github.io
-ALLOWED_BUCKET     = PIEZOMETRO
-DEVICE_KEY         = troque-esta-chave
-
-# Notificações (opcionais — ver seção "Alertas por Telegram e SMS")
-TELEGRAM_BOT_TOKEN = 123456:ABC-DEF...
-TELEGRAM_CHAT_ID   = -100123456789
-```
-
-> 🔐 **Segurança:** o dashboard só **lê** dados — o token em `INFLUX_TOKEN` fica **somente leitura**, restrito ao bucket `PIEZOMETRO` e usado pelo `/query`. Quem escreve agora é o próprio servidor, usando `INFLUX_WRITE_TOKEN` no `/ingest` — a placa nunca vê nenhum dos dois; ela só carrega a `DEVICE_KEY`, validada no header `x-device-key`. O proxy também rejeita queries que referenciem outros buckets (`ALLOWED_BUCKET`).
-
-> ⚠️ **Importante:** `ALLOWED_ORIGIN` deve ser exatamente `https://SEU-USUARIO.github.io` **sem barra final** e **sem o nome do repositório**.
-
-6. Clique em **Create Web Service** e aguarde o deploy
-
----
-
-### 4. Dashboard (GitHub Pages)
-
-1. No arquivo `index.html`, atualize a URL do proxy:
+1. No arquivo `index.html`, atualize a URL do backend para o Worker publicado (endpoints `/ultimos` e `/dados`):
 
 ```javascript
-const PROXY_URL = "https://SEU-APP.onrender.com/query";
+const WORKER_URL = "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev";
 ```
 
 2. Habilite o GitHub Pages:
@@ -200,100 +166,55 @@ const PROXY_URL = "https://SEU-APP.onrender.com/query";
 
 ## Variáveis de Ambiente
 
+Definidas em `cloudflare-worker/wrangler.toml`, no bloco `[vars]` (não sensíveis, ficam no repositório):
+
 | Variável | Descrição | Exemplo |
 |----------|-----------|---------|
-| `INFLUX_URL` | URL do cluster InfluxDB | `https://us-east-1-1.aws.cloud2.influxdata.com` |
-| `INFLUX_TOKEN` | Token de autenticação (**use um token somente leitura**) | `abc123...` |
-| `INFLUX_WRITE_TOKEN` | Token de **escrita**, usado só pelo `/ingest` (se ausente, usa `INFLUX_TOKEN`) | `def456...` |
-| `INFLUX_ORG` | Nome da organização | `SAMARCO` |
-| `ALLOWED_ORIGIN` | Origem permitida pelo CORS | `https://willianlsz1.github.io` |
-| `ALLOWED_BUCKET` | Único bucket que o proxy aceita consultar | `PIEZOMETRO` (padrão) |
-| `PORT` | Porta do servidor (opcional) | `3000` (padrão) |
+| `ALLOWED_ORIGIN` | Origem permitida pelo CORS (sem barra final) | `https://willianlsz1.github.io` |
 | `NIVEL_ATENCAO` | Limiar de atenção do nível d'água (m) | `12` (padrão) |
 | `NIVEL_CRITICO` | Limiar crítico do nível d'água (m) | `15` (padrão) |
-| `ALERT_POLL_SEC` | Intervalo de verificação do motor de alertas (s) | `60` (padrão) |
 | `ALERT_REPEAT_MIN` | Reenvio do alerta crítico enquanto persistir (min) | `15` (padrão) |
-| `TELEGRAM_BOT_TOKEN` | Token do bot do Telegram (opcional) | `123456:ABC-DEF...` |
-| `TELEGRAM_CHAT_ID` | Chat/grupo que recebe os alertas | `-100123456789` |
-| `TWILIO_ACCOUNT_SID` | SID da conta Twilio para SMS (opcional) | `ACxxxxxxxx...` |
-| `TWILIO_AUTH_TOKEN` | Token de autenticação Twilio | `xxxxxxxx` |
 | `TWILIO_FROM` | Número Twilio remetente (formato E.164) | `+15551234567` |
 | `TWILIO_TO` | Número que recebe os SMS | `+5531999999999` |
-| `DEVICE_KEY` | Chave que a placa envia no header `x-device-key` ao chamar `/ingest` (vazio = sem autenticação, só em dev) | `troque-esta-chave` |
+
+Segredos (definidos via `wrangler secret put`, **nunca** no `wrangler.toml`):
+
+| Segredo | Descrição |
+|---------|-----------|
+| `DEVICE_KEY` | Chave que a placa envia no header `x-device-key` ao chamar `/ingest` (único obrigatório na prática) |
+| `TELEGRAM_BOT_TOKEN` | Token do bot do Telegram (opcional) |
+| `TELEGRAM_CHAT_ID` | Chat/grupo que recebe os alertas (opcional) |
+| `TWILIO_ACCOUNT_SID` | SID da conta Twilio para SMS (opcional) |
+| `TWILIO_AUTH_TOKEN` | Token de autenticação Twilio (opcional) |
 
 ---
 
 ## Alertas por Telegram e SMS
 
-O `server.js` verifica o último `nivel_agua` no InfluxDB a cada `ALERT_POLL_SEC` segundos e notifica **nas transições de faixa** (anti-spam: não repete a mesma faixa; o nível CRÍTICO é reenviado a cada `ALERT_REPEAT_MIN` minutos enquanto persistir). O histórico de notificações fica exposto em `GET /alerts`.
+O motor de alertas do Worker roda como **Cron Trigger** (`* * * * *`, a cada 1 minuto), busca o último `nivel_agua` de cada piezômetro no D1 e notifica **nas transições de faixa** (anti-spam: não repete a mesma faixa; o nível CRÍTICO é reenviado a cada `ALERT_REPEAT_MIN` minutos enquanto persistir). O estado (última faixa notificada, histórico de reenvios) fica persistido no **Workers KV**, já que um Worker não mantém estado entre invocações. O histórico de notificações fica exposto em `GET /alerts`.
 
-O sistema monitora **múltiplos piezômetros**: cada leitura carrega o identificador do instrumento (tag `piezometro`, ex. `PZ-01`), gravado junto com a medição no InfluxDB. O motor de alertas acompanha cada piezômetro separadamente — a mesma lógica de transição de faixa e repetição do CRÍTICO é aplicada por instrumento — e as notificações (e o histórico em `GET /alerts`) indicam qual piezômetro disparou o alerta. O id é configurado no firmware através da constante `PIEZOMETRO_ID`.
+O sistema monitora **múltiplos piezômetros**: cada leitura carrega o identificador do instrumento (campo `piezometro`, ex. `PZ-01`), gravado junto com a medição no D1. O motor de alertas acompanha cada piezômetro separadamente — a mesma lógica de transição de faixa e repetição do CRÍTICO é aplicada por instrumento — e as notificações (e o histórico em `GET /alerts`) indicam qual piezômetro disparou o alerta. O id é configurado no firmware através da constante `PIEZOMETRO_ID`.
 
 ### Telegram (gratuito — recomendado para o TCC)
 
 1. No Telegram, fale com o **@BotFather** → `/newbot` → copie o **token**
 2. Adicione o bot a um grupo (ou fale com ele no privado) e envie uma mensagem qualquer
 3. Acesse `https://api.telegram.org/bot<TOKEN>/getUpdates` e copie o `chat.id`
-4. Defina `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` no Render
+4. Defina `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` com `wrangler secret put`
 
 ### SMS via Twilio (opcional, pago)
 
 1. Crie uma conta em [twilio.com](https://www.twilio.com) (o modo *trial* envia SMS para números verificados)
 2. Compre/ative um número remetente e copie **Account SID** e **Auth Token** do console
-3. Defina `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` e `TWILIO_TO` no Render
+3. Defina `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` com `wrangler secret put`, e `TWILIO_FROM`/`TWILIO_TO` em `[vars]`
 
-> 💡 **No hardware real (Fase 2)**, um módulo celular **SIM7600** no próprio ESP32 permitiria enviar SMS direto do campo, sem depender do servidor — importante como redundância se a nuvem estiver fora.
-
----
-
-## Arquitetura alternativa: sem servidor
-
-> ⚠️ Contas novas do InfluxDB Cloud são "Serverless" e não respondem a consultas Flux (`/api/v2/query`) — o sistema usa o endpoint v1 `/query` com InfluxQL, compatível com os dois tipos de conta.
-
-Além da arquitetura padrão (com o `server.js` como proxy no Render), o projeto também suporta um modo **sem servidor**, em que o navegador conversa direto com o InfluxDB Cloud:
-
-```
-┌──────────┐   escreve    ┌──────────────────┐   lê (token   ┌───────────┐
-│  ESP32   │ ───────────▶ │  InfluxDB Cloud   │  somente     │ Dashboard │
-│ (Wokwi)  │              │  (bucket          │◀──────────── │ (browser) │
-└──────────┘              │  PIEZOMETRO)      │   leitura)   └───────────┘
-     │                    └──────────────────┘
-     │ notifica direto
-     ▼
-┌──────────┐
-│ Telegram │
-└──────────┘
-```
-
-A API v2 do InfluxDB Cloud aceita requisições **cross-origin** vindas do navegador, então o dashboard consegue consultar o bucket diretamente, sem precisar de um servidor Node.js no meio.
-
-**Quando usar:** em demonstrações rápidas e no TCC, quando o objetivo é reduzir peças em movimento — sem o Render (e sua hibernação após 15 min de inatividade), sem `server.js`, sem variáveis de ambiente no Render. É a forma mais simples de deixar o dashboard "sempre ligado" para a banca, já que ele não depende de nenhum serviço acordar.
-
-**Trade-offs:**
-
-- ⚠️ O token do InfluxDB usado no `index.html` fica **visível no HTML publicado** (GitHub Pages é público). Por isso ele precisa ser **somente leitura** — nunca use aqui o token de escrita do firmware.
-- ⚠️ Sem `server.js` não há motor de alertas contínuo: os alertas por Telegram só disparam enquanto o **ESP32/Wokwi estiver ligado e simulando** (o firmware notifica o Telegram diretamente), e não há SMS via Twilio nem histórico em `GET /alerts`.
-
-**Passos:**
-
-1. Crie **2 tokens** no InfluxDB (Load Data → API Tokens):
-   - um de **escrita**, usado no firmware `firmware/sketch_sem_servidor.ino`;
-   - um **somente leitura** do bucket `PIEZOMETRO`, usado em `INFLUX_DIRECT.token` no `index.html`.
-2. Use o firmware `firmware/sketch_sem_servidor.ino` no Wokwi — ele escreve direto no InfluxDB (e, opcionalmente, chama a API do Telegram), sem passar pelo Render.
-3. Preencha o objeto `INFLUX_DIRECT` no `index.html` (`url`, `org` e o `token` de leitura). Com o token preenchido, o dashboard passa a consultar o InfluxDB diretamente e o status exibe "InfluxDB conectado (direto)".
-
-| | Com servidor | Sem servidor |
-|---|---|---|
-| Segurança do token | Token fica só no Render (nunca exposto) | Token de leitura fica exposto no HTML público |
-| Alertas 24/7 | Sim (server.js roda mesmo com o ESP32 desligado) | Não — só com a placa ligada |
-| Hibernação | Render dorme após 15 min de inatividade | Não há servidor para hibernar |
-| Nº de serviços | ESP32 + Render + InfluxDB | ESP32 + InfluxDB |
+> 💡 **No hardware real (Fase 2)**, um módulo celular **SIM7600** no próprio ESP32 permitiria enviar SMS direto do campo, sem depender do backend — importante como redundância se a nuvem estiver fora.
 
 ---
 
 ## Níveis de Alerta
 
-O sistema classifica o **nível d'água** em três faixas — a mesma lógica no firmware (LEDs/buzzer), no dashboard (badges/gráfico) e no servidor (Telegram/SMS):
+O sistema classifica o **nível d'água** em três faixas — a mesma lógica no firmware (LEDs/buzzer), no dashboard (badges/gráfico) e no motor de alertas do Worker (Telegram/SMS):
 
 | Nível | Condição | LED | Buzzer | Notificação |
 |-------|----------|-----|--------|-------------|
@@ -316,20 +237,21 @@ piezometro-teste/
 ├── docs/
 │   ├── MAPEAMENTO_DEMANDA_E_MERCADO.md  # Demanda SAGA × mercado real × regulação (fontes citadas)
 │   └── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e roteiro de demo
-├── server.js        # Proxy Node.js + ingestão + motor de alertas (Render)
+├── cloudflare-worker/  # Backend: ingestão (/ingest), leitura (/ultimos, /dados) e motor de alertas (cron)
+│   ├── src/index.js    # Código do Worker
+│   ├── schema.sql      # Schema da tabela `leituras` (D1)
+│   ├── wrangler.toml   # Config do Worker (vars, D1, KV, cron)
+│   └── README.md       # Guia de deploy passo a passo
 ├── index.html       # Dashboard web (GitHub Pages)
-├── package.json     # Dependências Node.js
-├── .env.example     # Modelo de variáveis de ambiente
-└── readme.md        # Este arquivo
+└── readme.md         # Este arquivo
 ```
 
 > 🧱 **Vai montar a maquete física?** Siga o guia completo em [`docs/PROTOTIPO_FISICO.md`](docs/PROTOTIPO_FISICO.md) — lista de compras (~R$ 150–220), esquema de ligação do JSN-SR04T (com o divisor de tensão obrigatório no ECHO), calibração e roteiro de demonstração para a banca.
 
 ---
 
-## 📝 Observações
+## Histórico de Arquitetura
 
-- O plano gratuito do Render hiberna após **15 minutos de inatividade**. A primeira requisição após hibernação pode demorar até 50 segundos. O dashboard ativa automaticamente o modo simulação enquanto aguarda.
-- ⚠️ A hibernação também **pausa o motor de alertas** (Telegram/SMS). Para monitoramento contínuo, configure um ping externo gratuito (ex.: [UptimeRobot](https://uptimerobot.com) ou [cron-job.org](https://cron-job.org)) chamando `https://SEU-APP.onrender.com/health` a cada 10 minutos — isso mantém o serviço acordado. Em produção real, use um plano pago ou infraestrutura dedicada.
-- O token do InfluxDB **nunca deve ser commitado** no repositório. Use sempre variáveis de ambiente.
-- O simulador Wokwi usa a rede `Wokwi-GUEST` (sem senha), que possui acesso à internet para enviar dados ao InfluxDB.
+A primeira versão do sistema (v1) usava um proxy Node.js (`server.js`) hospedado no Render, que ingeria as leituras do ESP32, repassava as consultas do dashboard ao InfluxDB Cloud e rodava o motor de alertas via `setInterval`. Essa arquitetura foi substituída (v2) pelo Cloudflare Worker descrito neste documento, por três motivos principais: o plano gratuito do Render hibernava após 15 minutos de inatividade, o que pausava o motor de alertas justamente quando ninguém estava olhando o dashboard (o pior momento para isso acontecer); o InfluxDB Cloud exigia gerenciar tokens de leitura/escrita separados e, em contas novas, tinha retenção de dados limitada a 30 dias no plano gratuito; e manter três serviços externos (Render, InfluxDB, GitHub Pages) para um protótipo de TCC adicionava complexidade operacional sem benefício correspondente.
+
+A v2 consolida ingestão, armazenamento e motor de alertas em uma única plataforma (Cloudflare), sem credenciais externas de banco de dados: o D1 tem retenção ilimitada dentro do limite de armazenamento do free tier (~5 GB, suficiente para anos de leituras de piezômetro), não exige nenhum token de acesso ao banco (o binding é interno ao Worker) e o motor de alertas, agora um Cron Trigger, nunca hiberna. A v1 não foi apagada do projeto — ela está preservada no histórico do git, disponível para consulta caso seja necessário comparar as duas abordagens.

@@ -23,26 +23,26 @@
  *   1013 hPa → 10,0 m (normal) · 1035 hPa → 12,2 m (atenção)
  *   1065 hPa → 15,2 m (CRÍTICO)
  *
- * ENVIO: o firmware NÃO fala mais direto com o InfluxDB — ele não guarda
- * nenhum token do banco, apenas a DEVICE_KEY do NOSSO servidor. Cada leitura
- * vira um JSON simples, que é enviado por HTTPS ao endpoint /ingest do
- * server.js (rodando no Render); é o servidor quem repassa os dados ao
- * InfluxDB, com a chave de verdade guardada só lá.
+ * ENVIO: o firmware não fala direto com nenhum banco de dados — ele não
+ * guarda nenhum segredo de banco, apenas a DEVICE_KEY do Worker. Cada
+ * leitura vira um JSON simples, enviado por HTTPS ao endpoint /ingest do
+ * Cloudflare Worker; é o Worker quem grava os dados no Cloudflare D1, com
+ * a validação de origem feita pela DEVICE_KEY.
  *
  * STORE & FORWARD ("caixa-preta", conceito AquaSense):
  * Cada leitura recebe timestamp via NTP (em SEGUNDOS, campo "ts") e entra em
- * um buffer local. O envio ao servidor despacha o buffer inteiro; se a
- * rede/servidor falhar, os dados ficam retidos e são reenviados no próximo
- * ciclo — nenhuma leitura se perde. O servidor converte o "ts" de segundos
- * para nanossegundos antes de gravar no InfluxDB.
+ * um buffer local. O envio ao Worker despacha o buffer inteiro; se a
+ * rede/Worker falhar, os dados ficam retidos e são reenviados no próximo
+ * ciclo — nenhuma leitura se perde.
  *
- * ALERTAS ATIVOS (Telegram/SMS): enviados pelo servidor (server.js), que
- * vigia o InfluxDB — ver README. No hardware real, um módulo SIM7600
- * permitiria SMS direto do campo, sem depender do servidor.
+ * ALERTAS ATIVOS (Telegram/SMS): disparados pelo motor de alertas do
+ * Cloudflare Worker (Cron Trigger, roda a cada 1 min e consulta o D1) — ver
+ * README. No hardware real, um módulo SIM7600 permitiria SMS direto do
+ * campo, sem depender do backend.
  *
  * IDENTIFICAÇÃO DO INSTRUMENTO: cada placa se identifica com um ID único
- * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), enviado como tag "piezometro"
- * ao InfluxDB — é esse ID que aparece no dashboard e nos alertas.
+ * (configurado em PIEZOMETRO_ID, ex.: "PZ-01"), enviado no campo "piezometro"
+ * — é esse ID que aparece no dashboard e nos alertas.
  *
  * CONEXÕES NO WOKWI (ver firmware/diagram.json):
  * BMP180:  VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
@@ -66,9 +66,9 @@
 // ===== CREDENCIAIS (preencha antes de usar!) =====
 #define WIFI_SSID   "Wokwi-GUEST"
 #define WIFI_PASS   ""
-#define SERVER_URL  "https://SEU-APP.onrender.com/ingest"  // endpoint /ingest do server.js
-#define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY do servidor
-#define MEASUREMENT "telemetria_samarco"                   // (info) measurement gravado pelo servidor
+#define SERVER_URL  "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev/ingest"  // endpoint /ingest do Cloudflare Worker
+#define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY definida como secret no Worker
+#define MEASUREMENT "telemetria_samarco"                   // (info) rótulo interno das leituras
 #define PIEZOMETRO_ID "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
 
 // ===== CONVERSÃO PRESSÃO → NÍVEL D'ÁGUA (simulação) =====
@@ -79,7 +79,7 @@
 #define NIVEL_REF   10.0     // m  — nível no ponto de referência
 #define SIM_ESCALA  10.0     // hPa por metro (didático)
 
-// ===== LIMIARES DE NÍVEL (m) — espelhados em index.html e server.js =====
+// ===== LIMIARES DE NÍVEL (m) — espelhados em index.html e no Cloudflare Worker =====
 #define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
 #define NIVEL_CRITICO 15.0   // acima disso = CRÍTICO
 
@@ -97,7 +97,7 @@
 
 // ===== INTERVALOS (ms) =====
 #define INTERVALO_LEITURA 1000UL    // leitura local + LEDs + display
-#define INTERVALO_ENVIO   10000UL   // envio ao servidor (Render)
+#define INTERVALO_ENVIO   10000UL   // envio ao backend (Cloudflare Worker)
 
 // ===== STORE & FORWARD =====
 #define BUFFER_MAX 120              // ~20 min de leituras retidas sem rede
@@ -235,7 +235,7 @@ void conectarWiFi() {
 
 // ===== FUNÇÃO: SINCRONIZAR RELÓGIO (NTP) =====
 // Necessário para o store & forward: cada leitura retida no buffer precisa
-// do SEU timestamp, senão o InfluxDB carimbaria tudo com a hora do reenvio.
+// do SEU timestamp, senão o backend carimbaria tudo com a hora do reenvio.
 void sincronizarNTP() {
   if (!wifiOk) return;
   Serial.print("Sincronizando relógio (NTP)");
@@ -254,7 +254,7 @@ void bufferizarLeitura() {
   char item[128];
 
   if (ntpOk) {
-    // Timestamp em SEGUNDOS — o servidor converte para nanossegundos
+    // Timestamp em SEGUNDOS
     long ts = (long)time(nullptr);
     snprintf(item, sizeof(item),
              "{\"piezometro\":\"" PIEZOMETRO_ID "\",\"nivel_agua\":%.3f,\"pressao\":%.3f,\"temperatura\":%.2f,\"ts\":%ld}",
@@ -542,12 +542,13 @@ void testarBuzzer() {
  * 2. ATENÇÃO (amarelo):  1035 hPa → nível 12,2 m  (beep a cada 2 s)
  * 3. CRÍTICO (vermelho): 1065 hPa → nível 15,2 m  (LED pisca + beep rápido)
  *
- * O dashboard usa os MESMOS limiares (12 m / 15 m) e o servidor dispara
- * Telegram/SMS nas transições de nível — veja o README.
+ * O dashboard usa os MESMOS limiares (12 m / 15 m) e o motor de alertas do
+ * Cloudflare Worker dispara Telegram/SMS nas transições de nível — veja o
+ * README.
  *
  * TESTE DO STORE & FORWARD: pause a simulação por ~1 min (ou desligue o
  * WiFi) e observe no Serial o buffer acumulando; ao reconectar, todas as
- * leituras retidas são enviadas de uma vez (JSON) ao servidor, com seus
- * timestamps originais, que por sua vez grava tudo no InfluxDB.
+ * leituras retidas são enviadas de uma vez (JSON) ao Worker, com seus
+ * timestamps originais, que por sua vez grava tudo no D1.
  * ============================================================================
  */
