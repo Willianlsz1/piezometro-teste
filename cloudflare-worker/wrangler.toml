@@ -34,7 +34,7 @@ id = "c8b05f6bf47f48fd80754250c26c54db"
 [[d1_databases]]
 binding = "DB"
 database_name = "piezometro-db"
-database_id = "COLOQUE_O_ID_AQUI"  # de: wrangler d1 create piezometro-db
+database_id = "df474eab-c128-42c0-bbf3-9b5a9afa0e87"
 
 # ── VARIÁVEIS NÃO SENSÍVEIS ───────────────────────────────────────────────────
 # Mesmos nomes e defaults do server.js (ver readme.md, seção "Variáveis de

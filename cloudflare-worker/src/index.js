@@ -376,7 +376,7 @@ async function handleDados(url, env, cfg) {
 
   try {
     const { results } = await env.DB.prepare(
-      `SELECT (ts / ?1) * ?1 AS t,
+      `SELECT CAST(ts / ?1 AS INTEGER) * ?1 AS t,
               AVG(nivel_agua) AS nivel_agua,
               AVG(pressao) AS pressao,
               AVG(temperatura) AS temperatura
