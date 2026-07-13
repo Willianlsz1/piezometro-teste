@@ -13,7 +13,9 @@ const CFG = {
   thrCritico: 15.0,
   // P1 — janela de "sem sinal" (segundos) e P3 — limiar de taxa de variação (m/dia);
   // sobrescritos por loadConfig() quando /config responder com stale_seg/taxa_max_m_dia.
-  staleSeg: 60,
+  // Default espelha STALE_SEG do worker, mas mais tolerante (120s): o Wokwi roda mais
+  // devagar que o tempo real, então mesmo com base em recebido_em vale dar folga.
+  staleSeg: 120,
   taxaMaxMDia: 0.5,
   // P4 — histerese (m) na detecção de borda entre faixas, evita repicar o badge/alarme
   // bem em cima do limiar; sobrescrita por /config `histerese_m`.

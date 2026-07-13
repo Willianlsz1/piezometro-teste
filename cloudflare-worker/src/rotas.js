@@ -71,6 +71,7 @@ export async function handleUltimos(env, cfg) {
         pressao: row.pressao,
         temperatura: row.temperatura,
         ts: row.ts,
+        recebido_em: row.recebido_em, // hora de RECEBIMENTO pelo Worker — fonte de frescor/"sem sinal"
         taxa_m_dia: taxa,
       };
     }

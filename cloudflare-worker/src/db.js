@@ -26,22 +26,29 @@ export function normalizarLeitura(leitura) {
       ? leitura.piezometro
       : "PZ-01";
 
+  const agoraMs = Date.now();
   const tsBruto = leitura.ts;
-  const ts =
+  let ts =
     Number.isInteger(tsBruto) && tsBruto > 1e9 && tsBruto < 1e11
       ? tsBruto
-      : Math.floor(Date.now() / 1000);
+      : Math.floor(agoraMs / 1000);
 
-  return { piezometro, nivel_agua: nivel, pressao, temperatura, ts };
+  const agoraSeg = Math.floor(agoraMs / 1000);
+  // Relógio do device adiantado não pode projetar leitura no futuro.
+  if (ts > agoraSeg + 300) ts = agoraSeg;
+
+  const recebido_em = agoraSeg;
+
+  return { piezometro, nivel_agua: nivel, pressao, temperatura, ts, recebido_em };
 }
 
 // Grava um lote de leituras já normalizadas no D1 (INSERT em batch).
 export async function inserirLeituras(env, normalizadas) {
   const stmt = env.DB.prepare(
-    "INSERT INTO leituras (piezometro, nivel_agua, pressao, temperatura, ts) VALUES (?1, ?2, ?3, ?4, ?5)"
+    "INSERT INTO leituras (piezometro, nivel_agua, pressao, temperatura, ts, recebido_em) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
   );
   const batch = normalizadas.map((l) =>
-    stmt.bind(l.piezometro, l.nivel_agua, l.pressao, l.temperatura, l.ts)
+    stmt.bind(l.piezometro, l.nivel_agua, l.pressao, l.temperatura, l.ts, l.recebido_em)
   );
   await env.DB.batch(batch);
 }
@@ -84,7 +91,7 @@ export async function lerUltimosNiveis(env) {
 // consulta, em vez de duas variações quase iguais).
 export async function lerUltimasLeiturasTodas(env) {
   const { results } = await env.DB.prepare(
-    `SELECT l.piezometro, l.nivel_agua, l.pressao, l.temperatura, l.ts
+    `SELECT l.piezometro, l.nivel_agua, l.pressao, l.temperatura, l.ts, l.recebido_em
        FROM leituras l
        JOIN (
          SELECT piezometro, MAX(id) AS mid FROM leituras GROUP BY piezometro
@@ -98,6 +105,9 @@ export async function lerUltimasLeiturasTodas(env) {
       pressao: row.pressao,
       temperatura: row.temperatura,
       ts: Number(row.ts),
+      // Fallback para linhas antigas (gravadas antes da migração 0001), que
+      // ficam com recebido_em NULL.
+      recebido_em: Number(row.recebido_em) || Number(row.ts),
     };
   }
   return ultimas;

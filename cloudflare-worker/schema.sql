@@ -13,7 +13,10 @@ CREATE TABLE IF NOT EXISTS leituras (
   nivel_agua  REAL NOT NULL,                      -- nível d'água medido, em metros
   pressao     REAL,                               -- pressão atmosférica opcional, em hPa
   temperatura REAL,                                -- temperatura opcional, em °C
-  ts          INTEGER NOT NULL                    -- instante da leitura, epoch em SEGUNDOS
+  ts          INTEGER NOT NULL,                   -- instante da leitura (medição), epoch em SEGUNDOS
+  recebido_em INTEGER                              -- instante em que o Worker recebeu a leitura, epoch em
+                                                    -- SEGUNDOS (nullable) — fonte de frescor, imune à deriva
+                                                    -- do relógio do device
 );
 
 -- Acelera tanto o "SELECT última leitura de cada piezômetro" (MAX(id) por

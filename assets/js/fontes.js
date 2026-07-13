@@ -48,7 +48,9 @@ const FonteApi = {
   simulada: false,
 
   // Último valor de CADA piezômetro — GET /ultimos
-  // Resposta: { "PZ-01": {nivel_agua,pressao,temperatura,ts,taxa_m_dia}, ... } (ts em segundos)
+  // Resposta: { "PZ-01": {nivel_agua,pressao,temperatura,ts,recebido_em,taxa_m_dia}, ... }
+  // (ts e recebido_em em segundos; recebido_em pode vir ausente/null em dados antigos —
+  // ts é a hora da MEDIÇÃO no device, recebido_em é a hora em que o Worker RECEBEU a leitura)
   async ultimos() {
     const json = await apiGet("/ultimos");
     const ids = Object.keys(json || {});
@@ -58,7 +60,8 @@ const FonteApi = {
       const row = json[id] || {};
       result[id] = {
         nivel: row.nivel_agua, pressao: row.pressao, temperatura: row.temperatura,
-        ts: row.ts, taxa_m_dia: Number.isFinite(row.taxa_m_dia) ? row.taxa_m_dia : null,
+        ts: row.ts, recebidoEm: Number.isFinite(row.recebido_em) ? row.recebido_em : row.ts,
+        taxa_m_dia: Number.isFinite(row.taxa_m_dia) ? row.taxa_m_dia : null,
       };
     });
     return result;
@@ -111,7 +114,8 @@ const FonteSimulada = {
       const taxa = parseFloat(((deltaPoll / (CFG.poll / 1000)) * 86400).toFixed(3));
       todos[pz] = {
         nivel: s.n, pressao: s.p, temperatura: s.t,
-        ts: Math.floor(Date.now() / 1000), taxa_m_dia: taxa,
+        ts: Math.floor(Date.now() / 1000), recebidoEm: Math.floor(Date.now() / 1000),
+        taxa_m_dia: taxa,
       };
     });
     return todos;

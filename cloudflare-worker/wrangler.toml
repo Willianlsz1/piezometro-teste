@@ -66,8 +66,10 @@ TAXA_MAX_M_DIA     = "0.5"
 
 # Janela (segundos) que o DASHBOARD usa para marcar um piezômetro como "sem
 # sinal" na UI — servida via GET /config para não duplicar esse número no
-# index.html (mesmo espírito de NIVEL_ATENCAO/NIVEL_CRITICO).
-STALE_SEG          = "60"
+# index.html (mesmo espírito de NIVEL_ATENCAO/NIVEL_CRITICO). Default mais
+# tolerante (120s) porque no Wokwi a simulação roda mais devagar que o tempo
+# real: um envio a cada 10s simulados pode levar 20-30s reais para acontecer.
+STALE_SEG          = "120"
 
 # Histerese (deadband) da classificação de nível, em metros: evita alarme
 # "chattering" quando o nível oscila bem em cima do limiar de ATENÇÃO ou

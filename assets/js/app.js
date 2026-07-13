@@ -94,7 +94,7 @@ async function loadHistoryAndStats() {
 }
 
 // ── APLICA DADOS DO PIEZÔMETRO SELECIONADO ───────────────────────────────────
-function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts }) {
+function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts, recebidoEm }) {
   const safe = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
   nivel       = safe(nivel, 10);      // 1013 hPa no Wokwi ↔ 10 m simulados
   pressao     = safe(pressao, 1013);
@@ -142,7 +142,7 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts }) {
   // P3+P4 — alarme de variação rápida, edge-triggered (só na transição parado→rápido),
   // só com comunicação ok (dado stale não confirma tendência real)
   const taxaRapidaAgora = Number.isFinite(taxa_m_dia) && Math.abs(taxa_m_dia) > CFG.taxaMaxMDia;
-  if (estadoComunicacao({ ts }) === "ok") {
+  if (estadoComunicacao({ ts, recebidoEm }) === "ok") {
     if (taxaRapidaAgora && !lastTaxaRapidaState) addTaxaRow(taxa_m_dia);
     lastTaxaRapidaState = taxaRapidaAgora;
   }
@@ -150,7 +150,7 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts }) {
   // P1 — dado stale nunca é avaliado como normal: alarme de nível fica suspenso,
   // o painel mostra o estado neutro "SEM SINAL" e a leitura VELHA não é
   // re-registrada na tabela como se fosse nova (seria enganoso).
-  if (estadoComunicacao({ ts }) === "stale") {
+  if (estadoComunicacao({ ts, recebidoEm }) === "stale") {
     setAlertSemSinal(ts);
   } else {
     pushReading(nivel); // tabela de últimas leituras — só com dado fresco
