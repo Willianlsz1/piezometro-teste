@@ -269,6 +269,9 @@ async function poll() {
   const exportBtn = document.getElementById("btn-export");
   if (exportBtn) exportBtn.addEventListener("click", exportCSV);
 
+  const exportXlsBtn = document.getElementById("btn-export-xls");
+  if (exportXlsBtn) exportXlsBtn.addEventListener("click", exportXLS);
+
   atualizarVisaoGeral(pzLatest);
   atualizarMapa(pzLatest);
 
