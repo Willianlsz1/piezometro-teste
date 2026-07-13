@@ -123,15 +123,21 @@ export async function handleDados(url, env, cfg) {
     // média de 12,1 m no gráfico). nivel_max preserva o PICO, que é o que
     // importa em monitoramento de segurança — ver
     // docs/DASHBOARD_PROFISSIONAL.md §5.
+    // nivel_min e n_leituras (nº de amostras agregadas no bucket) alimentam a
+    // coluna de qualidade do CSV exportado pelo dashboard (ver exportar.js).
     const pontos = linhas.map((row) => ({
       ts: row.t,
       nivel_agua: row.nivel_agua,
       nivel_max: row.nivel_max,
+      nivel_min: row.nivel_min,
+      n_leituras: row.n_leituras,
       pressao: row.pressao,
       temperatura: row.temperatura,
     }));
 
-    return json(cfg, 200, { pz: pzParam, range: rangeParam, pontos });
+    // bucket_seg: tamanho do intervalo de agregação (segundos), usado pelo
+    // dashboard nos metadados de auditoria do CSV exportado.
+    return json(cfg, 200, { pz: pzParam, range: rangeParam, bucket_seg: range.bucket, pontos });
   } catch (e) {
     console.error("/dados:", e.message);
     return json(cfg, 502, { error: e.message });

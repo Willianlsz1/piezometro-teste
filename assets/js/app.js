@@ -10,6 +10,7 @@ function resetPzState() {
   charts.t = { labels: [], data: [], times: [] };
   statsWin.n = []; statsWin.p = []; statsWin.t = []; statsWin.nMax = [];
   histPontos.n = [];
+  histPontos.bucketSeg = undefined;
   readingsHistory = [];
   lastLevel = null;
   lastTaxaRapidaState = false;
@@ -53,14 +54,14 @@ async function loadHistoryAndStats() {
   // terminarmos, histReqId avança e nós descartamos nosso resultado silenciosamente (ver
   // checagens após cada await abaixo) em vez de sobrescrever a seleção atual com dados velhos.
   const meuId = ++histReqId;
-  let pontos, viaFallbackLocal = false;
+  let pontos, bucketSeg, viaFallbackLocal = false;
   try {
-    pontos = await fonte.historico(pzSelecionado, periodoSelecionado);
+    ({ pontos, bucket_seg: bucketSeg } = await fonte.historico(pzSelecionado, periodoSelecionado));
   } catch (e) {
     if (meuId !== histReqId) return; // seleção mudou enquanto a 1ª chamada estava em voo
     // Fallback só para ESTE carregamento (não mexe na fonte global nem no banner —
     // isso é responsabilidade exclusiva de trocarFonte(), acionada pelo poll).
-    pontos = await FonteSimulada.historico(pzSelecionado, periodoSelecionado);
+    ({ pontos, bucket_seg: bucketSeg } = await FonteSimulada.historico(pzSelecionado, periodoSelecionado));
     viaFallbackLocal = true;
   }
   if (meuId !== histReqId) return; // seleção mudou enquanto o histórico estava em voo
@@ -78,7 +79,17 @@ async function loadHistoryAndStats() {
     statsWin.nMax    = charts.n.maxData.slice();
     // Série completa do período, com timestamps — não é truncada pelas 60 posições dos
     // gráficos, ao contrário de charts.n (ver comentário de histPontos em estado.js).
-    histPontos.n     = hn.map(h => ({ label: h.label, value: h.value, maxValue: Number.isFinite(h.max) ? h.max : h.value, time: h.time }));
+    // minValue/nLeituras (P5/auditoria) ficam `undefined` quando o Worker não trouxe
+    // nivel_min/n_leituras (dados antigos) — exportar.js trata isso sem quebrar.
+    histPontos.n     = hn.map(h => ({
+      label: h.label, value: h.value,
+      maxValue: Number.isFinite(h.max) ? h.max : h.value,
+      minValue: h.min, nLeituras: h.n,
+      time: h.time,
+    }));
+    // bucket_seg do período carregado (segundos) — guardado para os metadados do CSV
+    // exportado (exportar.js); ausente ("ao vivo") quando a fonte não o informou.
+    histPontos.bucketSeg = bucketSeg;
     updateStats("n", statsWin.n);
     aplicarMaxNivelPico(); // P5 — MÁX 24H usa o pico do intervalo, não a média
     readingsHistory = hn.slice(-12).reverse().map(h => {
