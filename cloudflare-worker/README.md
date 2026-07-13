@@ -92,10 +92,21 @@ Edite o bloco `[vars]` em `wrangler.toml` conforme o seu ambiente:
   ainda dentro da faixa NORMAL. A referência profissional (ASDSO) é 0,1
   m/dia; o default aqui é maior de propósito, por se tratar de um protótipo
   didático com sensor stand-in mais ruidoso.
-- `STALE_SEG` (default `"60"`) → não é usado pelo motor de alertas em si;
+- `STALE_SEG` (default `"120"`) → não é usado pelo motor de alertas em si;
   é só servido em `GET /config` para o **dashboard** decidir quando marcar um
   piezômetro como "sem sinal" na interface, evitando duplicar esse número
-  no `index.html`.
+  no `index.html`. Default mais tolerante que os antigos 60s porque no
+  Wokwi a simulação roda mais devagar que o tempo real (um envio a cada
+  10s simulados pode demorar 20-30s reais). O frescor é calculado com base
+  em `recebido_em` (hora em que o Worker recebeu a leitura), não em `ts`
+  (hora da medição no device) — isso evita falso "sem sinal" causado pela
+  deriva do relógio simulado do ESP32 no Wokwi. Bancos D1 criados antes
+  desta mudança precisam da migração `migrations/0001_recebido_em.sql`
+  (`wrangler d1 execute piezometro-db --remote --file=migrations/0001_recebido_em.sql`),
+  que adiciona a coluna `recebido_em` (linhas antigas ficam `NULL` e os
+  consumidores fazem fallback para `ts`). Aplique a migração **antes** do
+  `wrangler deploy` desta versão — o Worker novo referencia a coluna e a
+  ingestão falharia num banco ainda sem ela.
 - `HISTERESE_M` (default `"0.2"`, 20 cm) → folga (deadband) exigida para
   **descer** de faixa na classificação de nível (CRÍTICO→ATENÇÃO/NORMAL ou
   ATENÇÃO→NORMAL): o nível precisa cair `HISTERESE_M` metros abaixo do

@@ -59,6 +59,10 @@
 // ===== INTERVALOS (ms) =====
 #define INTERVALO_LEITURA 1000UL    // leitura local + LEDs + display
 #define INTERVALO_ENVIO   10000UL   // envio ao backend (Cloudflare Worker)
+#define INTERVALO_NTP     300000UL  // 5 min — re-sincroniza o relógio periodicamente:
+                                     // no Wokwi o clock simulado deriva (fica atrasado)
+                                     // em relação ao tempo real, e a deriva acumulada
+                                     // envelheceria o ts das leituras.
 
 // ===== STORE & FORWARD =====
 #define BUFFER_MAX 120              // ~20 min de leituras retidas sem rede
@@ -98,6 +102,7 @@ int corAtual = 0; // 0=Verde, 1=Amarelo, 2=Vermelho
 unsigned long ultimoBuzzer  = 0;
 unsigned long ultimaLeitura = 0;
 unsigned long ultimoEnvio   = 0;
+unsigned long ultimoNtp     = 0;
 bool estadoBuzzer = false;
 bool wifiOk = false;
 bool ntpOk = false;
@@ -455,6 +460,7 @@ void coreSetup() {
   mostrarTelaInicio();
   conectarWiFi();
   sincronizarNTP();
+  ultimoNtp = millis(); // evita re-sincronizar de novo já no primeiro loop
 
   Serial.println();
   Serial.println("Sistema pronto!");
@@ -485,6 +491,12 @@ void coreLoop() {
     ultimoEnvio = agora;
     bufferizarLeitura();
     despacharBuffer();
+  }
+
+  // Ciclo de relógio: re-sincroniza o NTP a cada 5 min (corrige a deriva do Wokwi)
+  if (wifiOk && agora - ultimoNtp >= INTERVALO_NTP) {
+    ultimoNtp = agora;
+    sincronizarNTP();
   }
 
   // Buzzer roda a cada passagem para não perder o timing dos beeps
