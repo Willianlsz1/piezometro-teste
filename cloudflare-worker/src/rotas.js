@@ -8,7 +8,17 @@ import { normalizarLeitura, inserirLeituras, lerUltimasLeiturasTodas, lerLeitura
 import { calcularTaxaMDia, lerEstado } from "./alertas.js";
 
 export async function handleIngest(request, env, cfg) {
-  if (cfg.DEVICE_KEY && request.headers.get("x-device-key") !== cfg.DEVICE_KEY) {
+  // Autenticação de sistema de segurança falha FECHADA: sem DEVICE_KEY
+  // configurada (wrangler secret put) não há como validar quem está
+  // enviando, então nenhuma leitura entra — o alternativo (pular a
+  // checagem) deixaria qualquer um injetar leituras falsas anônimas no
+  // histórico de monitoramento de segurança da barragem.
+  if (!cfg.DEVICE_KEY) {
+    return json(cfg, 503, {
+      error: "DEVICE_KEY não configurada no Worker (wrangler secret put DEVICE_KEY) — ingestão bloqueada",
+    });
+  }
+  if (request.headers.get("x-device-key") !== cfg.DEVICE_KEY) {
     return json(cfg, 401, { error: "Chave de dispositivo inválida" });
   }
 
@@ -32,10 +42,16 @@ export async function handleIngest(request, env, cfg) {
   }
 
   const normalizadas = [];
-  for (const leitura of leituras) {
-    const norm = normalizarLeitura(leitura);
+  for (let i = 0; i < leituras.length; i++) {
+    // Passa a posição no lote (i, total) para permitir reconstruir o ts
+    // aproximado quando o device não envia ts (NTP falhou) — ver comentário
+    // em normalizarLeitura, em db.js.
+    const norm = normalizarLeitura(leituras[i], i, leituras.length);
     if (!norm) {
-      return json(cfg, 400, { error: "Campo 'nivel_agua' é obrigatório e deve ser um número finito" });
+      return json(cfg, 400, {
+        error:
+          "Leitura inválida: 'nivel_agua' deve ser número finito e 'piezometro', quando presente, deve ter formato PZ-NN",
+      });
     }
     normalizadas.push(norm);
   }

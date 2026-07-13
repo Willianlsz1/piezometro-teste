@@ -23,3 +23,8 @@ CREATE TABLE IF NOT EXISTS leituras (
 -- piezometro) quanto as agregações por janela de tempo (WHERE piezometro = ?
 -- AND ts >= ?), que são os dois padrões de consulta usados pelo Worker.
 CREATE INDEX IF NOT EXISTS idx_leituras_pz_ts ON leituras (piezometro, ts);
+
+-- Reenvio idempotente do buffer store & forward do firmware (ex.: HTTP 204
+-- de confirmação perdido) não deve duplicar a linha — o INSERT OR IGNORE em
+-- db.js depende deste índice único para descartar a repetição.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_leituras_pz_ts_unico ON leituras (piezometro, ts);

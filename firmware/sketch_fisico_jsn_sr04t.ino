@@ -174,9 +174,13 @@ Leitura lerSensor() {
   float distancia = medirDistanciaMedianaCm();
 
   if (distancia < 0) {
-    // Sem leitura válida nesta rodada: mantém o ÚLTIMO nível conhecido
-    // (não zera! um alarme falso de "nível zero" seria pior que atrasar).
-    Serial.println("⚠️ Leitura ultrassônica inválida (sem eco confiável) — mantendo último nível");
+    // Sem leitura válida nesta rodada: mantém o ÚLTIMO nível conhecido para
+    // display/serial (não zera! um alarme falso de "nível zero" seria pior
+    // que atrasar) mas marca valida=false — essa leitura NÃO é enviada ao
+    // backend como medição nova, senão a falha do sensor entraria
+    // disfarçada de dado bom no histórico.
+    Serial.println("⚠️ Sem eco válido — leitura não enviada");
+    leituraAtual.valida = false;
     return leituraAtual;
   }
 
@@ -192,6 +196,7 @@ Leitura lerSensor() {
   l.temperatura = 0;
   l.temPressao = false;
   l.temTemperatura = false;
+  l.valida = true;
   return l;
 }
 
