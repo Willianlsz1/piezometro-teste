@@ -1,0 +1,48 @@
+# ── Deploy automático do Cloudflare Worker ────────────────────────────────────
+# Publica o Worker (e aplica a migração do D1) a cada push na main que toque a
+# pasta cloudflare-worker/ — pensado para quem trabalha só pelo navegador, sem
+# terminal. Também pode ser disparado à mão na aba Actions ("Run workflow").
+#
+# Pré-requisito (uma vez só): criar o secret CLOUDFLARE_API_TOKEN no GitHub
+# (Settings → Secrets and variables → Actions) com um token da Cloudflare
+# criado a partir do template "Edit Cloudflare Workers" + permissão
+# Account → D1 → Edit. O ACCOUNT_ID abaixo não é segredo (aparece na URL do
+# painel da Cloudflare).
+
+name: Deploy Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cloudflare-worker/**"
+      - ".github/workflows/deploy-worker.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 8bd6e3dd5c9087ee858f1b615d01ff98
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # A migração roda ANTES do deploy (o Worker novo referencia a coluna
+      # recebido_em). O "|| echo" torna o passo idempotente: se a coluna já
+      # existe, o ALTER falha com "duplicate column name" e seguimos em frente.
+      - name: Migração D1 (idempotente)
+        run: >
+          npx wrangler@4 d1 execute piezometro-db --remote
+          --command "ALTER TABLE leituras ADD COLUMN recebido_em INTEGER;"
+          || echo "Coluna recebido_em já existe — ok"
+
+      - name: Publicar Worker
+        run: npx wrangler@4 deploy
