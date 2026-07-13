@@ -318,6 +318,56 @@ deste repositório, não apenas o hardware em si.
   desafio" de "mercado do produto" evita a armadilha de propor vender para quem não é o comprador
   real.
 
+### 4.3 Cenário hipotético: como o sistema reduz os R$ 600 mil/ano
+
+Mesmo sem acesso à memória de cálculo da Samarco, é possível construir um cenário hipotético
+coerente que CHEGA nos R$ 600 mil/ano e mostrar, item a item, onde o sistema corta o gasto —
+é assim que o número do edital se justifica no projeto sem fingir auditoria.
+
+**De onde saem os R$ 600 mil (decomposição plausível — PREMISSAS EDITÁVEIS):**
+
+```
+R$ 600.000/ano ÷ 12 = R$ 50.000/mês de contrato terceirizado dedicado
+```
+
+R$ 50 mil/mês cobre, de forma realista: 2–3 técnicos de campo + veículo/combustível + EPIs +
+encargos + supervisão de engenheiro + relatórios. Com ~100 piezômetros (ordem de grandeza
+plausível para um complexo de barragens de grande porte) lidos 2×/semana, são ~10.400
+leituras/ano → **≈ R$ 58 por leitura individual**, valor compatível com o custo por campanha
+usado na seção 1 (uma campanha visita vários instrumentos e dilui o custo da equipe).
+
+**O que o gasto atual compra vs. o que o sistema muda:**
+
+| Item do gasto atual | Com o sistema | Motivo |
+|---|---|---|
+| Leituras de rotina (2×/semana — o grosso do contrato) | Eliminadas | Leitura automática a cada 10 s, dado chega sozinho |
+| Deslocamentos extras por suspeita de anomalia | Eliminados | Alerta Telegram/SMS em ~1 min já identifica instrumento e valor |
+| Digitação prancheta → planilha → relatório | Eliminada | Histórico nasce digital (D1), exportação CSV pronta |
+| Inspeção física periódica dos instrumentos | Permanece, reduzida | Norma e boa prática exigem visitar o instrumento — vira ~1 visita/mês de manutenção, não 8 de leitura |
+
+**A conta da redução (100 pontos, premissas das seções 1.1–1.3):**
+
+```
+Implantação (ano 1, uma vez): 100 × R$ 826–1.979 (kit campo + instalação) ≈ R$ 83–198 mil
+Operação recorrente:          100 × R$ 76–200/ano                        ≈ R$ 8–20 mil/ano
+Inspeção remanescente:        12 campanhas/ano × R$ 3.500 (PREMISSA)      = R$ 42 mil/ano
+
+Custo recorrente novo:   R$ 50–62 mil/ano   (antes: R$ 600 mil/ano)
+Redução recorrente:      ≈ R$ 540–550 mil/ano → corte de ~90%
+Ano 1 (com implantação): R$ 133–260 mil → economia de R$ 340–467 mil já no 1º ano
+Payback da implantação:  ≈ 2 a 4 meses
+```
+
+Três reduções que não aparecem em reais, mas pesam na defesa: **risco** (com leitura 2×/semana,
+uma anomalia pode evoluir 3–4 dias sem ser vista; com o sistema, 1 minuto), **segurança do
+trabalho** (menos pessoas circulando em área de risco da barragem) e **rastreabilidade**
+(histórico contínuo auditável, em vez de pranchetas).
+
+**Honestidade obrigatória ao apresentar:** o sistema reduz ~90% do gasto, não 100% — a inspeção
+física continua existindo (nenhuma norma aceita instrumento que ninguém visita), e numa operação
+real do porte da Samarco o sensor seria de corda vibrante certificada, integrada à mesma
+plataforma pelo contrato de adapter do firmware.
+
 ---
 
 ## 5. Frases prontas para a banca
