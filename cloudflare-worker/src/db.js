@@ -156,12 +156,16 @@ export async function lerLeituraBaseline(env, piezometro, tsAlvo) {
 
 // GET /dados — série histórica agregada em buckets para um piezômetro dentro
 // de uma janela de tempo. P5 — nivel_max preserva o PICO do bucket (ver
-// handleDados em rotas.js para o porquê).
+// handleDados em rotas.js para o porquê). nivel_min e n_leituras alimentam a
+// auditoria do CSV exportado (mín. do intervalo e nº de amostras que formaram
+// a agregação — ver exportar.js).
 export async function lerDadosAgregados(env, pz, range, desde) {
   const { results } = await env.DB.prepare(
     `SELECT CAST(ts / ?1 AS INTEGER) * ?1 AS t,
             AVG(nivel_agua) AS nivel_agua,
             MAX(nivel_agua) AS nivel_max,
+            MIN(nivel_agua) AS nivel_min,
+            COUNT(*) AS n_leituras,
             AVG(pressao) AS pressao,
             AVG(temperatura) AS temperatura
        FROM leituras

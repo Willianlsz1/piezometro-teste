@@ -56,8 +56,12 @@ const statsWin = { n: [], p: [], t: [], nMax: [] };
 // Série completa do histórico de nível carregado do período selecionado (sem o truncamento a
 // 60 pontos que os gráficos aplicam) — usada só pela exportação de CSV, para que o arquivo
 // cubra o período inteiro que o nome promete (ex.: "_30d.csv"), não apenas a janela visível
-// no gráfico. Substituída inteira a cada loadHistoryAndStats(); itens: { label, value, maxValue, time }.
-let histPontos = { n: [] };
+// no gráfico. Substituída inteira a cada loadHistoryAndStats(); itens:
+// { label, value, maxValue, minValue, nLeituras, time } — minValue/nLeituras podem vir
+// `undefined` (dados antigos/sem agregação); exportar.js trata isso sem quebrar.
+// bucketSeg: tamanho (segundos) do intervalo de agregação do período carregado, usado só
+// nos metadados de auditoria do CSV exportado — `undefined` quando a fonte não o informou.
+let histPontos = { n: [], bucketSeg: undefined };
 const STATS_MAX = 8640;
 function pushStats(key, val) {
   statsWin[key].push(val);
