@@ -8,6 +8,13 @@
 let pzSelecionado = "PZ-01";
 let periodoSelecionado = "24h";
 
+// Token de requisição do histórico: incrementado a cada chamada de loadHistoryAndStats().
+// A própria chamada guarda o valor lido ANTES do primeiro await; se, ao retomar depois de
+// qualquer await, o valor global já tiver mudado (o operador trocou de pz/período e disparou
+// uma chamada mais nova), a chamada antiga descarta seu resultado em silêncio — evita que uma
+// resposta atrasada da seleção ANTERIOR sobrescreva gráficos/stats da seleção atual.
+let histReqId = 0;
+
 let lastLevel = null, failCount = 0, simActive = false;
 // P4 — ISA-18.2: alarme (exige ação) e evento (informativo) em listas separadas,
 // derivadas de um único ponto de entrada (pushHistorico) que classifica pelo campo `lv`.
@@ -45,6 +52,12 @@ const stats = {
 // `nMax` (P5) — janela paralela do pico do intervalo, usada só pelo stat "MÁX 24H" do
 // nível (nunca substitui statsWin.n, que segue sendo a série de médias/leituras).
 const statsWin = { n: [], p: [], t: [], nMax: [] };
+
+// Série completa do histórico de nível carregado do período selecionado (sem o truncamento a
+// 60 pontos que os gráficos aplicam) — usada só pela exportação de CSV, para que o arquivo
+// cubra o período inteiro que o nome promete (ex.: "_30d.csv"), não apenas a janela visível
+// no gráfico. Substituída inteira a cada loadHistoryAndStats(); itens: { label, value, maxValue, time }.
+let histPontos = { n: [] };
 const STATS_MAX = 8640;
 function pushStats(key, val) {
   statsWin[key].push(val);

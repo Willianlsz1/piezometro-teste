@@ -35,14 +35,21 @@ jobs:
         with:
           node-version: 20
 
-      # A migração roda ANTES do deploy (o Worker novo referencia a coluna
-      # recebido_em). O "|| echo" torna o passo idempotente: se a coluna já
-      # existe, o ALTER falha com "duplicate column name" e seguimos em frente.
-      - name: Migração D1 (idempotente)
+      # As migrações rodam ANTES do deploy (o Worker novo referencia coluna/
+      # índice novos). O "|| echo" torna cada passo idempotente: 0001 falha com
+      # "duplicate column name" se a coluna já existe; 0002 usa DELETE de
+      # duplicatas (inócuo quando não há) + CREATE INDEX IF NOT EXISTS.
+      - name: Migração D1 0001 (recebido_em, idempotente)
         run: >
           npx wrangler@4 d1 execute piezometro-db --remote
           --command "ALTER TABLE leituras ADD COLUMN recebido_em INTEGER;"
           || echo "Coluna recebido_em já existe — ok"
+
+      - name: Migração D1 0002 (dedupe + índice único, idempotente)
+        run: >
+          npx wrangler@4 d1 execute piezometro-db --remote
+          --file=migrations/0002_dedupe_ts_unico.sql
+          || echo "Migração 0002 já aplicada — ok"
 
       - name: Publicar Worker
         run: npx wrangler@4 deploy

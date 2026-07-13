@@ -79,6 +79,9 @@ struct Leitura {
   float temperatura;  // °C — só se temTemperatura
   bool  temPressao;
   bool  temTemperatura;
+  bool  valida;        // false = sensor sem resposta neste ciclo — NÃO
+                        // bufferizar como medição nova, senão a falha do
+                        // sensor entra no histórico disfarçada de dado bom
 };
 
 // ===== DECLARAÇÕES DOS HOOKS DE SENSOR (implementados no .ino) =====
@@ -94,7 +97,7 @@ void linhasExtrasSerial();
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // ===== ESTADO DA ÚLTIMA LEITURA (preenchido pelo adapter via lerSensor) =====
-Leitura leituraAtual = {0, 0, 0, false, false};
+Leitura leituraAtual = {0, 0, 0, false, false, false};
 
 String nivelAlerta = "NORMAL";
 int corAtual = 0; // 0=Verde, 1=Amarelo, 2=Vermelho
@@ -106,6 +109,9 @@ unsigned long ultimoNtp     = 0;
 bool estadoBuzzer = false;
 bool wifiOk = false;
 bool ntpOk = false;
+// Instrumento de SEGURANÇA: falha de um componente secundário (display) não
+// pode derrubar a medição — degrada (segue sem OLED), nunca trava o setup.
+bool displayOk = false;
 
 String bufferDados[BUFFER_MAX];
 int bufferCount = 0;
@@ -186,6 +192,11 @@ void bufferizarLeitura() {
 
 // ===== FUNÇÃO: DESPACHAR BUFFER AO SERVIDOR =====
 void despacharBuffer() {
+  // Atualiza wifiOk aqui (e não só no boot em conectarWiFi()) — é o valor que
+  // o OLED/Serial exibem e que o re-sync NTP do coreLoop consulta; sem isso
+  // eles ficavam presos ao estado do momento da conexão inicial.
+  wifiOk = (WiFi.status() == WL_CONNECTED);
+
   if (bufferCount == 0) return;
 
   if (WiFi.status() != WL_CONNECTED) {
@@ -328,7 +339,13 @@ void mostrarSerial() {
 }
 
 // ===== FUNÇÃO: MOSTRAR NO DISPLAY OLED =====
+// Componente SECUNDÁRIO: se o OLED falhou no boot (displayOk == false), a
+// função simplesmente não faz nada — a medição, os alertas (LED/buzzer) e a
+// telemetria seguem intactos. Cobre também linhasExtrasDisplay(), chamada
+// logo abaixo.
 void mostrarDisplay() {
+  if (!displayOk) return;
+
   display.clearDisplay();
 
   display.setTextSize(1);
@@ -362,7 +379,11 @@ void mostrarDisplay() {
 }
 
 // ===== FUNÇÃO: TELA DE INICIALIZAÇÃO =====
+// Mesma lógica de degradação de mostrarDisplay(): sem OLED, não há tela de
+// boot, mas o resto do setup continua normalmente.
 void mostrarTelaInicio() {
+  if (!displayOk) return;
+
   display.clearDisplay();
   display.setTextSize(2);
   display.setCursor(10, 5);
@@ -444,18 +465,18 @@ void coreSetup() {
   Wire.begin(21, 22); // barramento I2C do OLED (compartilhado com o BMP180, quando houver)
 
   Serial.print("Inicializando OLED... ");
-  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+  // Instrumento de SEGURANÇA: o display é um componente SECUNDÁRIO — sua
+  // falha não pode travar o setup e derrubar leitura/alertas/telemetria.
+  // Antes entrava em while(1) piscando o LED amarelo; agora só registra o
+  // problema e segue em modo degradado (sem display).
+  displayOk = display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+  if (!displayOk) {
     Serial.println("ERRO!");
-    Serial.println("Display não encontrado!");
-    while (1) {
-      digitalWrite(LED_AMARELO, HIGH);
-      delay(200);
-      digitalWrite(LED_AMARELO, LOW);
-      delay(200);
-    }
+    Serial.println("OLED ausente — seguindo em modo degradado (sem display)");
+  } else {
+    Serial.println("OK!");
+    display.setTextColor(SSD1306_WHITE);
   }
-  Serial.println("OK!");
-  display.setTextColor(SSD1306_WHITE);
 
   mostrarTelaInicio();
   conectarWiFi();
@@ -486,10 +507,12 @@ void coreLoop() {
     mostrarDisplay();
   }
 
-  // Ciclo de telemetria: bufferiza e tenta despachar (a cada 10 s)
+  // Ciclo de telemetria: bufferiza (só leitura válida) e tenta despachar sempre
+  // (a cada 10 s) — despacharBuffer() roda mesmo sem leitura nova, para
+  // esvaziar pendências já retidas.
   if (agora - ultimoEnvio >= INTERVALO_ENVIO) {
     ultimoEnvio = agora;
-    bufferizarLeitura();
+    if (leituraAtual.valida) bufferizarLeitura();
     despacharBuffer();
   }
 

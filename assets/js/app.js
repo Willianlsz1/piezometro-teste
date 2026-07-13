@@ -9,6 +9,7 @@ function resetPzState() {
   charts.n = { labels: [], data: [], times: [], maxData: [] };
   charts.t = { labels: [], data: [], times: [] };
   statsWin.n = []; statsWin.p = []; statsWin.t = []; statsWin.nMax = [];
+  histPontos.n = [];
   readingsHistory = [];
   lastLevel = null;
   lastTaxaRapidaState = false;
@@ -48,15 +49,21 @@ function selectPeriodo(p) {
 // semeia stats, tabela de leituras e redesenha os gráficos.
 // Consome só `fonte.historico()` — não sabe (nem precisa saber) se é real ou simulada.
 async function loadHistoryAndStats() {
+  // P — token desta chamada: se pzSelecionado/periodoSelecionado mudar de novo antes de
+  // terminarmos, histReqId avança e nós descartamos nosso resultado silenciosamente (ver
+  // checagens após cada await abaixo) em vez de sobrescrever a seleção atual com dados velhos.
+  const meuId = ++histReqId;
   let pontos, viaFallbackLocal = false;
   try {
     pontos = await fonte.historico(pzSelecionado, periodoSelecionado);
   } catch (e) {
+    if (meuId !== histReqId) return; // seleção mudou enquanto a 1ª chamada estava em voo
     // Fallback só para ESTE carregamento (não mexe na fonte global nem no banner —
     // isso é responsabilidade exclusiva de trocarFonte(), acionada pelo poll).
     pontos = await FonteSimulada.historico(pzSelecionado, periodoSelecionado);
     viaFallbackLocal = true;
   }
+  if (meuId !== histReqId) return; // seleção mudou enquanto o histórico estava em voo
 
   const hn = pontosParaCampo(pontos, "nivel_agua");
   const ht = pontosParaCampo(pontos, "temperatura");
@@ -69,6 +76,9 @@ async function loadHistoryAndStats() {
     charts.n.maxData = hn.map(h => Number.isFinite(h.max) ? h.max : h.value);
     statsWin.n       = hn.map(h => h.value);
     statsWin.nMax    = charts.n.maxData.slice();
+    // Série completa do período, com timestamps — não é truncada pelas 60 posições dos
+    // gráficos, ao contrário de charts.n (ver comentário de histPontos em estado.js).
+    histPontos.n     = hn.map(h => ({ label: h.label, value: h.value, maxValue: Number.isFinite(h.max) ? h.max : h.value, time: h.time }));
     updateStats("n", statsWin.n);
     aplicarMaxNivelPico(); // P5 — MÁX 24H usa o pico do intervalo, não a média
     readingsHistory = hn.slice(-12).reverse().map(h => {
@@ -261,4 +271,11 @@ async function poll() {
 
   await poll();
   setInterval(poll, CFG.poll);
+
+  // Navegadores estrangulam (ou pausam) o setInterval de poll() em abas em background —
+  // ao voltar, o operador poderia olhar por até um ciclo inteiro (CFG.poll) para um dado
+  // que já está velho sem perceber. Ao readquirir visibilidade, força um poll() imediato.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") poll();
+  });
 })();
