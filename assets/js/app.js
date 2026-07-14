@@ -9,6 +9,8 @@ function resetPzState() {
   charts.n = { labels: [], data: [], times: [], maxData: [] };
   charts.t = { labels: [], data: [], times: [] };
   statsWin.n = []; statsWin.p = []; statsWin.t = []; statsWin.nMax = [];
+  histPontos.n = [];
+  histPontos.bucketSeg = undefined;
   readingsHistory = [];
   lastLevel = null;
   lastTaxaRapidaState = false;
@@ -48,15 +50,21 @@ function selectPeriodo(p) {
 // semeia stats, tabela de leituras e redesenha os gráficos.
 // Consome só `fonte.historico()` — não sabe (nem precisa saber) se é real ou simulada.
 async function loadHistoryAndStats() {
-  let pontos, viaFallbackLocal = false;
+  // P — token desta chamada: se pzSelecionado/periodoSelecionado mudar de novo antes de
+  // terminarmos, histReqId avança e nós descartamos nosso resultado silenciosamente (ver
+  // checagens após cada await abaixo) em vez de sobrescrever a seleção atual com dados velhos.
+  const meuId = ++histReqId;
+  let pontos, bucketSeg, viaFallbackLocal = false;
   try {
-    pontos = await fonte.historico(pzSelecionado, periodoSelecionado);
+    ({ pontos, bucket_seg: bucketSeg } = await fonte.historico(pzSelecionado, periodoSelecionado));
   } catch (e) {
+    if (meuId !== histReqId) return; // seleção mudou enquanto a 1ª chamada estava em voo
     // Fallback só para ESTE carregamento (não mexe na fonte global nem no banner —
     // isso é responsabilidade exclusiva de trocarFonte(), acionada pelo poll).
-    pontos = await FonteSimulada.historico(pzSelecionado, periodoSelecionado);
+    ({ pontos, bucket_seg: bucketSeg } = await FonteSimulada.historico(pzSelecionado, periodoSelecionado));
     viaFallbackLocal = true;
   }
+  if (meuId !== histReqId) return; // seleção mudou enquanto o histórico estava em voo
 
   const hn = pontosParaCampo(pontos, "nivel_agua");
   const ht = pontosParaCampo(pontos, "temperatura");
@@ -69,6 +77,19 @@ async function loadHistoryAndStats() {
     charts.n.maxData = hn.map(h => Number.isFinite(h.max) ? h.max : h.value);
     statsWin.n       = hn.map(h => h.value);
     statsWin.nMax    = charts.n.maxData.slice();
+    // Série completa do período, com timestamps — não é truncada pelas 60 posições dos
+    // gráficos, ao contrário de charts.n (ver comentário de histPontos em estado.js).
+    // minValue/nLeituras (P5/auditoria) ficam `undefined` quando o Worker não trouxe
+    // nivel_min/n_leituras (dados antigos) — exportar.js trata isso sem quebrar.
+    histPontos.n     = hn.map(h => ({
+      label: h.label, value: h.value,
+      maxValue: Number.isFinite(h.max) ? h.max : h.value,
+      minValue: h.min, nLeituras: h.n,
+      time: h.time,
+    }));
+    // bucket_seg do período carregado (segundos) — guardado para os metadados do CSV
+    // exportado (exportar.js); ausente ("ao vivo") quando a fonte não o informou.
+    histPontos.bucketSeg = bucketSeg;
     updateStats("n", statsWin.n);
     aplicarMaxNivelPico(); // P5 — MÁX 24H usa o pico do intervalo, não a média
     readingsHistory = hn.slice(-12).reverse().map(h => {
@@ -94,7 +115,7 @@ async function loadHistoryAndStats() {
 }
 
 // ── APLICA DADOS DO PIEZÔMETRO SELECIONADO ───────────────────────────────────
-function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts }) {
+function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts, recebidoEm }) {
   const safe = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
   nivel       = safe(nivel, 10);      // 1013 hPa no Wokwi ↔ 10 m simulados
   pressao     = safe(pressao, 1013);
@@ -142,7 +163,7 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts }) {
   // P3+P4 — alarme de variação rápida, edge-triggered (só na transição parado→rápido),
   // só com comunicação ok (dado stale não confirma tendência real)
   const taxaRapidaAgora = Number.isFinite(taxa_m_dia) && Math.abs(taxa_m_dia) > CFG.taxaMaxMDia;
-  if (estadoComunicacao({ ts }) === "ok") {
+  if (estadoComunicacao({ ts, recebidoEm }) === "ok") {
     if (taxaRapidaAgora && !lastTaxaRapidaState) addTaxaRow(taxa_m_dia);
     lastTaxaRapidaState = taxaRapidaAgora;
   }
@@ -150,7 +171,7 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts }) {
   // P1 — dado stale nunca é avaliado como normal: alarme de nível fica suspenso,
   // o painel mostra o estado neutro "SEM SINAL" e a leitura VELHA não é
   // re-registrada na tabela como se fosse nova (seria enganoso).
-  if (estadoComunicacao({ ts }) === "stale") {
+  if (estadoComunicacao({ ts, recebidoEm }) === "stale") {
     setAlertSemSinal(ts);
   } else {
     pushReading(nivel); // tabela de últimas leituras — só com dado fresco
@@ -248,6 +269,9 @@ async function poll() {
   const exportBtn = document.getElementById("btn-export");
   if (exportBtn) exportBtn.addEventListener("click", exportCSV);
 
+  const exportXlsBtn = document.getElementById("btn-export-xls");
+  if (exportXlsBtn) exportXlsBtn.addEventListener("click", exportXLS);
+
   atualizarVisaoGeral(pzLatest);
   atualizarMapa(pzLatest);
 
@@ -261,4 +285,11 @@ async function poll() {
 
   await poll();
   setInterval(poll, CFG.poll);
+
+  // Navegadores estrangulam (ou pausam) o setInterval de poll() em abas em background —
+  // ao voltar, o operador poderia olhar por até um ciclo inteiro (CFG.poll) para um dado
+  // que já está velho sem perceber. Ao readquirir visibilidade, força um poll() imediato.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") poll();
+  });
 })();

@@ -65,8 +65,21 @@
 // vêm do core — este sketch só implementa o adapter do sensor BMP180.
 #include "piezometro_core.h"
 
+// ===== MODO DE CAMPO A BATERIA/SOLAR (opcional) =====
+// Padrão aqui continua sendo sempre-ligado (bom para o Wokwi/demonstração).
+// Para o modo deep sleep (Opção C de docs/ALIMENTACAO_ENERGIA.md), ver o
+// bloco equivalente e mais detalhado em sketch_fisico_jsn_sr04t.ino e o
+// cabeçalho de piezometro_deep_sleep.h.
+
 // ===== OBJETO DO SENSOR =====
 Adafruit_BMP085 bmp;
+
+// Instrumento de SEGURANÇA: o BMP180 aqui é só o stand-in de simulação, mas
+// o padrão vale igual para o sensor real — falha dele não pode travar o
+// sketch. sensorOk indica se o begin() funcionou; se não, lerSensor()
+// degrada (devolve a última leitura conhecida, marcada valida=false) em vez
+// de entrar em while(1).
+bool sensorOk = false;
 
 // ===== HOOK: INICIALIZAR SENSOR =====
 void initSensor() {
@@ -76,22 +89,24 @@ void initSensor() {
   Wire.begin(21, 22);
 
   Serial.print("Inicializando BMP180... ");
-  if (!bmp.begin()) {
+  sensorOk = bmp.begin();
+  if (!sensorOk) {
     Serial.println("ERRO!");
-    Serial.println("Sensor não encontrado!");
-    pinMode(LED_VERMELHO, OUTPUT);
-    while (1) {
-      digitalWrite(LED_VERMELHO, HIGH);
-      delay(200);
-      digitalWrite(LED_VERMELHO, LOW);
-      delay(200);
-    }
+    Serial.println("BMP180 ausente — seguindo em modo degradado (sem sensor)");
+  } else {
+    Serial.println("OK!");
   }
-  Serial.println("OK!");
 }
 
 // ===== HOOK: LER SENSOR =====
 Leitura lerSensor() {
+  if (!sensorOk) {
+    // Sensor indisponível: mantém a última leitura conhecida, mas marca
+    // valida=false para NÃO entrar no histórico como medição nova.
+    leituraAtual.valida = false;
+    return leituraAtual;
+  }
+
   Leitura l;
   l.temperatura = bmp.readTemperature();
   l.pressao = bmp.readPressure() / 100.0;
@@ -100,6 +115,7 @@ Leitura lerSensor() {
   if (l.nivel < 0) l.nivel = 0;
   l.temPressao = true;
   l.temTemperatura = true;
+  l.valida = true;
   return l;
 }
 

@@ -66,6 +66,43 @@ e Twilio são opcionais — se não for usar SMS, por exemplo, não defina
 `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN` (o worker detecta e desativa o canal
 automaticamente, igual ao `server.js`).
 
+### Chave por dispositivo (`DEVICE_KEYS`, opcional)
+
+Além da `DEVICE_KEY` única (uma chave compartilhada por toda a frota), o
+Worker aceita uma chave **por piezômetro**, revogável individualmente sem
+afetar os demais devices — útil se um ESP32 de campo for perdido/comprometido:
+trocar só a chave dele no JSON, sem precisar reconfigurar toda a frota.
+
+```bash
+wrangler secret put DEVICE_KEYS
+```
+
+O valor é um JSON `{"piezometro": "chave"}`, um por instrumento cadastrado:
+
+```json
+{"PZ-01": "chave-do-pz01", "PZ-02": "chave-do-pz02"}
+```
+
+Regras de autenticação do `POST /ingest` (fail-closed, igual ao modo antigo):
+
+- Se `DEVICE_KEYS` estiver definida (e for um JSON válido), ela tem
+  prioridade sobre `DEVICE_KEY`: a chave do header `x-device-key` precisa
+  bater com a entrada do piezômetro de **cada** leitura do lote enviado —
+  um device só pode enviar leituras do(s) piezômetro(s) cuja chave ele
+  apresentou. Um lote com leitura de outro piezômetro (chave vazada usada
+  para outro pz, ou firmware mal configurado) é rejeitado inteiro com 401.
+- Se `DEVICE_KEYS` não estiver definida (ou o secret tiver JSON inválido —
+  logado como erro e tratado como ausente), o Worker cai no comportamento
+  atual: `DEVICE_KEY` única para todos os devices.
+- Se nenhuma das duas existir, a resposta é 503 (mesma mensagem de antes) —
+  ingestão bloqueada até algum segredo de autenticação ser definido.
+
+**Migração gradual**: dá para manter `DEVICE_KEY` única enquanto só existir
+1-2 devices e criar `DEVICE_KEYS` só quando a frota crescer (ou quando quiser
+revogação por instrumento) — as duas formas nunca precisam coexistir de
+propósito, mas nada impede manter `DEVICE_KEY` definida como fallback
+"morto" (ela é ignorada assim que `DEVICE_KEYS` existir).
+
 ## 5. Ajustar as variáveis não sensíveis
 
 Edite o bloco `[vars]` em `wrangler.toml` conforme o seu ambiente:
@@ -92,10 +129,21 @@ Edite o bloco `[vars]` em `wrangler.toml` conforme o seu ambiente:
   ainda dentro da faixa NORMAL. A referência profissional (ASDSO) é 0,1
   m/dia; o default aqui é maior de propósito, por se tratar de um protótipo
   didático com sensor stand-in mais ruidoso.
-- `STALE_SEG` (default `"60"`) → não é usado pelo motor de alertas em si;
+- `STALE_SEG` (default `"120"`) → não é usado pelo motor de alertas em si;
   é só servido em `GET /config` para o **dashboard** decidir quando marcar um
   piezômetro como "sem sinal" na interface, evitando duplicar esse número
-  no `index.html`.
+  no `index.html`. Default mais tolerante que os antigos 60s porque no
+  Wokwi a simulação roda mais devagar que o tempo real (um envio a cada
+  10s simulados pode demorar 20-30s reais). O frescor é calculado com base
+  em `recebido_em` (hora em que o Worker recebeu a leitura), não em `ts`
+  (hora da medição no device) — isso evita falso "sem sinal" causado pela
+  deriva do relógio simulado do ESP32 no Wokwi. Bancos D1 criados antes
+  desta mudança precisam da migração `migrations/0001_recebido_em.sql`
+  (`wrangler d1 execute piezometro-db --remote --file=migrations/0001_recebido_em.sql`),
+  que adiciona a coluna `recebido_em` (linhas antigas ficam `NULL` e os
+  consumidores fazem fallback para `ts`). Aplique a migração **antes** do
+  `wrangler deploy` desta versão — o Worker novo referencia a coluna e a
+  ingestão falharia num banco ainda sem ela.
 - `HISTERESE_M` (default `"0.2"`, 20 cm) → folga (deadband) exigida para
   **descer** de faixa na classificação de nível (CRÍTICO→ATENÇÃO/NORMAL ou
   ATENÇÃO→NORMAL): o nível precisa cair `HISTERESE_M` metros abaixo do
@@ -188,9 +236,27 @@ mexer no cron.
 
 Diferente do InfluxDB (que costuma ter política de retenção configurável e
 frequentemente limitada nos planos gratuitos), o D1 não expira dados
-automaticamente: as leituras ficam guardadas indefinidamente até você
-apagá-las, dentro do limite de armazenamento do free tier (5 GB — bastante
-espaço para anos de leituras de piezômetro, que são registros pequenos). Se
-o volume crescer muito, considere um job periódico de limpeza (`DELETE FROM
-leituras WHERE ts < ?`) para leituras muito antigas, mas isso não é
-necessário no dia a dia.
+automaticamente — mas deixar a tabela `leituras` crescer para sempre não é
+de graça (limite de 5 GB no free tier, consultas mais lentas com o tempo).
+O Worker resolve isso com **retenção com consolidação**: histórico
+"infinito" em tamanho de banco enxuto.
+
+Uma vez por dia (dentro do cron de 1 min já existente, controlado pelo campo
+`ultimaRetencao` no mesmo estado do KV usado pelos alertas — ver
+`src/retencao.js` e `scheduled()` em `src/index.js`), o Worker:
+
+1. Agrupa as leituras BRUTAS mais antigas que `RETENCAO_DIAS` dias
+   (`[vars]` em `wrangler.toml`, default `"180"`) por piezômetro e dia
+   (UTC), calculando média/mín/máx do nível d'água e o nº de leituras — e
+   grava 1 linha por piezômetro/dia na tabela `leituras_diario`
+   (`INSERT OR REPLACE`, então rodar de novo no mesmo dia é seguro/idempotente).
+2. Apaga da tabela `leituras` as linhas brutas já consolidadas
+   (`DELETE ... WHERE ts < corte`).
+
+Para mudar o prazo, edite `RETENCAO_DIAS` em `wrangler.toml` (o default de
+180 dias é 6x o maior range servido pelo dashboard, 30d — folga generosa
+antes de qualquer leitura bruta usada nos gráficos sumir). A tabela
+`leituras_diario` (schema em `schema.sql` / `migrations/0003_retencao_diaria.sql`)
+já fica disponível para análises de longo prazo (tendência plurianual do
+nível d'água, por exemplo), mas **nenhum endpoint a consome ainda** — é uma
+evolução natural do projeto, não um requisito atual.

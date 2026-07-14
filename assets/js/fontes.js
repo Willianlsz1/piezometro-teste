@@ -22,7 +22,12 @@ async function apiGet(path) {
 function pontosParaCampo(pontos, field) {
   // P5 — quando o campo é o nível d'água, propaga também o pico do intervalo (nivel_max),
   // devolvido pelo Worker em /dados junto da média — o pico nunca pode ficar escondido.
+  // nivel_min e n_leituras (nº de amostras do bucket) só existem para nivel_agua e alimentam
+  // a auditoria do CSV exportado (ver exportar.js) — ausentes viram `undefined` (fallback de
+  // dados antigos/ao vivo), sem quebrar quem consome.
   const maxField = field === "nivel_agua" ? "nivel_max" : null;
+  const minField = field === "nivel_agua" ? "nivel_min" : null;
+  const nField = field === "nivel_agua" ? "n_leituras" : null;
   return (pontos || [])
     .filter(p => p[field] !== null && p[field] !== undefined && Number.isFinite(p[field]))
     .map(p => {
@@ -33,6 +38,8 @@ function pontosParaCampo(pontos, field) {
         time: ms,
       };
       if (maxField && Number.isFinite(p[maxField])) out.max = parseFloat(Number(p[maxField]).toFixed(3));
+      if (minField && Number.isFinite(p[minField])) out.min = parseFloat(Number(p[minField]).toFixed(3));
+      if (nField && Number.isFinite(p[nField])) out.n = p[nField];
       return out;
     });
 }
@@ -48,7 +55,9 @@ const FonteApi = {
   simulada: false,
 
   // Último valor de CADA piezômetro — GET /ultimos
-  // Resposta: { "PZ-01": {nivel_agua,pressao,temperatura,ts,taxa_m_dia}, ... } (ts em segundos)
+  // Resposta: { "PZ-01": {nivel_agua,pressao,temperatura,ts,recebido_em,taxa_m_dia}, ... }
+  // (ts e recebido_em em segundos; recebido_em pode vir ausente/null em dados antigos —
+  // ts é a hora da MEDIÇÃO no device, recebido_em é a hora em que o Worker RECEBEU a leitura)
   async ultimos() {
     const json = await apiGet("/ultimos");
     const ids = Object.keys(json || {});
@@ -58,17 +67,22 @@ const FonteApi = {
       const row = json[id] || {};
       result[id] = {
         nivel: row.nivel_agua, pressao: row.pressao, temperatura: row.temperatura,
-        ts: row.ts, taxa_m_dia: Number.isFinite(row.taxa_m_dia) ? row.taxa_m_dia : null,
+        ts: row.ts, recebidoEm: Number.isFinite(row.recebido_em) ? row.recebido_em : row.ts,
+        taxa_m_dia: Number.isFinite(row.taxa_m_dia) ? row.taxa_m_dia : null,
       };
     });
     return result;
   },
 
   // Histórico bruto (todos os campos) de um piezômetro/período — GET /dados?pz=&range=
-  // Resposta: { pz, range, pontos: [{ts,nivel_agua,pressao,temperatura}, ...] } (ts em segundos, ordem cronológica)
+  // Resposta do Worker: { pz, range, bucket_seg, pontos: [{ts,nivel_agua,nivel_min,nivel_max,
+  // n_leituras,pressao,temperatura}, ...] } (ts em segundos, ordem cronológica).
+  // Interface devolvida ao chamador (mesma forma em FonteSimulada.historico, abaixo):
+  // { pontos, bucket_seg } — bucket_seg é o tamanho (segundos) do intervalo de agregação,
+  // usado só pelos metadados de auditoria do CSV exportado (ver exportar.js).
   async historico(pz, range) {
     const json = await apiGet(`/dados?pz=${encodeURIComponent(pz)}&range=${encodeURIComponent(range)}`);
-    return json.pontos || [];
+    return { pontos: json.pontos || [], bucket_seg: json.bucket_seg };
   },
 };
 
@@ -111,7 +125,8 @@ const FonteSimulada = {
       const taxa = parseFloat(((deltaPoll / (CFG.poll / 1000)) * 86400).toFixed(3));
       todos[pz] = {
         nivel: s.n, pressao: s.p, temperatura: s.t,
-        ts: Math.floor(Date.now() / 1000), taxa_m_dia: taxa,
+        ts: Math.floor(Date.now() / 1000), recebidoEm: Math.floor(Date.now() / 1000),
+        taxa_m_dia: taxa,
       };
     });
     return todos;
@@ -119,6 +134,9 @@ const FonteSimulada = {
 
   // Gera uma série histórica simulada coerente com a base do piezômetro/período pedidos
   // (mesma tabela `base` usada por ultimos() — ver comentário acima).
+  // Mesma interface de FonteApi.historico: { pontos, bucket_seg }. bucket_seg aqui é só o
+  // stepMs/1000 da tabela de fallback abaixo — espelha (não consulta) o RANGES do Worker
+  // (cloudflare-worker/src/config.js), já que a simulação não fala com o D1.
   async historico(pz, range) {
     const baseLevel = (this.base[pz] && this.base[pz].n) || 10;
     const fb = {
@@ -131,16 +149,23 @@ const FonteSimulada = {
     for (let i = fb.count; i >= 0; i--) {
       const time = now - i * fb.stepMs;
       const nivelAgua = parseFloat((baseLevel + (Math.random() - 0.5) * 1.6).toFixed(3));
+      // P5 — pico/mín simulados do intervalo (máx ≥ média ≥ mín), para exercitar as mesmas
+      // colunas de auditoria que a API real preenche via MAX/MIN/COUNT do D1.
+      const nivelMax = parseFloat((nivelAgua + Math.random() * 0.3).toFixed(3));
+      const nivelMin = parseFloat((nivelAgua - Math.random() * 0.3).toFixed(3));
       pontos.push({
         ts: Math.floor(time / 1000),
         nivel_agua: nivelAgua,
-        // P5 — pico simulado do intervalo, sempre ≥ à média, para exercitar a série de máximo
-        nivel_max: parseFloat((nivelAgua + Math.random() * 0.3).toFixed(3)),
+        nivel_max: nivelMax,
+        nivel_min: nivelMin,
+        // nº de leituras plausível dentro de um bucket de stepMs, num device que envia a
+        // cada ~10s (INTERVALO_ENVIO do firmware) — só para preencher a coluna de auditoria.
+        n_leituras: Math.max(1, Math.round(fb.stepMs / 10000)),
         pressao: null,
         temperatura: parseFloat((22 + Math.random() * 8).toFixed(1)),
       });
     }
-    return pontos;
+    return { pontos, bucket_seg: fb.stepMs / 1000 };
   },
 };
 

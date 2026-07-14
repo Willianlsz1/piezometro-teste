@@ -8,6 +8,13 @@
 let pzSelecionado = "PZ-01";
 let periodoSelecionado = "24h";
 
+// Token de requisição do histórico: incrementado a cada chamada de loadHistoryAndStats().
+// A própria chamada guarda o valor lido ANTES do primeiro await; se, ao retomar depois de
+// qualquer await, o valor global já tiver mudado (o operador trocou de pz/período e disparou
+// uma chamada mais nova), a chamada antiga descarta seu resultado em silêncio — evita que uma
+// resposta atrasada da seleção ANTERIOR sobrescreva gráficos/stats da seleção atual.
+let histReqId = 0;
+
 let lastLevel = null, failCount = 0, simActive = false;
 // P4 — ISA-18.2: alarme (exige ação) e evento (informativo) em listas separadas,
 // derivadas de um único ponto de entrada (pushHistorico) que classifica pelo campo `lv`.
@@ -16,7 +23,7 @@ let eventos = [];
 const HIST_MAX = 50;
 let lastTaxaRapidaState = false; // edge-trigger do alarme de variação rápida (P3+P4)
 let readingsHistory = []; // últimas leituras do piezômetro selecionado (mais recente primeiro)
-let pzLatest = {};         // último valor conhecido de cada piezômetro: { "PZ-01": {nivel,pressao,temperatura,ts,taxa_m_dia}, ... }
+let pzLatest = {};         // último valor conhecido de cada piezômetro: { "PZ-01": {nivel,pressao,temperatura,ts,recebidoEm,taxa_m_dia}, ... }
 let pzComm = {};           // último estado de comunicação conhecido por pz ("ok"|"stale") — dedupe de eventos (P1)
 let leafletMap = null;
 const pzMarkers = {};      // marcadores do mapa por id de piezômetro
@@ -45,6 +52,16 @@ const stats = {
 // `nMax` (P5) — janela paralela do pico do intervalo, usada só pelo stat "MÁX 24H" do
 // nível (nunca substitui statsWin.n, que segue sendo a série de médias/leituras).
 const statsWin = { n: [], p: [], t: [], nMax: [] };
+
+// Série completa do histórico de nível carregado do período selecionado (sem o truncamento a
+// 60 pontos que os gráficos aplicam) — usada só pela exportação de CSV, para que o arquivo
+// cubra o período inteiro que o nome promete (ex.: "_30d.csv"), não apenas a janela visível
+// no gráfico. Substituída inteira a cada loadHistoryAndStats(); itens:
+// { label, value, maxValue, minValue, nLeituras, time } — minValue/nLeituras podem vir
+// `undefined` (dados antigos/sem agregação); exportar.js trata isso sem quebrar.
+// bucketSeg: tamanho (segundos) do intervalo de agregação do período carregado, usado só
+// nos metadados de auditoria do CSV exportado — `undefined` quando a fonte não o informou.
+let histPontos = { n: [], bucketSeg: undefined };
 const STATS_MAX = 8640;
 function pushStats(key, val) {
   statsWin[key].push(val);

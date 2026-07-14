@@ -106,6 +106,17 @@
 // vêm do core — este sketch só implementa o adapter do sensor JSN-SR04T.
 #include "piezometro_core.h"
 
+// ===== MODO DE CAMPO A BATERIA/SOLAR (opcional — ver piezometro_deep_sleep.h) =====
+// O padrão deste sketch é o modo sempre-ligado acima (bom para a maquete: LEDs,
+// buzzer e OLED ao vivo). Para uma instalação de campo a bateria/solar (Opção C
+// de docs/ALIMENTACAO_ENERGIA.md), ative o deep sleep ANTES do #include acima:
+//   #define MODO_DEEP_SLEEP
+//   #include "piezometro_core.h"
+//   #include "piezometro_deep_sleep.h"
+// e troque o setup()/loop() no fim deste arquivo por:
+//   void setup() { initSensor(); deepSleepCiclo(); }  // nunca retorna
+//   void loop()  { }                                   // nunca alcançado
+
 // ===== VARIÁVEIS ESPECÍFICAS DO ADAPTER (só para display/serial) =====
 float distanciaCm = 0;   // última distância medida pelo sensor (sensor → água)
 float nivelCm = 0;       // nível real de água dentro do tubo/balde (cm)
@@ -174,9 +185,13 @@ Leitura lerSensor() {
   float distancia = medirDistanciaMedianaCm();
 
   if (distancia < 0) {
-    // Sem leitura válida nesta rodada: mantém o ÚLTIMO nível conhecido
-    // (não zera! um alarme falso de "nível zero" seria pior que atrasar).
-    Serial.println("⚠️ Leitura ultrassônica inválida (sem eco confiável) — mantendo último nível");
+    // Sem leitura válida nesta rodada: mantém o ÚLTIMO nível conhecido para
+    // display/serial (não zera! um alarme falso de "nível zero" seria pior
+    // que atrasar) mas marca valida=false — essa leitura NÃO é enviada ao
+    // backend como medição nova, senão a falha do sensor entraria
+    // disfarçada de dado bom no histórico.
+    Serial.println("⚠️ Sem eco válido — leitura não enviada");
+    leituraAtual.valida = false;
     return leituraAtual;
   }
 
@@ -192,6 +207,7 @@ Leitura lerSensor() {
   l.temperatura = 0;
   l.temPressao = false;
   l.temTemperatura = false;
+  l.valida = true;
   return l;
 }
 

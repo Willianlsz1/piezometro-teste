@@ -8,7 +8,32 @@ import { normalizarLeitura, inserirLeituras, lerUltimasLeiturasTodas, lerLeitura
 import { calcularTaxaMDia, lerEstado } from "./alertas.js";
 
 export async function handleIngest(request, env, cfg) {
-  if (cfg.DEVICE_KEY && request.headers.get("x-device-key") !== cfg.DEVICE_KEY) {
+  // Autenticação de sistema de segurança falha FECHADA: sem NENHUMA das duas
+  // formas de chave configurada (DEVICE_KEYS por dispositivo OU DEVICE_KEY
+  // única, via wrangler secret put) não há como validar quem está enviando,
+  // então nenhuma leitura entra — o alternativo (pular a checagem) deixaria
+  // qualquer um injetar leituras falsas anônimas no histórico de
+  // monitoramento de segurança da barragem.
+  //
+  // Modo por dispositivo (DEVICE_KEYS): cada piezômetro de campo tem sua
+  // própria chave, então vazar a chave de UM device não compromete a frota
+  // inteira — revogar é só trocar aquela entrada no JSON do secret e fazer
+  // `wrangler secret put DEVICE_KEYS` de novo, sem afetar os demais.
+  const modoPorDispositivo = cfg.DEVICE_KEYS && typeof cfg.DEVICE_KEYS === "object";
+  if (!modoPorDispositivo && !cfg.DEVICE_KEY) {
+    return json(cfg, 503, {
+      error: "DEVICE_KEY não configurada no Worker (wrangler secret put DEVICE_KEY) — ingestão bloqueada",
+    });
+  }
+
+  // Auth GLOBAL, fail-closed: a chave recebida precisa bater com ALGUMA
+  // chave válida conhecida (alguma entrada de DEVICE_KEYS, ou a DEVICE_KEY
+  // única). A checagem fina de qual pz cada chave autoriza só é possível
+  // depois do parse/normalização do corpo (o pz normalizado vem de lá) —
+  // ver mais abaixo, após o loop de normalizarLeitura.
+  const chaveRecebida = request.headers.get("x-device-key");
+  const chavesValidas = modoPorDispositivo ? Object.values(cfg.DEVICE_KEYS) : [cfg.DEVICE_KEY];
+  if (!chaveRecebida || !chavesValidas.includes(chaveRecebida)) {
     return json(cfg, 401, { error: "Chave de dispositivo inválida" });
   }
 
@@ -32,12 +57,33 @@ export async function handleIngest(request, env, cfg) {
   }
 
   const normalizadas = [];
-  for (const leitura of leituras) {
-    const norm = normalizarLeitura(leitura);
+  for (let i = 0; i < leituras.length; i++) {
+    // Passa a posição no lote (i, total) para permitir reconstruir o ts
+    // aproximado quando o device não envia ts (NTP falhou) — ver comentário
+    // em normalizarLeitura, em db.js.
+    const norm = normalizarLeitura(leituras[i], i, leituras.length);
     if (!norm) {
-      return json(cfg, 400, { error: "Campo 'nivel_agua' é obrigatório e deve ser um número finito" });
+      return json(cfg, 400, {
+        error:
+          "Leitura inválida: 'nivel_agua' deve ser número finito e 'piezometro', quando presente, deve ter formato PZ-NN",
+      });
     }
     normalizadas.push(norm);
+  }
+
+  // Checagem POR PIEZÔMETRO (modo DEVICE_KEYS): um device só pode enviar
+  // leituras do(s) piezômetro(s) cuja chave bate com a que ele apresentou —
+  // um lote com pz de outro device (chave roubada ou config errada no
+  // firmware) é rejeitado inteiro, mesmo que a chave seja válida para OUTRO
+  // piezômetro da frota.
+  if (modoPorDispositivo) {
+    for (const norm of normalizadas) {
+      if (cfg.DEVICE_KEYS[norm.piezometro] !== chaveRecebida) {
+        return json(cfg, 401, {
+          error: `Chave de dispositivo não autoriza leituras de '${norm.piezometro}'`,
+        });
+      }
+    }
   }
 
   try {
@@ -71,6 +117,7 @@ export async function handleUltimos(env, cfg) {
         pressao: row.pressao,
         temperatura: row.temperatura,
         ts: row.ts,
+        recebido_em: row.recebido_em, // hora de RECEBIMENTO pelo Worker — fonte de frescor/"sem sinal"
         taxa_m_dia: taxa,
       };
     }
@@ -106,15 +153,21 @@ export async function handleDados(url, env, cfg) {
     // média de 12,1 m no gráfico). nivel_max preserva o PICO, que é o que
     // importa em monitoramento de segurança — ver
     // docs/projeto/DASHBOARD_PROFISSIONAL.md §5.
+    // nivel_min e n_leituras (nº de amostras agregadas no bucket) alimentam a
+    // coluna de qualidade do CSV exportado pelo dashboard (ver exportar.js).
     const pontos = linhas.map((row) => ({
       ts: row.t,
       nivel_agua: row.nivel_agua,
       nivel_max: row.nivel_max,
+      nivel_min: row.nivel_min,
+      n_leituras: row.n_leituras,
       pressao: row.pressao,
       temperatura: row.temperatura,
     }));
 
-    return json(cfg, 200, { pz: pzParam, range: rangeParam, pontos });
+    // bucket_seg: tamanho do intervalo de agregação (segundos), usado pelo
+    // dashboard nos metadados de auditoria do CSV exportado.
+    return json(cfg, 200, { pz: pzParam, range: rangeParam, bucket_seg: range.bucket, pontos });
   } catch (e) {
     console.error("/dados:", e.message);
     return json(cfg, 502, { error: e.message });

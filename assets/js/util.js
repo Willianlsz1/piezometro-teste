@@ -41,9 +41,15 @@ function classifyComHisterese(nivel, faixaAnterior) {
 // ── ESTADO DE COMUNICAÇÃO (P1) ───────────────────────────────────────────────
 // Helper puro: decide se a leitura de um piezômetro está "ok" ou "stale" (sem sinal).
 // Dado ausente NUNCA é avaliado como normal — ver docs/projeto/DASHBOARD_PROFISSIONAL.md §2.
+// Frescor = última RECEPÇÃO no servidor (leitura.recebidoEm), não a hora da medição no
+// device (leitura.ts) — imune à deriva do relógio simulado do Wokwi. `ts` segue sendo
+// usado só para exibição ("há X min") e gráficos; aqui é só fallback quando recebidoEm
+// não vier (dado antigo/fonte simulada sem o campo).
 function estadoComunicacao(leitura) {
-  if (!leitura || !Number.isFinite(leitura.ts)) return "stale";
-  const idadeSeg = Date.now() / 1000 - leitura.ts;
+  if (!leitura) return "stale";
+  const base = Number.isFinite(leitura.recebidoEm) ? leitura.recebidoEm : leitura.ts;
+  if (!Number.isFinite(base)) return "stale";
+  const idadeSeg = Date.now() / 1000 - base;
   return idadeSeg > CFG.staleSeg ? "stale" : "ok";
 }
 

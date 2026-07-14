@@ -66,14 +66,24 @@ TAXA_MAX_M_DIA     = "0.5"
 
 # Janela (segundos) que o DASHBOARD usa para marcar um piezômetro como "sem
 # sinal" na UI — servida via GET /config para não duplicar esse número no
-# index.html (mesmo espírito de NIVEL_ATENCAO/NIVEL_CRITICO).
-STALE_SEG          = "60"
+# index.html (mesmo espírito de NIVEL_ATENCAO/NIVEL_CRITICO). Default mais
+# tolerante (120s) porque no Wokwi a simulação roda mais devagar que o tempo
+# real: um envio a cada 10s simulados pode levar 20-30s reais para acontecer.
+STALE_SEG          = "120"
 
 # Histerese (deadband) da classificação de nível, em metros: evita alarme
 # "chattering" quando o nível oscila bem em cima do limiar de ATENÇÃO ou
 # CRÍTICO (ISA-18.2). Só se aplica na DESCIDA de faixa — a subida continua
 # usando o limiar puro, sem atraso. Ver docs/projeto/DASHBOARD_PROFISSIONAL.md §5.
 HISTERESE_M        = "0.2"
+
+# Retenção de dados brutos, em dias: leituras mais antigas que isso são
+# consolidadas em 1 linha/dia/piezômetro na tabela `leituras_diario` e
+# depois apagadas de `leituras` (ver src/retencao.js, rodado 1x/dia pelo
+# cron). Default 180 dias = folga de 6x sobre o maior range servido pelo
+# dashboard (30d) — histórico "infinito" com o banco enxuto, sem perder
+# a tendência de longo prazo (a consolidação guarda média/mín/máx do dia).
+RETENCAO_DIAS      = "180"
 
 # Catálogo de instrumentos exibido no dashboard (mapa/seletor de piezômetro):
 # id, nome amigável e coordenadas de cada piezômetro cadastrado. Servido em
@@ -82,6 +92,10 @@ PIEZOMETROS = '[{"id":"PZ-01","nome":"Dique Norte","lat":-20.1975,"lng":-43.4653
 
 # ── SEGREDOS (definir com `wrangler secret put <NOME>`) ──────────────────────
 # DEVICE_KEY           → chave compartilhada da placa ESP32 (header x-device-key)
+# DEVICE_KEYS          → (opcional) chave POR piezômetro, JSON
+#                        {"PZ-01":"chave-do-pz01","PZ-02":"..."} — revogação
+#                        individual sem afetar a frota; se definida, tem
+#                        prioridade sobre DEVICE_KEY (ver README, seção Segredos)
 # TELEGRAM_BOT_TOKEN   → token do bot do Telegram (@BotFather)
 # TELEGRAM_CHAT_ID     → chat/grupo que recebe os alertas
 # TWILIO_ACCOUNT_SID   → SID da conta Twilio (SMS, opcional)

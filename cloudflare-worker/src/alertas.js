@@ -66,6 +66,7 @@ function estadoVazio() {
     commStatus: {}, // P2 — pz → "OK" | "SEM_SINAL"
     taxaStatus: {}, // P3 — pz → "OK" | "TAXA_ALTA"
     alertLog: [],
+    ultimaRetencao: "", // data (YYYY-MM-DD, UTC) da última execução da retenção — ver index.js scheduled()
   };
 }
 
@@ -80,6 +81,7 @@ export async function lerEstado(env) {
       commStatus: parsed.commStatus || {},
       taxaStatus: parsed.taxaStatus || {},
       alertLog: Array.isArray(parsed.alertLog) ? parsed.alertLog : [],
+      ultimaRetencao: parsed.ultimaRetencao || "",
     };
   } catch {
     return estadoVazio();
@@ -147,7 +149,11 @@ export async function checkAlerts(cfg, env, estado) {
     // É deliberadamente separada da camada de nível acima.
     const ultimas = await lerUltimasLeiturasTodas(env);
     for (const [pz, leitura] of Object.entries(ultimas)) {
-      const silencioSeg = agoraSeg - leitura.ts;
+      // O silêncio é medido pela última RECEPÇÃO (recebido_em), não pelo
+      // relógio do device (ts) — a deriva do relógio simulado no Wokwi
+      // causava falso SEM_SINAL quando medida por ts. lerUltimasLeiturasTodas
+      // já garante o fallback para ts em linhas antigas sem recebido_em.
+      const silencioSeg = agoraSeg - leitura.recebido_em;
       const statusComm = silencioSeg > cfg.SILENCE_ALERT_SEC ? "SEM_SINAL" : "OK";
       const statusCommAnterior = estado.commStatus[pz] || "OK";
 

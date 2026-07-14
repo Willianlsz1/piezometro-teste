@@ -19,6 +19,29 @@ export function getConfig(env) {
   const ALLOWED_ORIGIN = env.ALLOWED_ORIGIN || "*";
   const DEVICE_KEY = env.DEVICE_KEY || "";
 
+  // Chave por dispositivo (opcional): JSON { "PZ-01": "chave-do-pz01", ... },
+  // definido via `wrangler secret put DEVICE_KEYS`. Permite revogar a chave
+  // de UM piezômetro de campo sem afetar a frota inteira — com a DEVICE_KEY
+  // única antiga, vazar a chave de um device comprometia todos. JSON inválido
+  // vira null (loga o erro) e handleIngest cai no fallback de DEVICE_KEY
+  // única, mantendo o serviço no ar em vez de travar a ingestão inteira por
+  // um typo no secret.
+  let DEVICE_KEYS = null;
+  if (env.DEVICE_KEYS) {
+    try {
+      DEVICE_KEYS = JSON.parse(env.DEVICE_KEYS);
+    } catch (e) {
+      console.error("DEVICE_KEYS: JSON inválido —", e.message);
+      DEVICE_KEYS = null;
+    }
+  }
+
+  // Retenção de dados brutos (dias) — leituras mais antigas que isso são
+  // consolidadas em 1 linha/dia/piezômetro (leituras_diario) e apagadas da
+  // tabela `leituras`. Ver src/retencao.js. Default 180 dias — folga de 6x
+  // sobre o maior range servido pelo dashboard (30d).
+  const RETENCAO_DIAS = parseInt(env.RETENCAO_DIAS || "180", 10);
+
   const NIVEL_ATENCAO = parseFloat(env.NIVEL_ATENCAO || "12");
   const NIVEL_CRITICO = parseFloat(env.NIVEL_CRITICO || "15");
   const ALERT_REPEAT_MIN = parseInt(env.ALERT_REPEAT_MIN || "15", 10);
@@ -46,7 +69,7 @@ export function getConfig(env) {
   const smsOn = !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_FROM && TWILIO_TO);
 
   return {
-    ALLOWED_ORIGIN, DEVICE_KEY,
+    ALLOWED_ORIGIN, DEVICE_KEY, DEVICE_KEYS, RETENCAO_DIAS,
     NIVEL_ATENCAO, NIVEL_CRITICO, ALERT_REPEAT_MIN,
     SILENCE_ALERT_SEC, TAXA_JANELA_MIN, TAXA_MAX_M_DIA, STALE_SEG, HISTERESE_M,
     TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,

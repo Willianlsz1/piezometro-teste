@@ -17,6 +17,7 @@
 import { getConfig } from "./config.js";
 import { corsHeaders, json } from "./http.js";
 import { lerEstado, salvarEstado, checkAlerts } from "./alertas.js";
+import { executarRetencao } from "./retencao.js";
 import {
   handleIngest,
   handleUltimos,
@@ -75,7 +76,28 @@ export default {
     const cfg = getConfig(env);
     ctx.waitUntil((async () => {
       const estado = await lerEstado(env);
-      const mutou = await checkAlerts(cfg, env, estado);
+      let mutou = await checkAlerts(cfg, env, estado);
+
+      // Retenção de dados (ver src/retencao.js): roda NO MÁXIMO 1x/dia — a
+      // data (YYYY-MM-DD, UTC) da última execução fica no MESMO estado do
+      // KV usado pelos alertas (campo ultimaRetencao), então só custa +1
+      // write/dia (bem abaixo do limite do free tier), não 1440.
+      // Erro na retenção NÃO pode derrubar o salvamento do estado dos
+      // alertas (ex.: banco ainda sem a migração 0003 lançaria exceção a
+      // cada ciclo e o commStatus/lastNotifiedLevel nunca seriam salvos):
+      // captura, loga e tenta de novo no próximo ciclo — ultimaRetencao só
+      // avança quando a execução de fato deu certo.
+      const hojeUTC = new Date().toISOString().slice(0, 10);
+      if (estado.ultimaRetencao !== hojeUTC) {
+        try {
+          await executarRetencao(env, cfg);
+          estado.ultimaRetencao = hojeUTC;
+          mutou = true;
+        } catch (e) {
+          console.error("Retenção: falhou (será tentada de novo no próximo ciclo):", e.message);
+        }
+      }
+
       // Só grava se algo mudou — respeita o limite de escritas do KV free tier
       if (mutou) await salvarEstado(env, estado);
     })());
