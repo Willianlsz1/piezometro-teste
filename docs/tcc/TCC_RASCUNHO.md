@@ -1,6 +1,9 @@
-> **Nota de uso:** rascunho da primeira entrega do TCC, estruturado no template oficial
-> (`TEMPLATE_INTEGRA_MG.docx`). Copie cada seção para o Word, substitua os `[PREENCHER]` e
-> ajuste o texto à voz da equipe antes de entregar.
+> **DOCUMENTO HISTÓRICO (material-fonte).** Este rascunho foi superado pelo TCC oficial da
+> equipe (AquaSense, template INTEGRA-MG, mantido em Word pela equipe; versão de entrega em
+> `TCC_AQUASENSE.md`/`TCC_ENTREGA.docx` nesta pasta). Permanece no repositório como fonte de
+> consulta: a prosa de seções como cadeia de confiança do dado, piezômetro vs INA e limitações
+> continua útil para incorporar ao texto oficial. Não usar os números econômicos daqui — os
+> oficiais estão em `docs/projeto/VIABILIDADE_ECONOMICA.md`.
 
 ---
 
