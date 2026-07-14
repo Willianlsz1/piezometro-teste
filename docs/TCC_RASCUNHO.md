@@ -103,7 +103,8 @@ pesquisa vem de um artigo técnico do IBRACON de 2007 sobre automação de medid
 Este projeto não compete com essa automação profissional: ele democratiza o conceito de centro de
 monitoramento contínuo com alertas automáticos para a camada de barragens, açudes e aterros que
 hoje é lida à mão, a um custo de hardware por ponto estimado em R$ 150 a R$ 220 no cenário de
-protótipo (ver lista de compras em `docs/PROTOTIPO_FISICO.md`), somado a um backend que opera
+protótipo (ESP32, sensor ultrassônico, display OLED, sinalização luminosa e sonora e acessórios
+de montagem), somado a um backend que opera
 dentro do free tier da Cloudflare. A proposta de valor central é trocar a detecção tardia (uma
 leitura manual periódica que só revela uma anomalia dias ou semanas depois de ela começar) por
 alerta preventivo, com notificação em até aproximadamente um minuto após a transição de faixa.
@@ -272,8 +273,8 @@ confundidos com leituras reais.
 
 **Metodologia de trabalho.** O desenvolvimento seguiu duas frentes paralelas e complementares:
 simulação no Wokwi, para iteração rápida de firmware e testes de alerta sem depender de hardware
-físico, e montagem de uma maquete física real (ESP32, JSN-SR04T e tubo com água, ver
-`docs/PROTOTIPO_FISICO.md`), ambas falando com o mesmo backend em produção. O código foi versionado
+físico, e montagem de uma maquete física real (ESP32, sensor JSN-SR04T e tubo com água), ambas
+falando com o mesmo backend em produção. O código foi versionado
 em git ao longo de todo o projeto, com a v1 preservada no histórico para rastreabilidade da decisão
 de migração, e o backend é publicado por deploy contínuo a partir do repositório, incluindo a
 aplicação automática das migrações de banco antes de cada publicação.
@@ -281,11 +282,12 @@ aplicação automática das migrações de banco antes de cada publicação.
 ### 1.3.5 VIABILIDADE TÉCNICA
 
 Todos os componentes de hardware usados no protótipo são de fácil acesso no mercado nacional
-(ESP32, sensor ultrassônico JSN-SR04T, display OLED, LEDs, buzzer; lista completa e fornecedores em
-`docs/PROTOTIPO_FISICO.md`), sem depender de importação ou de peças especiais.
+(ESP32, sensor ultrassônico JSN-SR04T, display OLED, LEDs e buzzer, todos disponíveis em
+fornecedores nacionais de componentes eletrônicos), sem depender de importação ou de peças
+especiais.
 
 A precisão do sensor utilizado na maquete física foi avaliada por um protocolo experimental
-descrito em `docs/VALIDACAO_SENSOR.md`: cinco alturas de água conhecidas, medidas com régua, cada
+elaborado pela própria equipe: cinco alturas de água conhecidas, medidas com régua, cada
 uma com dez leituras repetidas do sensor, calculando erro médio, desvio padrão e erro máximo por
 altura, e declarando a incerteza final como aproximadamente duas vezes o maior desvio padrão
 observado, regra prática de cerca de 95% de cobertura.
@@ -410,8 +412,8 @@ tempo real para o backend, persistência de histórico consultável no dashboard
 correta em NORMAL, ATENÇÃO e CRÍTICO nos limiares configurados (12 m e 15 m), alertas entregues por
 Telegram (e, quando configurado, SMS via Twilio) nas transições de faixa em até aproximadamente um
 minuto (ciclo do cron), e resiliência a queda de rede, com o buffer de store and forward retendo
-leituras localmente e reenviando-as sem perda assim que a conectividade retorna, demonstração
-roteirizada em `docs/PROTOTIPO_FISICO.md`.
+leituras localmente e reenviando-as sem perda assim que a conectividade retorna, comportamento
+demonstrado desligando e religando a rede durante a operação.
 
 `[PREENCHER: resultados quantitativos do ensaio de validação do sensor, inserir aqui a mesma
 incerteza declarada (erro médio, desvio padrão, erro máximo, incerteza ±Z cm/2σ) já solicitada na
@@ -452,9 +454,8 @@ WiFi.
 
 ### 1.4.1 BMG CANVAS
 
-Esqueleto dos nove blocos do Business Model Canvas, com base no mercado e nos dados de
-`docs/BASE_DE_CONHECIMENTO.md` (Parte 3) e `docs/VIABILIDADE_ECONOMICA.md`, para a equipe transpor
-ao quadro visual.
+Esqueleto dos nove blocos do Business Model Canvas, com base na pesquisa de mercado e no estudo
+de viabilidade econômica conduzidos pela equipe, para transpor ao quadro visual.
 
 | Bloco | Conteúdo sugerido |
 |---|---|
@@ -473,7 +474,9 @@ ao quadro visual.
 `[PREENCHER conforme orientação do instrutor]`
 
 Costumam compor esta seção as competências mobilizadas ao longo do projeto (desenvolvimento de
-firmware embarcado em C++/Arduino, integração com APIs em nuvem via Cloudflare Workers, D1 e KV,
+firmware embarcado em C++/Arduino, automação de processos, que vai do ciclo completo de medição,
+transmissão, decisão e alerta sem intervenção humana até a publicação automática do sistema a cada
+atualização do código, integração com APIs em nuvem via Cloudflare Workers, D1 e KV,
 desenvolvimento web front-end em HTML, CSS e JavaScript sem bundler, noções de instrumentação
 geotécnica e segurança de barragens, e trabalho em equipe com versionamento de código em git), o
 cronograma do projeto e o papel individual de cada aluno, coerente com a tabela da equipe na seção
