@@ -57,6 +57,8 @@
 #define BUZZER       26
 
 // ===== INTERVALOS (ms) =====
+// Modo de campo a bateria/solar (duty cycling, sem ficar sempre ligado):
+// ver piezometro_deep_sleep.h — opcional, não afeta os intervalos abaixo.
 #define INTERVALO_LEITURA 1000UL    // leitura local + LEDs + display
 #define INTERVALO_ENVIO   10000UL   // envio ao backend (Cloudflare Worker)
 #define INTERVALO_NTP     300000UL  // 5 min — re-sincroniza o relógio periodicamente:

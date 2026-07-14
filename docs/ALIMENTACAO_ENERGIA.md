@@ -218,24 +218,22 @@ painel gera, num único HSP médio (4h), de 8 a 20 Wh/dia, várias vezes o consu
   não depende de o dispositivo estar sempre acordado, só de o ciclo de despacho rodar quando ele
   acorda.
 
-**Exige mudança no firmware** — não é uma troca de hardware, é trabalho futuro. Esboço do que
-mudaria em `coreLoop()` (`firmware/piezometro_core.h`):
-
-```cpp
-// Esboço (trabalho futuro — NÃO implementado nesta versão do firmware):
-void loop() {
-  lerSensor(); determinarAlerta(); atualizarLEDs(); mostrarDisplay(); // igual a hoje
-  conectarWiFi(); bufferizarLeitura(); despacharBuffer();             // igual a hoje
-  esp_sleep_enable_timer_wakeup(5 * 60 * 1000000ULL); // 5 min em microssegundos
-  esp_deep_sleep_start();                              // dorme; reinicia do zero ao acordar
-}
-```
+**Já implementado como opção de compilação** — `firmware/piezometro_deep_sleep.h`. Não é o modo
+padrão (a maquete/demonstração continua sempre-ligada, LEDs/buzzer/OLED ao vivo); é opt-in via
+`#define MODO_DEEP_SLEEP` antes do `#include "piezometro_core.h"` seguido de
+`#include "piezometro_deep_sleep.h"`, trocando o `setup()/loop()` por
+`void setup(){ initSensor(); deepSleepCiclo(); }` (nunca retorna) e `void loop(){}` (nunca
+alcançado) — ver o cabeçalho do arquivo para o "como usar" completo.
 
 A diferença central é que `esp_deep_sleep_start()` **reinicia o programa do zero** ao acordar
-(não é um `delay()`) — todo o estado que hoje vive em variáveis globais (`bufferDados`,
-`ultimoNtp`, etc.) precisaria ser avaliado para o que sobrevive em RTC memory (`RTC_DATA_ATTR`) e
-o que pode ser recalculado a cada ciclo. É mudança de arquitetura do firmware, não só de
-parâmetro — por isso fica registrada como trabalho futuro, não implementada nesta entrega.
+(não é um `delay()`) — todo o estado que no modo sempre-ligado vive em variáveis globais comuns
+(`bufferDados`, `ultimoNtp`, etc.) morreria a cada ciclo. Por isso o novo header mantém seu
+próprio buffer de leituras retidas em RTC memory (`RTC_DATA_ATTR`, até 96 leituras, ~2,3 KB dos
+~8 KB disponíveis) em vez de reusar o buffer do core, reconecta o WiFi a cada despertar e só
+re-sincroniza o NTP quando o relógio ainda não é válido ou a cada ~1 h de ciclos (o RTC interno
+mantém a hora através do sono, com deriva). Os trade-offs (perde leitura a cada 10 s, perde alertas locais contínuos, mas mantém
+store & forward e os alertas via Telegram/SMS do Worker) são os mesmos já descritos acima — a
+implementação não muda essa análise, só a torna concreta.
 
 ### Menção — LoRaWAN como evolução para campo sem Wi-Fi
 

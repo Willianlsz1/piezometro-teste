@@ -48,6 +48,7 @@ Dashboard (GitHub Pages, index.html) → GET /ultimos, /dados?pz&range
 | `index.html` | Só a estrutura HTML do dashboard (~280 l.) — GitHub Pages |
 | `assets/styles.css` + `assets/js/*` | CSS e os 8 módulos JS do dashboard (`config`, `util`, `fontes`, `estado`, `graficos`, `paineis`, `exportar`, `app`), carregados por `<script src>` em ordem de dependência — **sem bundler** |
 | `firmware/piezometro_core.h` | Núcleo comum do firmware (WiFi/buffer/envio/alertas/OLED) |
+| `firmware/piezometro_deep_sleep.h` | Modo de campo a bateria/solar (opcional, opt-in via `MODO_DEEP_SLEEP`) |
 | `firmware/sketch*.ino` | Adapters de sensor (BMP180 simulação; JSN-SR04T físico) |
 | `docs/` | Base de conhecimento, pesquisa de dashboards, planos e guia da maquete |
 

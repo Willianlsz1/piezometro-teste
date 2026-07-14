@@ -65,6 +65,12 @@
 // vêm do core — este sketch só implementa o adapter do sensor BMP180.
 #include "piezometro_core.h"
 
+// ===== MODO DE CAMPO A BATERIA/SOLAR (opcional) =====
+// Padrão aqui continua sendo sempre-ligado (bom para o Wokwi/demonstração).
+// Para o modo deep sleep (Opção C de docs/ALIMENTACAO_ENERGIA.md), ver o
+// bloco equivalente e mais detalhado em sketch_fisico_jsn_sr04t.ino e o
+// cabeçalho de piezometro_deep_sleep.h.
+
 // ===== OBJETO DO SENSOR =====
 Adafruit_BMP085 bmp;
 
