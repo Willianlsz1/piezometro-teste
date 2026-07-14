@@ -28,3 +28,18 @@ CREATE INDEX IF NOT EXISTS idx_leituras_pz_ts ON leituras (piezometro, ts);
 -- de confirmação perdido) não deve duplicar a linha — o INSERT OR IGNORE em
 -- db.js depende deste índice único para descartar a repetição.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_leituras_pz_ts_unico ON leituras (piezometro, ts);
+
+-- ── RETENÇÃO DE DADOS (histórico infinito, banco enxuto) ─────────────────────
+-- Consolida leituras brutas mais antigas que RETENCAO_DIAS em 1 linha/dia/
+-- piezômetro (ver src/retencao.js e migrations/0003_retencao_diaria.sql).
+-- Nenhum endpoint consome esta tabela ainda — fica disponível para uma
+-- futura análise de longo prazo.
+CREATE TABLE IF NOT EXISTS leituras_diario (
+  piezometro  TEXT NOT NULL,                -- identificador do sensor (ex.: "PZ-01")
+  dia         INTEGER NOT NULL,             -- epoch em SEGUNDOS do início do dia UTC (00:00)
+  nivel_medio REAL,                          -- média do nível d'água no dia, em metros
+  nivel_min   REAL,                          -- mínimo do nível d'água no dia, em metros
+  nivel_max   REAL,                          -- máximo do nível d'água no dia, em metros
+  n_leituras  INTEGER,                       -- nº de leituras brutas que formaram o resumo do dia
+  PRIMARY KEY (piezometro, dia)
+);

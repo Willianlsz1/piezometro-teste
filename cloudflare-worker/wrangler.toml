@@ -77,6 +77,14 @@ STALE_SEG          = "120"
 # usando o limiar puro, sem atraso. Ver docs/DASHBOARD_PROFISSIONAL.md §5.
 HISTERESE_M        = "0.2"
 
+# Retenção de dados brutos, em dias: leituras mais antigas que isso são
+# consolidadas em 1 linha/dia/piezômetro na tabela `leituras_diario` e
+# depois apagadas de `leituras` (ver src/retencao.js, rodado 1x/dia pelo
+# cron). Default 180 dias = folga de 6x sobre o maior range servido pelo
+# dashboard (30d) — histórico "infinito" com o banco enxuto, sem perder
+# a tendência de longo prazo (a consolidação guarda média/mín/máx do dia).
+RETENCAO_DIAS      = "180"
+
 # Catálogo de instrumentos exibido no dashboard (mapa/seletor de piezômetro):
 # id, nome amigável e coordenadas de cada piezômetro cadastrado. Servido em
 # GET /config para o dashboard carregar no boot em vez de hard-codar a lista.
@@ -84,6 +92,10 @@ PIEZOMETROS = '[{"id":"PZ-01","nome":"Dique Norte","lat":-20.1975,"lng":-43.4653
 
 # ── SEGREDOS (definir com `wrangler secret put <NOME>`) ──────────────────────
 # DEVICE_KEY           → chave compartilhada da placa ESP32 (header x-device-key)
+# DEVICE_KEYS          → (opcional) chave POR piezômetro, JSON
+#                        {"PZ-01":"chave-do-pz01","PZ-02":"..."} — revogação
+#                        individual sem afetar a frota; se definida, tem
+#                        prioridade sobre DEVICE_KEY (ver README, seção Segredos)
 # TELEGRAM_BOT_TOKEN   → token do bot do Telegram (@BotFather)
 # TELEGRAM_CHAT_ID     → chat/grupo que recebe os alertas
 # TWILIO_ACCOUNT_SID   → SID da conta Twilio (SMS, opcional)

@@ -8,17 +8,32 @@ import { normalizarLeitura, inserirLeituras, lerUltimasLeiturasTodas, lerLeitura
 import { calcularTaxaMDia, lerEstado } from "./alertas.js";
 
 export async function handleIngest(request, env, cfg) {
-  // Autenticação de sistema de segurança falha FECHADA: sem DEVICE_KEY
-  // configurada (wrangler secret put) não há como validar quem está
-  // enviando, então nenhuma leitura entra — o alternativo (pular a
-  // checagem) deixaria qualquer um injetar leituras falsas anônimas no
-  // histórico de monitoramento de segurança da barragem.
-  if (!cfg.DEVICE_KEY) {
+  // Autenticação de sistema de segurança falha FECHADA: sem NENHUMA das duas
+  // formas de chave configurada (DEVICE_KEYS por dispositivo OU DEVICE_KEY
+  // única, via wrangler secret put) não há como validar quem está enviando,
+  // então nenhuma leitura entra — o alternativo (pular a checagem) deixaria
+  // qualquer um injetar leituras falsas anônimas no histórico de
+  // monitoramento de segurança da barragem.
+  //
+  // Modo por dispositivo (DEVICE_KEYS): cada piezômetro de campo tem sua
+  // própria chave, então vazar a chave de UM device não compromete a frota
+  // inteira — revogar é só trocar aquela entrada no JSON do secret e fazer
+  // `wrangler secret put DEVICE_KEYS` de novo, sem afetar os demais.
+  const modoPorDispositivo = cfg.DEVICE_KEYS && typeof cfg.DEVICE_KEYS === "object";
+  if (!modoPorDispositivo && !cfg.DEVICE_KEY) {
     return json(cfg, 503, {
       error: "DEVICE_KEY não configurada no Worker (wrangler secret put DEVICE_KEY) — ingestão bloqueada",
     });
   }
-  if (request.headers.get("x-device-key") !== cfg.DEVICE_KEY) {
+
+  // Auth GLOBAL, fail-closed: a chave recebida precisa bater com ALGUMA
+  // chave válida conhecida (alguma entrada de DEVICE_KEYS, ou a DEVICE_KEY
+  // única). A checagem fina de qual pz cada chave autoriza só é possível
+  // depois do parse/normalização do corpo (o pz normalizado vem de lá) —
+  // ver mais abaixo, após o loop de normalizarLeitura.
+  const chaveRecebida = request.headers.get("x-device-key");
+  const chavesValidas = modoPorDispositivo ? Object.values(cfg.DEVICE_KEYS) : [cfg.DEVICE_KEY];
+  if (!chaveRecebida || !chavesValidas.includes(chaveRecebida)) {
     return json(cfg, 401, { error: "Chave de dispositivo inválida" });
   }
 
@@ -54,6 +69,21 @@ export async function handleIngest(request, env, cfg) {
       });
     }
     normalizadas.push(norm);
+  }
+
+  // Checagem POR PIEZÔMETRO (modo DEVICE_KEYS): um device só pode enviar
+  // leituras do(s) piezômetro(s) cuja chave bate com a que ele apresentou —
+  // um lote com pz de outro device (chave roubada ou config errada no
+  // firmware) é rejeitado inteiro, mesmo que a chave seja válida para OUTRO
+  // piezômetro da frota.
+  if (modoPorDispositivo) {
+    for (const norm of normalizadas) {
+      if (cfg.DEVICE_KEYS[norm.piezometro] !== chaveRecebida) {
+        return json(cfg, 401, {
+          error: `Chave de dispositivo não autoriza leituras de '${norm.piezometro}'`,
+        });
+      }
+    }
   }
 
   try {
