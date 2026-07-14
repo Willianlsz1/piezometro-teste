@@ -4,8 +4,8 @@
 > documento de TCC (template INTEGRA-MG, "Projeto de Inovação.docx"), onde a unidade de campo é
 > chamada de **UCT (Unidade de Controle e Telemetria)**. É a especificação de engenharia do
 > produto real, separada do protótipo (Fase 1): uma unidade instalável em campo, vendável e
-> sustentável operacionalmente. As divergências ainda abertas entre este documento e o rascunho
-> do TCC estão consolidadas na [seção 10](#10-divergências-abertas-com-o-rascunho-do-tcc).
+> sustentável operacionalmente. As divergências entre este documento e o rascunho
+> do TCC foram fechadas; o registro das decisões está na [seção 10](#10-divergências-com-o-rascunho-do-tcc-fechadas-em-14072026).
 >
 > Base factual: [`BASE_DE_CONHECIMENTO.md`](BASE_DE_CONHECIMENTO.md),
 > [`MAPEAMENTO_DEMANDA_E_MERCADO.md`](MAPEAMENTO_DEMANDA_E_MERCADO.md),
@@ -81,7 +81,7 @@ a campo, com robustez de produto.
 | ID | Requisito | Referência |
 |---|---|---|
 | RNF1 | Autonomia energética ≥ 12 meses sem intervenção | Bateria + solar, ver seção 4.4 |
-| RNF2 | Grau de proteção IP67 no gabinete de campo | Exposição a chuva, poeira, imersão eventual |
+| RNF2 | Grau de proteção IP66 no gabinete de campo | Exposição a chuva, poeira e jatos d'água (alinhado ao TCC; IP67 acrescentaria imersão temporária, desnecessária para gabinete de superfície) |
 | RNF3 | Faixa de temperatura de operação −20 °C a +60 °C (eletrônica), MCU industrial −40 °C a +85 °C | Compatível com clima brasileiro em campo aberto |
 | RNF4 | MTBF alvo ≥ 3 anos por unidade em campo | Componentes industriais, proteção contra surto |
 | RNF5 | Precisão do sensor de nível/poropressão: erro ≤ 0,1–0,25% do fundo de escala (transdutores 4–20 mA de linha industrial) | Ordem de grandeza muito superior ao protótipo (±1–2 cm), adequada a decisão técnica |
@@ -101,7 +101,7 @@ celular redundante.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
-│                       UNIDADE DE CAMPO (gabinete IP67)                 │
+│                       UNIDADE DE CAMPO (gabinete IP66)                 │
 │                                                                         │
 │  Sensor            Condicionamento         MCU               Comunic. │
 │  ┌──────────┐      ┌──────────────┐   ┌──────────────┐   ┌──────────┐ │
@@ -236,7 +236,7 @@ Dimensionamento básico do condicionamento de sinal:
 
 ### 4.6 Invólucro
 
-- Caixa **IP67**, prensa-cabos vedados nas entradas de cabo do sensor, antena e energia.
+- Caixa **IP66**, prensa-cabos vedados nas entradas de cabo do sensor, antena e energia.
 - **Proteção contra surto** na entrada de energia (painel solar) e no loop de sinal 4–20 mA —
   relevante porque barragens são estruturas expostas, sujeitas a descargas atmosféricas diretas ou
   induzidas.
@@ -255,7 +255,7 @@ Dimensionamento básico do condicionamento de sinal:
 | Placa de montagem | Protoboard 830 pontos + jumpers | PCB dedicada, soldada, com conectores de painel | Interconexão elétrica confiável em campo |
 | Energia | Cabo USB (fonte de bancada) | Bateria LiFePO4 + painel solar + controlador de carga | Alimentação autônoma |
 | Comunicação | WiFi (Wokwi/roteador local) | 4G Cat-M/NB-IoT (SIM7600) + SMS local, ou LoRaWAN quando houver gateway | Transporte da leitura até a nuvem |
-| Gabinete | Tubo de PVC aberto/protoboard exposta | Caixa IP67 com prensa-cabos e proteção contra surto | Proteção ambiental do equipamento |
+| Gabinete | Tubo de PVC aberto/protoboard exposta | Caixa IP66 com prensa-cabos e proteção contra surto | Proteção ambiental do equipamento |
 
 A diferença entre as duas colunas é **de robustez e certificação, não de conceito** — a mesma linha
 de argumento já usada na defesa de banca (`DEFESA_BANCA.md`).
@@ -271,7 +271,7 @@ de argumento já usada na defesa de banca (`DEFESA_BANCA.md`).
 | ESP32 industrial (WROOM-32, −40..+85 °C) + PCB dedicada | Placa fabricada (não protoboard) | 80 – 200 |
 | Módulo celular 4G Cat-M/NB-IoT (SIM7600 ou equivalente) + chip M2M | Comunicação + SMS local | 150 – 350 |
 | Bateria LiFePO4 + painel solar + controlador de carga | Dimensionado para autonomia ≥ 12 meses | 250 – 600 |
-| Gabinete IP67 + prensa-cabos + proteção contra surto | Invólucro de campo | 150 – 350 |
+| Gabinete IP66 + prensa-cabos + proteção contra surto | Invólucro de campo | 150 – 350 |
 | Sinalização local (LED/sirene) + fixação mecânica | Montagem no tubo existente | 50 – 100 |
 | Instalação, calibração e comissionamento (mão de obra) | Responsável técnico em campo | 300 – 800 |
 | **Total estimado por ponto** | | **≈ R$ 1.250 – 4.500** |
@@ -364,7 +364,7 @@ suportar isso, pois o backend já é multi-instrumento e já expõe os endpoints
 | Fase | Descrição | Status |
 |---|---|---|
 | **1. Protótipo** | ESP32 + sensor stand-in (BMP180 na simulação Wokwi, JSN-SR04T na maquete física) + backend Cloudflare completo + dashboard + alertas Telegram/SMS | **Concluída** (este TCC) |
-| **2. Piloto em campo** | 1 unidade com transdutor 4–20 mA + ADS1115, PCB dedicada, gabinete IP67, energia solar+bateria, instalada em um açude ou pequena barragem parceira (ex. via convênio com DNOCS, prefeitura ou operador de aterro), operando por um ciclo hidrológico completo (mínimo 6–12 meses) para validar autonomia energética, comunicação em campo real e precisão de calibração | Planejada |
+| **2. Piloto em campo** | 1 unidade com transdutor 4–20 mA + ADS1115, PCB dedicada, gabinete IP66, energia solar+bateria, instalada em um açude ou pequena barragem parceira (ex. via convênio com DNOCS, prefeitura ou operador de aterro), operando por um ciclo hidrológico completo (mínimo 6–12 meses) para validar autonomia energética, comunicação em campo real e precisão de calibração | Planejada |
 | **3. Pequena série** | Fabricação de PCB em lote pequeno (dezenas de unidades), padronização do processo de calibração e instalação, ajuste da BOM por volume de compra, formalização de manual de instalação/manutenção e SLA de suporte | Planejada, condicionada aos resultados do piloto |
 
 O critério de avanço entre fases é **dado de campo real**, não estimativa de bancada: o piloto deve
@@ -374,21 +374,21 @@ comprometer capital em uma série maior.
 
 ---
 
-## 10. Divergências abertas com o rascunho do TCC
+## 10. Divergências com o rascunho do TCC (fechadas em 14/07/2026)
 
-O rascunho do TCC ("Projeto de Inovação.docx", template INTEGRA-MG — em desenvolvimento) toma
-algumas decisões que ainda não batem com o que está construído/documentado no repositório.
-Consolidadas aqui para fechamento antes do texto final:
+As divergências abaixo foram identificadas entre versões anteriores do rascunho do TCC e este
+documento, e estão FECHADAS: a versão atual do TCC (AquaSense, template INTEGRA-MG) e o
+repositório falam a mesma língua. A tabela permanece como registro da decisão tomada em cada uma.
 
-| # | Tema | Rascunho do TCC (AquaSense) | Repositório / este documento | Recomendação |
-|---|---|---|---|---|
-| 1 | Shunt do loop 4–20 mA | 250 Ω | 150 Ω | **150 Ω** — 250 Ω gera 5,0 V a 20 mA e estoura a entrada do ADS1115 em 3,3 V (ver seção 4.2). Corrigir o TCC ou justificar alimentação em 5 V |
-| 2 | Backend / transporte | MQTT + JSON, dashboard Grafana ou ThingsBoard | HTTP POST `/ingest` → Cloudflare Worker + D1, dashboard próprio (GitHub Pages) já pronto, com motor de alertas Telegram/SMS funcionando | Decidir: ou o TCC descreve o backend real (Cloudflare, já validado — mais honesto para a banca), ou se implementa a ponte MQTT. Reescrever o backend joga fora o que já funciona |
-| 3 | Grau de proteção | Gabinete IP66 | IP67 (RNF2) | Qualquer um defende; IP66 (jato d'água) é suficiente para gabinete de superfície — alinhar os dois textos no mesmo número |
-| 4 | Alerta em dupla via | Telegram/E-mail | Telegram/SMS (Twilio) implementado; SMS local via SIM7600 como redundância | Manter Telegram/SMS (já funciona e SMS não depende de internet do destinatário); e-mail é adição trivial se a banca pedir |
-| 5 | Economia / payback | CAPEX R$ 300.000, payback 6 meses, economia R$ 600 mil/ano | R$ 2.965/unidade, 50 unidades ≈ R$ 260 mil (MAPEAMENTO seção 5), payback 5,8 meses | Números da mesma ordem — homogeneizar para um único par (CAPEX e payback) nos dois documentos |
-| 6 | Cadência de leitura | "mais de 96 leituras/dia" (1 a cada 15 min) | Protótipo demonstra a 1 envio/10 s; RF1 prevê 1–15 min em campo | Consistente — apenas deixar explícito no TCC que a cadência do protótipo é de demonstração |
-| 7 | Papel do WiFi | Não menciona | Protótipo usa WiFi; produto usa celular | Sem conflito — o TCC já descreve a fase industrial |
+| # | Tema | Decisão fechada | Status |
+|---|---|---|---|
+| 1 | Shunt do loop 4–20 mA | **150 Ω** (0,6–3,0 V a 4–20 mA, compatível com o ADS1115 em 3,3 V) — o TCC atual já usa 150 Ω e a faixa correta | ✅ Resolvida |
+| 2 | Backend / transporte | O TCC descreve o **backend real** (serverless sem hibernação, ingestão HTTP, motor de alertas por gatilho de 1 min, Telegram/SMS) — a ponte MQTT/Grafana foi descartada | ✅ Resolvida |
+| 3 | Grau de proteção | **IP66** nos dois textos (suficiente para gabinete de superfície; IP67 acrescentaria imersão temporária, desnecessária aqui) — este documento foi alinhado de IP67 para IP66 | ✅ Resolvida |
+| 4 | Alerta em dupla via | **Telegram/SMS (Twilio)**, já implementado; SMS local via SIM7600 como redundância futura; e-mail é adição trivial se solicitada | ✅ Resolvida |
+| 5 | Economia / payback | Par oficial: **CAPEX R$ 260.000 (50 pontos, composição fechada em `VIABILIDADE_ECONOMICA.md`: hardware R$ 148.250 + instalação R$ 40.000 + sobressalentes R$ 14.825 + bancada R$ 25.000 + contingência R$ 31.925), payback 5,6 meses, redução de 93,5% sobre os R$ 600 mil/ano** | ✅ Resolvida |
+| 6 | Cadência de leitura | RF1 (1–15 min em campo) mantido; a cadência de 10 s do protótipo é de demonstração — ao revisar o TCC, manter explícita essa distinção | ✅ Resolvida (verificar redação final) |
+| 7 | Papel do WiFi | Protótipo usa WiFi (representação); produto usa celular 4G com chip M2M (OPEX contabilizado na viabilidade) | ✅ Resolvida |
 
 As decisões do rascunho **já incorporadas** a este documento: nome AquaSense/UCT, transdutor
 piezorresistivo 4–20 mA submersível, ADS1115 16 bits, ESP32, SIM7600, deep sleep com RTC DS3231,
