@@ -81,6 +81,15 @@ histórico de eventos em tempo real. O firmware implementa store and forward: le
 conectividade ficam retidas em buffer local, com timestamp obtido por NTP, e são reenviadas assim
 que a rede volta, sem perda de dados.
 
+Cabe deixar claro, desde já, o papel de cada parte deste trabalho. O protótipo, montado com
+componentes de bancada, é a representação funcional da ideia: existe para demonstrar a arquitetura
+operando de ponta a ponta, do sensor ao alerta no celular. O produto do trabalho é maior do que
+ele e independe dele: é a plataforma de software completa (backend, banco, motor de alertas e
+dashboard, todos em produção), a especificação de engenharia da versão profissional, a pesquisa de
+mercado com fontes, a análise de viabilidade econômica com preço e retorno calculados e o
+protocolo de validação experimental, todos desenvolvidos pela equipe e apresentados nas seções
+seguintes.
+
 ### 1.3.1 ÁREA TECNOLÓGICA DA SOLUÇÃO
 
 Internet das Coisas (IoT) e sistemas embarcados, computação em nuvem serverless (Cloudflare
@@ -271,6 +280,20 @@ acima. Quando o backend não está acessível, o dashboard ativa um modo de simu
 um banner destacado no topo da página, para que dados fictícios de demonstração nunca sejam
 confundidos com leituras reais.
 
+**A versão de produção.** O trabalho não termina no protótipo: especificamos a versão profissional
+do sistema sobre a mesma plataforma, seguindo o princípio de que profissionalizar significa trocar
+as pontas e manter o núcleo. O sensor de bancada dá lugar a um transdutor de pressão submersível
+(com o piezômetro de corda vibrante como opção premium), conectado pelo mesmo contrato de adapter
+do firmware, sem alterar backend, dashboard ou motor de alertas; a alimentação passa a painel
+solar com bateria operando em deep sleep, modo que já implementamos e que reduz o consumo em cerca
+de trinta vezes; e a comunicação ganha a opção LoRaWAN para locais sem cobertura WiFi. Parte dessa
+versão já está em produção no software: cada dispositivo passou a ter chave de autenticação
+própria, revogável individualmente sem afetar os demais, e o banco consolida automaticamente as
+leituras antigas em resumos diários, mantendo histórico de tendência ilimitado com armazenamento
+controlado. O plano de implantação prevê três fases, do piloto interno de cinco pontos ao produto
+em escala, com custo por ponto entre R$ 1.800 e R$ 2.200 na configuração padrão, abaixo do preço
+de venda definido na viabilidade econômica.
+
 **Metodologia de trabalho.** O desenvolvimento seguiu duas frentes paralelas e complementares:
 simulação no Wokwi, para iteração rápida de firmware e testes de alerta sem depender de hardware
 físico, e montagem de uma maquete física real (ESP32, sensor JSN-SR04T e tubo com água), ambas
@@ -410,6 +433,15 @@ corrigido antes de comprometer a credibilidade das demonstrações. Cada uma des
 documentada e é citada aqui não como um problema a esconder, mas como prova de que o projeto foi
 conduzido com revisão e correção contínuas, e não apenas com um resultado final apresentado sem
 histórico do caminho até ele.
+
+Além do sistema em funcionamento, o trabalho entrega um conjunto de engenharia que existe
+independentemente do protótipo: a especificação completa da versão de produção, com sensor
+certificado, energia redundante e comunicação de campo; a pesquisa de mercado com fontes datadas,
+que analisou oito fabricantes e confirmou a lacuna de preço que o produto ocupa; a análise
+econômica com custo, preço, payback e retorno sobre investimento calculados; o protocolo de
+validação experimental do sensor; e a cadeia de confiança do dado, implementada em código, da
+autenticação por dispositivo à retenção automática do histórico. O protótipo é a representação
+física que demonstra que tudo isso funciona em conjunto; o valor do trabalho está no conjunto.
 
 As limitações honestas do protótipo continuam sendo as mesmas destacadas ao longo do documento: o
 sensor utilizado é um stand-in de coluna d'água, mais próximo de um INA do que de um piezômetro de
