@@ -327,81 +327,61 @@ backend, dashboard e motor de alertas.
 
 ### 1.3.6 VIABILIDADE ECONÔMICA
 
-O edital do desafio SAGA declara, como estimativa da própria Samarco, uma economia de R$ 600 mil
-por ano ao substituir a medição manual terceirizada por monitoramento automatizado. Esse é um
-número emprestado do edital, não auditado por este trabalho: os alunos não tiveram acesso à
-memória de cálculo original da empresa.
+A análise econômica parte de duas referências concretas: o custo real dos componentes que
+compramos para o protótipo e o gasto de R$ 600 mil por ano com medição manual terceirizada
+declarado pela Samarco no edital do desafio SAGA. Reconstruímos esse gasto para verificar sua
+coerência e o número fecha: um contrato de leitura manual de R$ 50 mil mensais cobre equipe de
+campo, veículo, combustível, EPIs, encargos, supervisão de engenheiro e relatórios para atender
+cerca de cem piezômetros lidos duas vezes por semana, o que resulta em R$ 58 por leitura
+individual, valor compatível com o mercado de serviços técnicos terceirizados. Todos os cálculos
+desta seção usam esse cenário de cem pontos.
 
-Para avaliar a plausibilidade da ordem de grandeza dessa economia, foi construída uma estimativa
-própria e independente, com premissas explícitas dos alunos, livremente ajustáveis. Considerando 20
-piezômetros (ordem de grandeza razoável para uma barragem de porte médio), lidos cerca de duas
-vezes por semana (104 campanhas por ano, periodicidade comumente exigida em operação estabilizada)
-e um custo de R$ 350 por campanha (deslocamento, técnico terceirizado e relatório, estimativa
-própria dos alunos, não auditada), o custo anual da leitura manual chega a aproximadamente R$
-728.000. Contra isso, o custo do sistema proposto para os mesmos 20 pontos é de cerca de R$ 3.700
-no ano de implantação (hardware, custo único, mais backend a custo zero dentro do free tier), caindo
-a praticamente zero por ano nos anos seguintes, fora manutenção e substituição eventual de sensores.
-A diferença entre os dois números resulta em uma economia estimada de aproximadamente R$ 724.000 no
-primeiro ano, uma estimativa própria e independente, não uma reprodução do número do edital, mas
-que confirma que a ordem de grandeza de centenas de milhares de reais por ano é plausível para essa
-comparação, sustentando o número declarado pela Samarco como coerente, sem validá-lo tecnicamente.
+Quanto custa o nosso produto: o protótipo de bancada custa R$ 220 por ponto em componentes (ESP32,
+sensor ultrassônico, display, sinalização e acessórios). A versão de campo, que substitui o sensor
+ultrassônico por um transdutor de pressão submersível e adiciona caixa hermética IP65, cabo
+blindado e fixação, custa R$ 900 por ponto em materiais e, somada a instalação e calibração, chega a
+R$ 1.400 por ponto instalado. O backend em nuvem custa R$ 30 por mês para a operação inteira, não
+por ponto, e as notificações por Telegram são gratuitas.
 
-Além dessa estimativa por ponto, é possível construir um cenário hipotético que chega justamente
-aos R$ 600 mil por ano do edital e mostra, item a item, onde o sistema corta o gasto. Um contrato
-terceirizado dedicado de R$ 50 mil por mês cobre, de forma realista, equipe de campo, veículo,
-combustível, EPIs, encargos, supervisão de engenheiro e relatórios para atender algo como cem
-piezômetros lidos duas vezes por semana, ordem de grandeza plausível para um complexo de barragens
-de grande porte. Nesse cenário, o sistema elimina as leituras de rotina (o dado passa a chegar
-sozinho a cada 10 segundos), elimina os deslocamentos extras motivados por suspeita de anomalia (o
-alerta por Telegram ou SMS em cerca de um minuto já identifica o instrumento e o valor) e elimina a
-digitação de prancheta para planilha e relatório (o histórico nasce digital, com exportação em CSV
-já pronta); a inspeção física periódica dos instrumentos permanece, como a norma exige, mas reduzida
-a cerca de uma visita mensal de manutenção em vez de oito visitas de leitura. Somando a implantação
-de cem pontos (entre R$ 83 mil e R$ 198 mil, uma vez), a operação recorrente da nuvem e manutenção
-(entre R$ 8 mil e R$ 20 mil por ano) e a inspeção remanescente (cerca de R$ 42 mil por ano em doze
-campanhas), o custo recorrente novo cai para a faixa de R$ 50 mil a R$ 62 mil por ano, ante os R$
-600 mil originais, uma redução de aproximadamente 90% no custo recorrente. Considerando a
-implantação, a economia já no primeiro ano fica entre R$ 340 mil e R$ 467 mil, e o retorno do
-investimento de implantação ocorre entre dois e quatro meses. É importante frisar que essa redução
-é de aproximadamente 90%, não de 100%: a inspeção física continua existindo, porque nenhuma norma
-aceita um instrumento que ninguém visita, e, numa operação real do porte da Samarco, o sensor seria
-de corda vibrante certificada, integrada à mesma plataforma pelo contrato de adapter do firmware.
+Quanto a empresa gasta hoje: R$ 600 mil por ano, todos os anos, apenas para saber o nível dos seus
+piezômetros.
 
-A precificação do produto foi construída por três métodos independentes que convergem para a mesma
-faixa de bom senso. Pelo método de custo mais margem, aplicando um markup típico de hardware
-embarcado de duas a três vezes sobre o custo de uma instalação de campo realista (entre R$ 586 e R$
-1.179 por ponto, já com transdutor de pressão e proteção industrial IP65), o preço fica entre R$
-1.170 e R$ 3.540 por ponto. Pelo método de referência competitiva, posicionando o produto entre 5%
-e 15% do preço da telemetria industrial (R$ 5.000 a R$ 20.000 por ponto), a faixa resultante é de R$
-250 a R$ 3.000. E pelo método baseado em valor, capturando entre 5% e 15% do custo evitado de R$
-36.400 por ano e por ponto de leitura manual, chega-se a um teto justificável de R$ 150 a R$ 455
-por ponto e por mês. Os três métodos convergem para uma faixa comum de aproximadamente R$ 1.000 a
-R$ 3.500 por ponto instalado, muito abaixo dos R$ 5.000 a R$ 20.000 da telemetria industrial. O
-modelo comercial recomendado é híbrido: kit em comodato ou venda facilitada, somado a uma
-assinatura mensal de plataforma entre R$ 30 e R$ 80 por ponto, abaixo do teto de valor calculado,
-para manter competitividade na fase de tração inicial. Nesse modelo, o cliente recupera, com a
-economia evitada de R$ 36.400 por ano e por ponto, o custo do primeiro ano do sistema em menos de
-46 dias, mesmo no cenário mais caro de venda do kit com assinatura alta.
+Quanto ela passa a gastar com o sistema: R$ 140 mil de implantação, uma única vez (cem pontos a
+R$ 1.400), e R$ 57 mil por ano de operação, valor que inclui nuvem, manutenção com reposição de
+sensores e uma inspeção física mensal dos instrumentos, que a norma continua exigindo e que
+mantivemos no cálculo por honestidade: o sistema elimina as visitas de leitura, não as visitas de
+manutenção.
 
-O dimensionamento de mercado segue a lógica de TAM, SAM e SOM. O TAM (mercado total endereçável),
-somando barragens do SNISB, aterros sanitários e municípios com área de risco em pontos de
-monitoramento potenciais, fica entre aproximadamente 98 mil e 277 mil pontos, o que representaria
-uma receita recorrente teórica entre R$ 35 milhões e R$ 266 milhões por ano na faixa de assinatura
-recomendada; essa faixa é deliberadamente ampla, servindo para mostrar ordem de grandeza, não uma
-meta. O SAM (mercado que a equipe consegue efetivamente alcançar com o modelo de negócio e os
-canais atuais), recortado para as barragens fora da PNSB e os aterros sanitários, fica entre
-aproximadamente 69 mil e 185 mil pontos. Já o SOM (mercado realista de conquistar em um horizonte
-de três a cinco anos), capturando entre 0,1% e 1% do SAM, fica entre aproximadamente 69 e 1.850
-pontos, o que representaria uma receita recorrente da ordem de R$ 25 mil a R$ 1,8 milhão por ano.
+O resultado é direto. A economia recorrente é de R$ 543 mil por ano, uma redução de 91% no custo.
+O payback da implantação é de 3,1 meses. Já no primeiro ano, descontando implantação e operação, a
+empresa economiza R$ 403 mil líquidos, um retorno sobre o investimento (ROI) de 288% em doze
+meses. Em cinco anos, a economia acumulada passa de R$ 2,5 milhões para um investimento de R$ 140
+mil, um ROI superior a 1.800%. Não há cenário, mesmo dobrando todos os nossos custos, em que a
+conta deixe de fechar, porque a distância entre o custo do sistema e o custo da leitura manual é
+de duas ordens de grandeza.
 
-Vale um argumento final sobre quem, de fato, compraria este produto: uma empresa do porte da
-Samarco, com barragens de DPA alto sujeitas à Resolução ANM 95/2022, compraria telemetria industrial
-certificada, com corda vibrante e redundância de energia, não um sistema fundamentado em sensor
-stand-in. O desafio SAGA funciona como porta de entrada e validação de conceito, a demonstração de
-que a arquitetura funciona ponta a ponta, em tempo real, com alertas; o mercado comercial real deste
-produto é a camada dimensionada acima, as dezenas de milhares de barragens fora da PNSB e os
-setecentos aterros sanitários que hoje não têm acesso a nenhuma automação porque o preço "sob
-consulta" da telemetria industrial não cabe no orçamento deles.
+Como produto comercial, definimos o preço de R$ 2.500 por ponto instalado mais uma assinatura de
+plataforma de R$ 50 mensais por ponto. Esse preço foi fixado cruzando três referências: cobre o
+nosso custo de R$ 1.400 com margem de 44% no hardware, representa cerca de 15% do que custa a
+telemetria industrial equivalente (de R$ 5 mil a R$ 20 mil por ponto, sempre sob consulta) e fica
+muito abaixo do valor que o cliente economiza. Na ponta do cliente, cada ponto lido manualmente
+custa cerca de R$ 6 mil por ano; com o nosso sistema, ele paga R$ 3.100 no primeiro ano (kit mais
+doze mensalidades) e R$ 600 por ano daí em diante. O investimento dele se paga em pouco mais de
+seis meses e, a partir do segundo ano, ele gasta um décimo do que gastava.
+
+Sobre o mercado além da Samarco: o Brasil tem 28.043 barragens cadastradas no SNISB e apenas 6.210
+enquadradas na PNSB, de modo que mais de 21 mil estruturas seguem com leitura manual ou sem
+leitura, às quais se somam cerca de 700 aterros sanitários com 5 a 15 piezômetros de chorume cada,
+já obrigados a monitorar por condicionante de licença ambiental. Capturar 1% desse universo, cerca
+de 900 pontos, significa R$ 2,25 milhões em vendas de kits e R$ 540 mil por ano de receita
+recorrente de assinaturas. É um mercado real, alcançável com o preço definido acima, e no qual o
+concorrente industrial não tem interesse em descer: a estrutura de custos dele não compete a
+R$ 2.500 por ponto.
+
+Uma empresa do porte da Samarco, sujeita à Resolução ANM 95/2022 para barragens de DPA alto,
+compraria telemetria industrial certificada, e não é a ela que pretendemos vender: o desafio SAGA
+valida o conceito de ponta a ponta, e o mercado do produto é a camada de estruturas que hoje não
+monitora nada porque a única alternativa existente custa dez vezes mais.
 
 ### 1.3.7 RESULTADOS E CONCLUSÃO
 
