@@ -35,8 +35,9 @@ Guia completo para transformar a simulação Wokwi (`firmware/sketch.ino`, com o
 | Cabo micro-USB **de dados** | ⚠️ precisa ser de dados, não só de carga | R$ 5–12 | Qualquer loja/já deve ter em casa |
 | Tubo de PVC 100 mm (~60 cm) ou balde transparente | Tubo de esgoto (barato) com tampa/cap de PVC nas pontas, ou um balde/pote transparente | R$ 15–30 | Loja de materiais de construção |
 | Fita adesiva / abraçadeira de nylon | Para fixar o sensor no topo do tubo | R$ 5–10 | Papelaria/loja de construção |
+| **(Opcional, recomendado)** Fonte USB 5 V/2 A **ou** powerbank 10.000–20.000 mAh | Deixa a maquete independente do notebook na apresentação; o powerbank ainda demonstra ao vivo a "opção A" (backup de energia) do estudo de alimentação | R$ 30–80 | Qualquer loja de eletrônicos/já deve ter em casa |
 
-**Total estimado: R$ 150 – 220**
+**Total estimado: R$ 150 – 220** (itens obrigatórios; +R$ 30–80 com a fonte/powerbank opcional)
 
 > ⚠️ Prefira o JSN-SR04T ao HC-SR04 comum: o transdutor do JSN é separado do módulo eletrônico por um cabo, então ele pode ficar dentro/perto da água (protegido) enquanto a eletrônica fica seca — ideal para esta maquete.
 
