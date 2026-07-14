@@ -238,13 +238,23 @@ piezometro-teste/
 ├── docs/
 │   ├── projeto/                         # A face "empresa" (o produto real)
 │   │   ├── PROJETO_INDUSTRIAL.md            # Especificação da unidade industrial (Fase 2)
+│   │   ├── PROJETO_PROFISSIONAL.md          # Especificação de engenharia da versão de produção
 │   │   ├── MAPEAMENTO_DEMANDA_E_MERCADO.md  # Demanda SAGA × mercado real × regulação
 │   │   ├── BASE_DE_CONHECIMENTO.md          # Piezômetros, barragens, legislação e mercados (fontes)
+│   │   ├── COMPARATIVO_MERCADO.md           # Concorrentes, arquiteturas e preços pesquisados
+│   │   ├── VIABILIDADE_ECONOMICA.md         # Custos, precificação, TAM-SAM-SOM e payback
+│   │   ├── ALIMENTACAO_ENERGIA.md           # Energia: hoje, mercado e dimensionamento solar
+│   │   ├── CADEIA_DE_CONFIANCA.md           # Integridade do dado da medição ao alerta
 │   │   └── DASHBOARD_PROFISSIONAL.md        # Padrões ISA-101/18.2 e plano de melhorias P1–P8
-│   └── prototipo/                       # A face "maquete/banca" (Fase 1)
-│       ├── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e demo
-│       ├── DEFESA_BANCA.md                  # Posicionamento frente aos equipamentos profissionais
-│       └── PLANO_REFATORACAO.md             # Plano anti-godfile (executado)
+│   ├── prototipo/                       # A face "maquete/banca" (Fase 1)
+│   │   ├── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e demo
+│   │   ├── VALIDACAO_SENSOR.md              # Protocolo de bancada e incerteza do sensor
+│   │   ├── DEFESA_BANCA.md                  # Posicionamento frente aos equipamentos profissionais
+│   │   ├── PREPARACAO_BANCA.md              # Memória de cálculo, conformidade e perguntas prováveis
+│   │   └── PLANO_REFATORACAO.md             # Plano anti-godfile (executado)
+│   └── tcc/                             # Entregáveis do TCC
+│       ├── TCC_RASCUNHO.md                  # Rascunho estruturado no template oficial do SENAI
+│       └── TCC_ENTREGA.docx                 # Versão para envio ao professor (ABNT)
 ├── cloudflare-worker/       # Backend (deploy: ver README da pasta)
 │   ├── src/
 │   │   ├── index.js         # Roteador (fetch + scheduled) — só orquestra

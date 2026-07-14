@@ -1,10 +1,10 @@
 # Alimentação e Energia — Da Bancada ao Campo
 
-> Material de apoio para a pergunta 4 do `docs/DEFESA_BANCA.md` ("E se faltar energia no ESP32?")
+> Material de apoio para a pergunta 4 do `docs/prototipo/PREPARACAO_BANCA.md` ("E se faltar energia no ESP32?")
 > e para a seção de limitações do TCC. Todo número marcado como **PREMISSA** é uma escolha de
 > trabalho dos alunos — troque o valor e refaça a conta indicada logo abaixo dele. Referências
-> cruzadas: `docs/COMPARATIVO_MERCADO.md` (soluções de energia dos concorrentes),
-> `docs/DEFESA_BANCA.md` (item c, tabela de conformidade ANM 95/2022), `docs/VIABILIDADE_ECONOMICA.md`
+> cruzadas: `docs/projeto/COMPARATIVO_MERCADO.md` (soluções de energia dos concorrentes),
+> `docs/prototipo/PREPARACAO_BANCA.md` (item c, tabela de conformidade ANM 95/2022), `docs/projeto/VIABILIDADE_ECONOMICA.md`
 > (cenário de campo real), `firmware/piezometro_core.h` (intervalos de leitura/envio).
 
 ---
@@ -47,7 +47,7 @@ caminho de solução — não para escondê-la.
 
 ## 2. O que o mercado usa
 
-O `docs/COMPARATIVO_MERCADO.md` já documenta as soluções comerciais de telemetria (Camada 1) e
+O `docs/projeto/COMPARATIVO_MERCADO.md` já documenta as soluções comerciais de telemetria (Camada 1) e
 duas delas deixam clara a arquitetura de energia padrão do setor:
 
 - **Nós wireless de corda vibrante** (ex.: Sisgeo WR-Log, ref. [3] do comparativo) — bateria
@@ -240,7 +240,7 @@ implementação não muda essa análise, só a torna concreta.
 Para instalações onde não há rede Wi-Fi disponível no local (comum em campo, longe de
 infraestrutura), a evolução natural é trocar o rádio Wi-Fi por **LoRaWAN**: consumo ainda menor
 que o Wi-Fi mesmo em modo ativo, alcance de quilômetros até um gateway compartilhado (já citado em
-`docs/VIABILIDADE_ECONOMICA.md`, seção 1.3, como alternativa de conectividade para locais sem
+`docs/projeto/VIABILIDADE_ECONOMICA.md`, seção 1.3, como alternativa de conectividade para locais sem
 Wi-Fi — gateway compartilhado R$ 800–1.500 uma vez, custo recorrente por nó R$ 0–15/mês). Não é
 parte do escopo deste protótipo, mas é o caminho natural de evolução de conectividade combinado
 com deep sleep.

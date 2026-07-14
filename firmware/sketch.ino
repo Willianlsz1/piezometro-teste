@@ -67,7 +67,7 @@
 
 // ===== MODO DE CAMPO A BATERIA/SOLAR (opcional) =====
 // Padrão aqui continua sendo sempre-ligado (bom para o Wokwi/demonstração).
-// Para o modo deep sleep (Opção C de docs/ALIMENTACAO_ENERGIA.md), ver o
+// Para o modo deep sleep (Opção C de docs/projeto/ALIMENTACAO_ENERGIA.md), ver o
 // bloco equivalente e mais detalhado em sketch_fisico_jsn_sr04t.ino e o
 // cabeçalho de piezometro_deep_sleep.h.
 

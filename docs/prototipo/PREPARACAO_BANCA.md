@@ -2,7 +2,7 @@
 
 Documento direto, sem enrolação, para responder às perguntas mais prováveis da banca do TCC.
 Referências de contexto: `docs/BASE_DE_CONHECIMENTO.md` (piezômetros/legislação/mercado),
-`docs/PROTOTIPO_FISICO.md` (hardware), `docs/VALIDACAO_SENSOR.md` (precisão do sensor).
+`docs/PROTOTIPO_FISICO.md` (hardware), `docs/prototipo/VALIDACAO_SENSOR.md` (precisão do sensor).
 
 ---
 
@@ -127,7 +127,7 @@ escondida.
 
 | # | Pergunta | Resposta curta |
 |---|---|---|
-| 1 | "Qual a incerteza de medição do sensor?" | Ver `docs/VALIDACAO_SENSOR.md` — protocolo de 5 alturas × 10 leituras, erro médio/desvio padrão/erro máximo calculados, incerteza declarada como ±2σ |
+| 1 | "Qual a incerteza de medição do sensor?" | Ver `docs/prototipo/VALIDACAO_SENSOR.md` — protocolo de 5 alturas × 10 leituras, erro médio/desvio padrão/erro máximo calculados, incerteza declarada como ±2σ |
 | 2 | "Isso é piezômetro ou INA?" | Ver item (b) acima — hoje é mais próximo de INA (coluna d'água); eletrônica é idêntica para os dois; muda o sensor e a instalação |
 | 3 | "De onde vem o R$ 600 mil/ano?" | É o número do edital da Samarco, não auditado por nós; ver item (a) para a memória de cálculo própria e independente |
 | 4 | "E se faltar energia no ESP32?" | Admitir: sem redundância de energia hoje (não atende ao exigido pela ANM 95/2022 para DPA alto); mitigação futura é bateria + painel solar; o firmware já tem store & forward para não perder dados na falta de **rede**, mas falta de **energia** derruba o dispositivo — são problemas diferentes |

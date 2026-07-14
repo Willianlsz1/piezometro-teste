@@ -109,7 +109,7 @@
 // ===== MODO DE CAMPO A BATERIA/SOLAR (opcional — ver piezometro_deep_sleep.h) =====
 // O padrão deste sketch é o modo sempre-ligado acima (bom para a maquete: LEDs,
 // buzzer e OLED ao vivo). Para uma instalação de campo a bateria/solar (Opção C
-// de docs/ALIMENTACAO_ENERGIA.md), ative o deep sleep ANTES do #include acima:
+// de docs/projeto/ALIMENTACAO_ENERGIA.md), ative o deep sleep ANTES do #include acima:
 //   #define MODO_DEEP_SLEEP
 //   #include "piezometro_core.h"
 //   #include "piezometro_deep_sleep.h"

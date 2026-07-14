@@ -1,10 +1,10 @@
 # Viabilidade Econômica — Material de Apoio (TCC + BMG Canvas)
 
 > **Nota:** este documento é material de apoio para a seção de Viabilidade Econômica do TCC
-> (`docs/TCC_RASCUNHO.md`, item 1.3.6) e para o preenchimento do **BMG Canvas**. Todo número
+> (`docs/tcc/TCC_RASCUNHO.md`, item 1.3.6) e para o preenchimento do **BMG Canvas**. Todo número
 > marcado como **PREMISSA EDITÁVEL** é uma escolha de trabalho dos alunos, não um dado auditado —
 > troque o valor e refaça a conta indicada logo abaixo dele. Os números que já aparecem em
-> `docs/DEFESA_BANCA.md` (custo de leitura manual, R$ 350/campanha, R$ 724 mil/ano) são mantidos
+> `docs/prototipo/PREPARACAO_BANCA.md` (custo de leitura manual, R$ 350/campanha, R$ 724 mil/ano) são mantidos
 > aqui sem contradição; este documento os aprofunda e constrói a precificação e o dimensionamento
 > de mercado em cima deles.
 

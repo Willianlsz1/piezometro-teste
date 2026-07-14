@@ -13,7 +13,7 @@
  * ciclo) — ele mantém seu PRÓPRIO buffer, em RTC_DATA_ATTR (ver seção 2).
  *
  * QUANDO USAR: instalação de campo alimentada por bateria/solar (Opção C de
- * docs/ALIMENTACAO_ENERGIA.md) — reduz o consumo em ~30× (de ~30 Wh/dia para
+ * docs/projeto/ALIMENTACAO_ENERGIA.md) — reduz o consumo em ~30× (de ~30 Wh/dia para
  * <1 Wh/dia) porque o Wi-Fi só liga durante os poucos segundos do ciclo ativo.
  *
  * QUANDO **NÃO** USAR: na maquete/demonstração da banca. Sem este modo, o
@@ -66,7 +66,7 @@
 
 // ===== 1. INTERVALOS DO CICLO =====
 // Piezômetro é um fenômeno LENTO (poropressão varia em horas/dias, não em
-// segundos) — os próprios concorrentes comerciais (docs/ALIMENTACAO_ENERGIA.md,
+// segundos) — os próprios concorrentes comerciais (docs/projeto/ALIMENTACAO_ENERGIA.md,
 // seção 2) medem a cada 5-30 min. 5 min é o valor de referência usado nas
 // contas de autonomia daquele documento; não diminua sem refazer a conta de
 // consumo lá.

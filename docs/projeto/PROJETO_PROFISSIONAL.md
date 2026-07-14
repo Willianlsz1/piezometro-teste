@@ -2,9 +2,9 @@
 
 > Este documento não é um pitch nem uma lista de desejos: é a especificação de engenharia de como
 > o protótipo do TCC vira um produto de campo. Referências que ele consolida sem repetir:
-> `docs/ALIMENTACAO_ENERGIA.md` (energia), `docs/COMPARATIVO_MERCADO.md` (mercado e preços),
-> `docs/VIABILIDADE_ECONOMICA.md` (custo/precificação/TAM-SAM-SOM), `docs/CADEIA_DE_CONFIANCA.md`
-> (integridade do dado) e `docs/DEFESA_BANCA.md` (conformidade regulatória e respostas prontas).
+> `docs/projeto/ALIMENTACAO_ENERGIA.md` (energia), `docs/projeto/COMPARATIVO_MERCADO.md` (mercado e preços),
+> `docs/projeto/VIABILIDADE_ECONOMICA.md` (custo/precificação/TAM-SAM-SOM), `docs/projeto/CADEIA_DE_CONFIANCA.md`
+> (integridade do dado) e `docs/prototipo/PREPARACAO_BANCA.md` (conformidade regulatória e respostas prontas).
 > `firmware/piezometro_core.h` e `firmware/piezometro_deep_sleep.h` são citados pelo contrato que
 > já definem, não reexplicados linha a linha.
 
@@ -55,7 +55,7 @@ duplicação de lógica de rede/alerta.
 
 Sensor submersível que mede pressão hidrostática diretamente (sem depender de linha de visada
 livre e seca, ao contrário do ultrassônico) e converte para nível de coluna d'água. Já dimensionado
-em `docs/VIABILIDADE_ECONOMICA.md` (seção 1.1, cenário "campo real"): **R$ 300–600** o sensor,
+em `docs/projeto/VIABILIDADE_ECONOMICA.md` (seção 1.1, cenário "campo real"): **R$ 300–600** o sensor,
 dentro de um CAPEX de ponto de R$ 586–1.179. É o caminho pragmático: sensor comercial disponível,
 saída elétrica simples (4-20 mA ou 0-5V lida por um conversor ADC/divisor no ESP32), sem exigir
 eletrônica de excitação dedicada.
@@ -66,14 +66,14 @@ ADC/leitura de corrente) e `lerSensor()` (converte a leitura elétrica em metros
 usando a curva de calibração do instrumento — ver 2.3), preenchendo `Leitura.valida = false` sempre
 que a leitura estiver fora da faixa elétrica esperada (ex.: < 3,8 mA ou > 20,5 mA num laço 4-20 mA
 indica sensor desconectado/em falha) — mesma disciplina de "não disfarçar falha de dado bom" já
-documentada em `docs/CADEIA_DE_CONFIANCA.md` §2 para o JSN-SR04T.
+documentada em `docs/projeto/CADEIA_DE_CONFIANCA.md` §2 para o JSN-SR04T.
 
 ### 2.2 Padrão-ouro — piezômetro de corda vibrante
 
 O sensor de fato usado pela Camada 1 do mercado (Worldsensing, Geokon, Sisgeo, Ackcio,
-Encardio-rite — ver `docs/COMPARATIVO_MERCADO.md` seção 2) e o único que mede poropressão de uma
+Encardio-rite — ver `docs/projeto/COMPARATIVO_MERCADO.md` seção 2) e o único que mede poropressão de uma
 camada específica isolada por bulbo com bentonita (diferença conceitual, não só de precisão, frente
-ao INA — ver `docs/DEFESA_BANCA.md` item b). Não é um ADC simples: a leitura exige excitar a corda
+ao INA — ver `docs/prototipo/PREPARACAO_BANCA.md` item b). Não é um ADC simples: a leitura exige excitar a corda
 com um pulso elétrico e medir a frequência de ressonância resultante, circuito que o ESP32 não tem
 nativamente.
 
@@ -93,9 +93,9 @@ Dois níveis, que não se substituem:
 
 - **Certificado rastreável RBC/Inmetro por instrumento** — a "verdade terrestre" oficial que valida
   a curva de conversão sinal→nível de cada sensor individual antes da instalação. É o que
-  `docs/CADEIA_DE_CONFIANCA.md` §4 já identifica como responsabilidade da cadeia institucional
+  `docs/projeto/CADEIA_DE_CONFIANCA.md` §4 já identifica como responsabilidade da cadeia institucional
   (laboratório acreditado), não do software.
-- **O protocolo de bancada do próprio projeto** (`docs/VALIDACAO_SENSOR.md`) — 5 alturas × 10
+- **O protocolo de bancada do próprio projeto** (`docs/prototipo/VALIDACAO_SENSOR.md`) — 5 alturas × 10
   leituras, erro médio/desvio padrão/erro máximo, incerteza ±2σ — não substitui o certificado, mas
   serve como **verificação de recepção**: ao instalar um sensor já certificado, repetir esse
   protocolo em campo confirma que o sensor chegou íntegro e que a instalação (cabo, conector,
@@ -109,7 +109,7 @@ Dois níveis, que não se substituem:
 (`firmware/piezometro_deep_sleep.h`) — buffer próprio em RTC memory (`RTC_DATA_ATTR`, até 96
 leituras, ~2,3 KB), reconexão de WiFi e re-sincronização de NTP por ciclo, reduzindo o consumo em
 **~30×** (de ~30 Wh/dia sempre-ligado para <1 Wh/dia, conta fechada em
-`docs/ALIMENTACAO_ENERGIA.md` seção 4, Opção C). O dimensionamento de solar/bateria também já está
+`docs/projeto/ALIMENTACAO_ENERGIA.md` seção 4, Opção C). O dimensionamento de solar/bateria também já está
 feito (seção 4, Opção B): painel 20 W + bateria 12V 18Ah AGM, ~3 dias de autonomia sem sol mesmo no
 modo sempre-ligado — com deep sleep ativo, a mesma bateria (ou uma 18650 muito menor) dura semanas.
 
@@ -130,7 +130,7 @@ modo sempre-ligado — com deep sleep ativo, a mesma bateria (ou uma 18650 muito
   dias muito nublados), evitando comportamento indefinido em vez de um reset limpo.
 - Isso atende, "em espírito", a exigência de **redundância de energia** da ANM 95/2022 para DPA
   alto (energia autônoma contínua via solar+bateria) — como já registrado em
-  `docs/ALIMENTACAO_ENERGIA.md` seção 5, uma validação formal para DPA alto exigiria dimensionamento
+  `docs/projeto/ALIMENTACAO_ENERGIA.md` seção 5, uma validação formal para DPA alto exigiria dimensionamento
   por engenheiro responsável, não apenas a conta do TCC.
 
 ---
@@ -140,7 +140,7 @@ modo sempre-ligado — com deep sleep ativo, a mesma bateria (ou uma 18650 muito
 **O que já temos:** store & forward em duas variantes — buffer de até 120 leituras em RAM comum
 (modo sempre-ligado, `piezometro_core.h`) e buffer de até 96 leituras em RTC memory (modo deep
 sleep, `piezometro_deep_sleep.h`) — ambos toleram queda de **rede** (não de energia, distinção que
-`docs/ALIMENTACAO_ENERGIA.md` seção 1 marca com cuidado) sem perder leitura, reenviando quando a
+`docs/projeto/ALIMENTACAO_ENERGIA.md` seção 1 marca com cuidado) sem perder leitura, reenviando quando a
 conectividade volta. O Worker recebe o mesmo formato de payload (`{"leituras":[...]}`) não importa
 qual variante de firmware o enviou.
 
@@ -149,7 +149,7 @@ qual variante de firmware o enviou.
 - **Wi-Fi onde houver rede local** (instalações urbanas/industriais com infraestrutura já
   disponível) — modo atual, sem alteração.
 - **LoRaWAN para campo sem Wi-Fi** — a evolução já apontada em
-  `docs/ALIMENTACAO_ENERGIA.md` (menção, seção 4) e `docs/VIABILIDADE_ECONOMICA.md` (seção 1.3):
+  `docs/projeto/ALIMENTACAO_ENERGIA.md` (menção, seção 4) e `docs/projeto/VIABILIDADE_ECONOMICA.md` (seção 1.3):
   nó classe A de baixíssimo consumo, gateway compartilhado por barragem (**~R$ 800–1.500**, custo
   único), backhaul do gateway até a internet via 4G. O ponto de engenharia central: **o Worker não
   muda em nada** — o gateway LoRaWAN é quem fala HTTP com `/ingest`, agregando os nós que fala
@@ -188,7 +188,7 @@ dispositivo for fisicamente comprometido (roubo, violação do gabinete), revoga
   `WiFiClientSecure::setCACert()` com o certificado raiz da Cloudflare fixado no firmware.
 - **Assinatura HMAC por mensagem (evolução, não requisito do piloto)** — `DEVICE_KEY`/`DEVICE_KEYS`
   provam "quem enviou" (posse do segredo), não "esta leitura específica não foi alterada em
-  trânsito" com garantia criptográfica (gap já registrado em `docs/CADEIA_DE_CONFIANCA.md` §5).
+  trânsito" com garantia criptográfica (gap já registrado em `docs/projeto/CADEIA_DE_CONFIANCA.md` §5).
   Um HMAC-SHA256 do corpo da requisição, calculado com a `DEVICE_KEY` do dispositivo e verificado
   no Worker, fecha essa lacuna sem trocar o modelo de chave — é uma camada adicional sobre a mesma
   identidade, não uma reescrita da autenticação.
@@ -222,15 +222,15 @@ de 1 minuto que já roda o motor de alertas.
 - **Backup**: `wrangler d1 export` (exportação periódica do banco D1 inteiro) como rotina agendada
   (ex.: mensal, via cron externo ou GitHub Actions) gravando o dump num bucket externo (R2 ou S3) —
   caminho simples para uma réplica fora do D1 gerenciado pela Cloudflare, cobrindo o gap de
-  "redundância de armazenamento" já identificado em `docs/CADEIA_DE_CONFIANCA.md` §5.
+  "redundância de armazenamento" já identificado em `docs/projeto/CADEIA_DE_CONFIANCA.md` §5.
 
 ---
 
 ## §7 Operação profissional
 
 - **Plano Cloudflare pago desde o dia 1 em produção** — Workers Paid, US$ 5/mês (~R$ 25-30/mês,
-  compartilhado entre todos os pontos, não por ponto — ver `docs/VIABILIDADE_ECONOMICA.md` seção
-  1.3). O argumento já está fechado em `docs/DEFESA_BANCA.md` item d: o free tier é aceitável para
+  compartilhado entre todos os pontos, não por ponto — ver `docs/projeto/VIABILIDADE_ECONOMICA.md` seção
+  1.3). O argumento já está fechado em `docs/prototipo/PREPARACAO_BANCA.md` item d: o free tier é aceitável para
   um protótipo de TCC, mas uma operação real com dados de segurança de barragem em jogo contrata o
   plano pago desde o início — trade-off consciente, não economia de última hora.
 - **Monitoramento do monitor** — o motor de alertas já cobre "instrumento mudo" (P2 "sem dados",
@@ -243,13 +243,13 @@ de 1 minuto que já roda o motor de alertas.
 - **Procedimento de comissionamento por ponto** — instalar (fixação física do sensor + adapter
   correto) → calibrar (curva sinal→nível do instrumento, certificado RBC quando aplicável, §2.3) →
   validar por 2 semanas em paralelo contra leitura manual no mesmo ponto (mesma disciplina que o
-  protocolo de bancada de `docs/VALIDACAO_SENSOR.md`, mas em campo e por período mais longo, para
+  protocolo de bancada de `docs/prototipo/VALIDACAO_SENSOR.md`, mas em campo e por período mais longo, para
   capturar efeitos que a bancada não reproduz — temperatura, umidade, vibração) → aceitar
   (documentar o erro medido, liberar o ponto para operação sem acompanhamento manual paralelo).
 - **Manutenção programada** — inspeção mensal por ponto (mesmo em operação autônoma, nenhuma norma
-  aceita instrumento que ninguém visita — princípio já registrado em `docs/DEFESA_BANCA.md` item c);
+  aceita instrumento que ninguém visita — princípio já registrado em `docs/prototipo/PREPARACAO_BANCA.md` item c);
   troca de bateria e/ou sensor por vida útil estimada (bateria: anos, conforme a química e o
-  dimensionamento de `docs/ALIMENTACAO_ENERGIA.md`; sensor: conforme especificação do fabricante,
+  dimensionamento de `docs/projeto/ALIMENTACAO_ENERGIA.md`; sensor: conforme especificação do fabricante,
   tipicamente 5-10 anos para corda vibrante, menor para transdutor piezorresistivo em ambiente
   agressivo).
 
@@ -257,7 +257,7 @@ de 1 minuto que já roda o motor de alertas.
 
 ## §8 Conformidade ANM 95/2022 — antes e depois
 
-Retomando a tabela de `docs/DEFESA_BANCA.md` item c, atualizada para o que a versão PROFISSIONAL
+Retomando a tabela de `docs/prototipo/PREPARACAO_BANCA.md` item c, atualizada para o que a versão PROFISSIONAL
 passa a atender:
 
 | Requisito regulatório | Protótipo (hoje) | Versão profissional |
@@ -273,13 +273,13 @@ passa a atender:
 
 A honestidade da linha de inspeção física é deliberada: mesmo a versão profissional não substitui o
 engenheiro responsável nem a visita humana periódica — o sistema informa com mais frequência e mais
-confiabilidade, não decide nem fiscaliza (mesmo princípio de `docs/CADEIA_DE_CONFIANCA.md` §4).
+confiabilidade, não decide nem fiscaliza (mesmo princípio de `docs/projeto/CADEIA_DE_CONFIANCA.md` §4).
 
 ---
 
 ## §9 Roadmap em 3 fases
 
-Custos por ponto abaixo usam a mesma base de `docs/VIABILIDADE_ECONOMICA.md` (CAPEX + implantação +
+Custos por ponto abaixo usam a mesma base de `docs/projeto/VIABILIDADE_ECONOMICA.md` (CAPEX + implantação +
 OPEX ano 1), ajustada a cada fase pelo sensor/comunicação daquela fase. Preço de venda de referência
 (R$ 2.500 + R$ 50/mês de assinatura) é o mesmo da seção 2.4 daquele documento — todo custo por ponto
 abaixo fica abaixo desse preço, condição obrigatória para o modelo se sustentar.
@@ -327,7 +327,7 @@ abaixo fica abaixo desse preço, condição obrigatória para o modelo se susten
 Nada do que profissionaliza o sistema apaga o que já diferencia o protótipo:
 
 - **Stack aberta e documentada** — nenhuma das oito soluções pesquisadas em
-  `docs/COMPARATIVO_MERCADO.md` publica arquitetura ou preço; este projeto publica os dois, do
+  `docs/projeto/COMPARATIVO_MERCADO.md` publica arquitetura ou preço; este projeto publica os dois, do
   Worker de 7 módulos ao dashboard sem bundler.
 - **Custo por ponto uma ordem de grandeza menor** — mesmo na Fase 3 (produto maduro, ~R$ 1.800-2.200
   de custo), continua muito abaixo da faixa de R$ 5.000-20.000/ponto da telemetria industrial

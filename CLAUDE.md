@@ -51,7 +51,8 @@ Dashboard (GitHub Pages, index.html) → GET /ultimos, /dados?pz&range
 | `firmware/piezometro_deep_sleep.h` | Modo de campo a bateria/solar (opcional, opt-in via `MODO_DEEP_SLEEP`) |
 | `firmware/sketch*.ino` | Adapters de sensor (BMP180 simulação; JSN-SR04T físico) |
 | `docs/projeto/` | A face "empresa": base de conhecimento, mercado, padrões ISA do dashboard e a especificação industrial (`PROJETO_INDUSTRIAL.md`) |
-| `docs/prototipo/` | A face "maquete/banca": guia de montagem física, defesa na banca e planos de dev executados |
+| `docs/prototipo/` | A face "maquete/banca": guia de montagem física, validação do sensor, defesa/preparação da banca e planos de dev executados |
+| `docs/tcc/` | Entregáveis do TCC (rascunho estruturado e .docx de entrega) |
 
 **Guarda anti-godfile (permanente):** ≤ ~300 linhas por arquivo (exceção: `paineis.js` até ~450),
 1 responsabilidade por arquivo, nome = responsabilidade. Função nova entra no arquivo cujo nome a

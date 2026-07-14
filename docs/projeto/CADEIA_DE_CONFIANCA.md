@@ -1,7 +1,7 @@
 # Cadeia de Confiança — "Quem garante que o monitoramento é válido?"
 
-Documento direto, no mesmo espírito de `docs/DEFESA_BANCA.md`. Referências que este documento
-não repete: `docs/VALIDACAO_SENSOR.md` (precisão do sensor) e `docs/DEFESA_BANCA.md` (economia,
+Documento direto, no mesmo espírito de `docs/prototipo/PREPARACAO_BANCA.md`. Referências que este documento
+não repete: `docs/prototipo/VALIDACAO_SENSOR.md` (precisão do sensor) e `docs/prototipo/PREPARACAO_BANCA.md` (economia,
 piezômetro vs. INA, conformidade regulatória, free tier).
 
 ---
@@ -51,7 +51,7 @@ Integridade garante que o dado exibido é o dado que chegou. Não garante que o 
 é *correto* — isso é uma pergunta de calibração, respondida confrontando o sensor com uma
 referência independente (régua/trena) em alturas conhecidas. O protocolo completo — materiais,
 procedimento de 5 alturas × 10 leituras, fórmulas de erro médio/desvio padrão/erro máximo e a
-frase de incerteza declarada (±2σ) — está em `docs/VALIDACAO_SENSOR.md`; não repetido aqui. O
+frase de incerteza declarada (±2σ) — está em `docs/prototipo/VALIDACAO_SENSOR.md`; não repetido aqui. O
 papel dele nesta cadeia é fechar o elo que a arquitetura de software, sozinha, não consegue
 fechar: mostrar que o número na tela também *bate com a realidade física*, dentro de uma faixa
 de erro conhecida.
@@ -62,10 +62,10 @@ de erro conhecida.
 
 | Elo institucional | Papel |
 |---|---|
-| **Laboratório de calibração acreditado (RBC/Inmetro)** | Emite o certificado rastreável do instrumento — a "verdade terrestre" oficial que um TCC não pode substituir (ver nota honesta em `docs/VALIDACAO_SENSOR.md` §6) |
+| **Laboratório de calibração acreditado (RBC/Inmetro)** | Emite o certificado rastreável do instrumento — a "verdade terrestre" oficial que um TCC não pode substituir (ver nota honesta em `docs/prototipo/VALIDACAO_SENSOR.md` §6) |
 | **Projetista geotécnico** | Define os limiares de controle por instrumento e por barragem — por isso o sistema **parametriza** `NIVEL_ATENCAO`/`NIVEL_CRITICO` em vez de fixar um valor universal (`CLAUDE.md`, "Limiares espelhados em 3 lugares") |
 | **Engenheiro responsável + Plano de Segurança da Barragem** | Decide e documenta a operação com base nos dados — o sistema informa, não decide |
-| **ANM (Res. 95/2022) + auditorias** | Fiscaliza o cumprimento regulatório da instrumentação e da resposta a alertas (ver tabela de conformidade em `docs/DEFESA_BANCA.md` item c) |
+| **ANM (Res. 95/2022) + auditorias** | Fiscaliza o cumprimento regulatório da instrumentação e da resposta a alertas (ver tabela de conformidade em `docs/prototipo/PREPARACAO_BANCA.md` item c) |
 
 **Mensagem central:** o sistema não substitui essa cadeia institucional — ele a **alimenta com
 dados melhores** (contínuos, em tempo real, com histórico auditável). O que garantimos **por
@@ -78,13 +78,13 @@ responsabilidade da cadeia institucional acima, não do software.
 ## §5 O que falta para auditabilidade formal (admitir antes que perguntem)
 
 - **Calibração rastreável RBC** — o protótipo usa régua/trena como referência (ver
-  `docs/VALIDACAO_SENSOR.md`), não um padrão acreditado.
+  `docs/prototipo/VALIDACAO_SENSOR.md`), não um padrão acreditado.
 - **Assinatura digital das leituras no device** — hoje a autenticação é por `DEVICE_KEY`
   compartilhada (prova "alguém com a chave enviou", não "esta leitura específica não foi
   alterada em trânsito" com garantia criptográfica por mensagem).
 - **Log de auditoria de acessos** — quem consultou o `/dados` de qual piezômetro e quando não é
   registrado hoje.
-- **Redundância** — nem de energia (ver `docs/DEFESA_BANCA.md` item c/e, pergunta 4), nem de
+- **Redundância** — nem de energia (ver `docs/prototipo/PREPARACAO_BANCA.md` item c/e, pergunta 4), nem de
   armazenamento fora do D1 gerenciado pela Cloudflare.
 
 Nenhum desses itens muda a arquitetura atual — são todos trabalhos futuros aditivos sobre a
