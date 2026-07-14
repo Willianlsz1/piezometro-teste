@@ -144,6 +144,11 @@ via ADS1115 e converter para nível/carga piezométrica em metros — o mesmo co
 sistema — protocolo HTTP, autenticação por `DEVICE_KEY`, schema do D1, motor de alertas, dashboard —
 é reaproveitado integralmente, sem reescrita.
 
+Este adapter já está implementado em `firmware/sketch_uct_4a20ma.ino`: lê o ADS1115 (shunt 150 Ω,
+ganho `GAIN_ONE`), calibra por dois pontos (coeficientes ajustados na etapa E2 de
+`HOMOLOGACAO_UCT.md`) e detecta falha elétrica do loop (NAMUR NE43) marcando a leitura como
+inválida em vez de enviá-la ao histórico.
+
 ---
 
 ## 4. Hardware industrial

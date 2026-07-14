@@ -49,7 +49,7 @@ Dashboard (GitHub Pages, index.html) → GET /ultimos, /dados?pz&range
 | `assets/styles.css` + `assets/js/*` | CSS e os 8 módulos JS do dashboard (`config`, `util`, `fontes`, `estado`, `graficos`, `paineis`, `exportar`, `app`), carregados por `<script src>` em ordem de dependência — **sem bundler** |
 | `firmware/piezometro_core.h` | Núcleo comum do firmware (WiFi/buffer/envio/alertas/OLED) |
 | `firmware/piezometro_deep_sleep.h` | Modo de campo a bateria/solar (opcional, opt-in via `MODO_DEEP_SLEEP`) |
-| `firmware/sketch*.ino` | Adapters de sensor (BMP180 simulação; JSN-SR04T físico) |
+| `firmware/sketch*.ino` | Adapters de sensor (BMP180 simulação; JSN-SR04T físico; UCT 4-20 mA/ADS1115 industrial) |
 | `docs/projeto/` | A face "empresa": base de conhecimento, mercado, padrões ISA do dashboard e a especificação industrial (`PROJETO_INDUSTRIAL.md`) |
 | `docs/prototipo/` | A face "maquete/banca": guia de montagem física, validação do sensor, defesa/preparação da banca e planos de dev executados |
 | `docs/tcc/` | Entregáveis do TCC (rascunho estruturado e .docx de entrega) |
