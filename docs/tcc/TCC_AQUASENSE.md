@@ -127,7 +127,9 @@ Por isso, o valor de referência usado no projeto para cada unidade é R$ 2.965,
 | Reserva de contingência | Imprevistos de fabricação, câmbio e frete | 31.925 |
 | **Investimento total para 50 pontos** | | **260.000** |
 
-O investimento total de R$ 260.000 equivale a R$ 5.200 por ponto de monitoramento já instalado e funcionando, dos quais R$ 2.965 são o próprio equipamento e o restante cobre tudo o que é preciso para colocá-lo em operação segura no campo.
+O investimento total de R$ 260.000 equivale a R$ 5.200 por ponto de monitoramento já instalado e funcionando, dos quais R$ 2.965 são o próprio equipamento e o restante cobre tudo o que é preciso para colocá-lo em operação segura no campo. O gráfico abaixo apresenta a mesma composição em escala visual.
+
+[GRAFICO: grafico3_capex.png | Gráfico 1 – Composição do investimento total de R$ 260.000 (50 pontos)]
 
 **Quanto a empresa gasta hoje**
 
@@ -147,11 +149,15 @@ Depois de instalado, o AquaSense ainda gera custo de manutenção, e ignorá-lo 
 
 **Economia anual gerada: R$ 560.845,00 (redução de 93,5%)**
 
-Comparando o gasto atual de R$ 600.000,00 por ano com o custo operacional de R$ 39.155,00, a empresa passa a economizar R$ 560.845,00 todos os anos a partir do segundo ano de operação, uma redução de 93,5% do que gastava antes. No primeiro ano, descontando também o investimento inicial de R$ 260.000,00, a economia líquida ainda é de R$ 300.845,00 nos primeiros doze meses.
+Comparando o gasto atual de R$ 600.000,00 por ano com o custo operacional de R$ 39.155,00, a empresa passa a economizar R$ 560.845,00 todos os anos a partir do segundo ano de operação, uma redução de 93,5% do que gastava antes. No primeiro ano, descontando também o investimento inicial de R$ 260.000,00, a economia líquida ainda é de R$ 300.845,00 nos primeiros doze meses. O contraste entre os dois custos anuais é apresentado no gráfico a seguir.
+
+[GRAFICO: grafico2_custo_anual.png | Gráfico 2 – Custo anual da leitura manual em comparação com a operação do AquaSense]
 
 **Payback do projeto: 5,6 meses**
 
-Payback é o tempo que a economia gerada leva para pagar de volta o investimento feito. Dividindo o investimento de R$ 260.000,00 pela economia líquida mensal de aproximadamente R$ 46.737,00, chegamos a 5,6 meses: em pouco mais de meio ano de operação, o sistema já se pagou sozinho, e tudo o que economizar dali em diante é ganho da empresa.
+Payback é o tempo que a economia gerada leva para pagar de volta o investimento feito. Dividindo o investimento de R$ 260.000,00 pela economia líquida mensal de aproximadamente R$ 46.737,00, chegamos a 5,6 meses: em pouco mais de meio ano de operação, o sistema já se pagou sozinho, e tudo o que economizar dali em diante é ganho da empresa. O gráfico a seguir mostra essa trajetória mês a mês, com o saldo saindo do investimento inicial negativo e cruzando o zero antes do sexto mês.
+
+[GRAFICO: grafico1_payback.png | Gráfico 3 – Saldo acumulado do investimento ao longo do primeiro ano de operação]
 
 **ROI do projeto: 116% no primeiro ano e 978% em cinco anos**
 
