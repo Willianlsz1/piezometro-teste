@@ -1,4 +1,4 @@
-# AquaSense: Sistema de Telemetria e Monitoramento Geotécnico Remoto e Contínuo para Piezômetros via IoT
+# #[PREENCHER: código da unidade]# AquaSense: Sistema de Telemetria e Monitoramento Geotécnico Remoto e Contínuo para Piezômetros via IoT
 
 > Fonte deste documento: transcrição fiel do TCC oficial da equipe (template INTEGRA SENAI-MG),
 > com as correções decididas em 14/07/2026 aplicadas (ver nota ao final). É a partir deste
