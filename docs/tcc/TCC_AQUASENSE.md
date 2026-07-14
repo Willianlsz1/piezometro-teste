@@ -133,15 +133,29 @@ O investimento total de R$ 260.000 equivale a R$ 5.200 por ponto de monitorament
 
 O edital que originou este projeto declara uma economia potencial de R$ 600 mil por ano com a substituição da leitura manual terceirizada. Não tivemos acesso à planilha interna da empresa que gerou esse número, então testamos se ele é coerente com a prática do mercado. Um contrato de leitura manual terceirizada custa, em faixas usuais do setor, algo em torno de R$ 50 mil por mês, valor que paga uma equipe de campo com técnicos, veículo, combustível, equipamentos de segurança, encargos trabalhistas e a elaboração de relatórios. Essa equipe consegue ler cerca de cem piezômetros duas vezes por semana. Dividindo o custo mensal pelo número de leituras realizadas no período, cada leitura individual sai por cerca de R$ 58, um valor plausível para um serviço técnico terceirizado de campo. Ou seja, o número de R$ 600 mil por ano declarado no edital é coerente com o que o mercado de fato cobra por esse tipo de serviço, e não uma cifra arbitrária.
 
-**Quanto passará a gastar**
+**Indicadores de viabilidade do projeto**
 
-Depois de instalado, o AquaSense ainda gera custo de manutenção, e ignorá-lo distorceria a comparação. Somamos a conectividade celular dos cinquenta pontos, o serviço de nuvem que recebe e processa os dados, a manutenção preventiva de peças e as inspeções físicas mensais de campo. O total é R$ 39.155 por ano, ou cerca de R$ 783 por ponto por ano. O maior item dessa conta é o chip 4G de cada ponto, calculado no cenário mais caro, com cada unidade operando de forma totalmente independente; existem duas rotas concretas para reduzir esse valor, uma pela contratação de um plano de dados sob medida para o baixo volume que o sistema realmente transmite, outra pela instalação de um único ponto de comunicação compartilhado entre os sensores próximos entre si, o que é o caso típico de uma barragem. Mesmo sem aplicar nenhuma dessas duas reduções, o custo de manutenção anual representa uma fração pequena diante da economia obtida, como mostra o cálculo a seguir.
+Com os custos levantados e o gasto atual da empresa verificado, os cinco indicadores abaixo resumem a viabilidade econômica do AquaSense. Cada um traz o valor calculado e a explicação de como chegamos a ele.
 
-**O que a empresa ganha**
+**Investimento inicial do projeto: R$ 260.000,00**
 
-Comparando a economia bruta de R$ 600.000 por ano com o custo de manutenção de R$ 39.155, sobra uma economia líquida de R$ 560.845 por ano a partir do segundo ano de operação, uma redução de 93,5% do que a empresa gastava antes. No primeiro ano, é preciso descontar também o investimento inicial de R$ 260.000, o que ainda deixa uma economia líquida de R$ 300.845 já nos primeiros doze meses.
+É o valor único necessário para colocar os cinquenta pontos de monitoramento em operação, conforme a composição detalhada na tabela anterior: hardware, instalação em campo, peças sobressalentes, bancada de homologação e reserva de contingência. Equivale a R$ 5.200,00 por ponto instalado e funcionando, pago uma única vez.
 
-Esse resultado permite calcular dois indicadores que costumam aparecer em qualquer análise desse tipo, e que explicamos aqui em palavras simples. O primeiro é o payback, o tempo que a economia gerada leva para pagar de volta o investimento feito. Dividindo o investimento de R$ 260.000 pela economia líquida mensal de aproximadamente R$ 46.737, chegamos a um payback de 5,6 meses: em pouco mais de meio ano de operação, o sistema já se pagou sozinho. O segundo indicador é o ROI, ou retorno sobre o investimento, que mostra quanto volta para o bolso da empresa para cada real investido. No primeiro ano, o ROI é de 116%, o que quer dizer que cada R$ 1,00 investido retorna R$ 2,16: o real investido de volta mais R$ 1,16 de ganho líquido, mesmo já contando o custo de manutenção do primeiro ano. Olhando cinco anos de operação, período em que o investimento inicial é pago uma única vez e só o custo de manutenção se repete, o retorno acumulado chega a 978%, ou seja, cada R$ 1,00 investido vira quase R$ 11,00.
+**Custo operacional anual: R$ 39.155,00**
+
+Depois de instalado, o AquaSense ainda gera custo de manutenção, e ignorá-lo distorceria a comparação. O valor soma a conectividade celular dos cinquenta pontos, o serviço de nuvem que recebe e processa os dados, a manutenção preventiva de peças e as inspeções físicas mensais de campo, resultando em cerca de R$ 783,00 por ponto por ano. O maior item é o chip 4G de cada ponto, calculado no cenário mais caro, com cada unidade operando de forma totalmente independente; existem duas rotas concretas para reduzir esse valor, uma pela contratação de um plano de dados sob medida para o baixo volume que o sistema realmente transmite, outra pela instalação de um único ponto de comunicação compartilhado entre sensores próximos entre si, o que é o caso típico de uma barragem.
+
+**Economia anual gerada: R$ 560.845,00 (redução de 93,5%)**
+
+Comparando o gasto atual de R$ 600.000,00 por ano com o custo operacional de R$ 39.155,00, a empresa passa a economizar R$ 560.845,00 todos os anos a partir do segundo ano de operação, uma redução de 93,5% do que gastava antes. No primeiro ano, descontando também o investimento inicial de R$ 260.000,00, a economia líquida ainda é de R$ 300.845,00 nos primeiros doze meses.
+
+**Payback do projeto: 5,6 meses**
+
+Payback é o tempo que a economia gerada leva para pagar de volta o investimento feito. Dividindo o investimento de R$ 260.000,00 pela economia líquida mensal de aproximadamente R$ 46.737,00, chegamos a 5,6 meses: em pouco mais de meio ano de operação, o sistema já se pagou sozinho, e tudo o que economizar dali em diante é ganho da empresa.
+
+**ROI do projeto: 116% no primeiro ano e 978% em cinco anos**
+
+ROI, ou retorno sobre o investimento, mostra quanto volta para a empresa para cada real investido. No primeiro ano, o ROI de 116% significa que cada R$ 1,00 investido retorna R$ 2,16: o real investido de volta mais R$ 1,16 de ganho líquido, já contando o custo de manutenção do período. Em cinco anos de operação, período em que o investimento inicial é pago uma única vez e apenas o custo de manutenção se repete, o retorno acumulado chega a 978%, ou seja, cada R$ 1,00 investido vira quase R$ 11,00.
 
 **O AquaSense diante do mercado**
 
