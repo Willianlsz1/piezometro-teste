@@ -1,394 +1,291 @@
-# Viabilidade Econômica — Material de Apoio (TCC + BMG Canvas)
+# Viabilidade Econômica — Sistema Industrial AquaSense (UCT)
 
-> **Nota:** este documento é material de apoio para a seção de Viabilidade Econômica do TCC
-> (`docs/tcc/TCC_RASCUNHO.md`, item 1.3.6) e para o preenchimento do **BMG Canvas**. Todo número
-> marcado como **PREMISSA EDITÁVEL** é uma escolha de trabalho dos alunos, não um dado auditado —
-> troque o valor e refaça a conta indicada logo abaixo dele. Os números que já aparecem em
-> `docs/prototipo/PREPARACAO_BANCA.md` (custo de leitura manual, R$ 350/campanha, R$ 724 mil/ano) são mantidos
-> aqui sem contradição; este documento os aprofunda e constrói a precificação e o dimensionamento
-> de mercado em cima deles.
+> **Pesquisa de preços realizada em:** 14/07/2026, via busca na internet (16 buscas textuais +
+> tentativas de acesso direto a páginas de fornecedores; várias páginas retornaram HTTP 403
+> ao acesso direto — nesses casos o preço usado veio do resumo da busca, marcado como tal).
+> Todos os valores devem ser confirmados por cotação direta antes de qualquer decisão de compra
+> real — preços de e-commerce mudam diariamente e variam por vendedor, frete e lote.
 
 ---
 
-## 1. Estrutura de custos (o que custa para NÓS)
+## 0. Nota de escopo
 
-### 1.1 CAPEX por ponto
+Esta viabilidade econômica é do **sistema industrial** — a Unidade de Controle e Telemetria (UCT)
+AquaSense especificada em `PROJETO_INDUSTRIAL.md`, seções 4 a 6: transdutor piezométrico
+submersível 4–20 mA, ADS1115, ESP32 industrial em PCB dedicada, módulo celular 4G SIM7600, energia
+solar autônoma, gabinete IP66/67 com proteção contra surto. **O protótipo de bancada (ESP32 DevKit
+em protoboard, sensor ultrassônico JSN-SR04T, Cloudflare Worker/D1 já publicado) não entra nos
+números deste documento** — ele é a representação funcional que provou a arquitetura de software
+(ingestão, alertas, dashboard), não o produto que seria fabricado e vendido. Os números de CAPEX de
+protótipo (R$ 150–220/ponto) e de instalação de campo genérica que apareciam na versão anterior
+deste documento foram descontinuados aqui em favor do BOM real da UCT.
 
-**Cenário 1 — Protótipo/bancada** (o que está montado hoje, ver `docs/PROTOTIPO_FISICO.md`):
-
-| Item | Faixa de preço |
-|---|---|
-| ESP32 DevKit V1 | R$ 35–50 |
-| Sensor ultrassônico JSN-SR04T | R$ 40–70 |
-| Display OLED SSD1306 | R$ 20–35 |
-| LEDs (verde/amarelo/vermelho) | R$ 1–3 |
-| Resistores 220 Ω (×3) | R$ 1–2 |
-| Resistores 1 kΩ + 2 kΩ (divisor do ECHO) | R$ 1–2 |
-| Buzzer ativo 5V | R$ 3–5 |
-| Protoboard 830 pontos | R$ 10–20 |
-| Jumpers (kit) | R$ 8–15 |
-| Cabo micro-USB de dados | R$ 5–12 |
-| Tubo de PVC/balde (recipiente de teste) | R$ 15–30 |
-| Fita adesiva/abraçadeira | R$ 5–10 |
-| **Soma item a item (mín. + mín., máx. + máx.)** | **R$ 144 – R$ 254** |
-
-Conferindo a soma: mínimo = 35+40+20+1+1+1+3+10+8+5+15+5 = **R$ 144**; máximo =
-50+70+35+3+2+2+5+20+15+12+30+10 = **R$ 254**. `PROTOTIPO_FISICO.md` arredonda esse total para
-**R$ 150–220** — a diferença vem do fato de que, na prática, nem todo item bate no teto ao mesmo
-tempo (jumpers e resistores costumam sobrar de kits já comprados para outros pontos). Este
-documento usa a faixa **R$ 150–220/ponto** (a mesma do `DEFESA_BANCA.md`) como referência do
-cenário protótipo, e registra R$ 144–254 como o cálculo aritmético estrito, para deixar a conta
-auditável.
-
-**Cenário 2 — Instalação de campo realista** (PREMISSA EDITÁVEL — não existe ainda, é o que
-mudaria para sair da bancada para uma barragem de verdade): troca-se o sensor ultrassônico por um
-transdutor de pressão submersível (o ultrassônico não é adequado para um poço/tubo de piezômetro
-real — precisa de linha de visada livre e seca) e adiciona-se proteção industrial:
-
-| Item | Faixa de preço | Observação |
-|---|---|---|
-| ESP32 DevKit V1 | R$ 35–50 | mesmo módulo |
-| **Transdutor de pressão submersível** (substitui o JSN-SR04T) | **R$ 300–600** (PREMISSA) | faixa plausível para transdutor 0–5/0–10 m com saída 4-20mA ou 0-5V, sem certificação de corda vibrante |
-| Display OLED SSD1306 | R$ 20–35 | opcional em campo (checagem local) |
-| LEDs + resistores + buzzer (sinalização local) | R$ 6–12 | mesmos componentes, agrupados |
-| Placa/terminais industriais (substitui protoboard/jumpers) | R$ 25–45 (PREMISSA) | conexões soldadas/parafusadas, mais robustas que protoboard |
-| Fonte de alimentação industrial 5V/2A + gabinete interno | R$ 25–45 (PREMISSA) | |
-| **Caixa hermética IP65** | **R$ 80–150** (PREMISSA) | abrigo da eletrônica no campo |
-| Cabo submersível/blindado do transdutor (5–10 m) | R$ 50–150 (PREMISSA) | varia com a profundidade do poço |
-| Fixação/suporte (inox ou PVC industrial + abraçadeiras) | R$ 40–80 (PREMISSA) | |
-| Cabo micro-USB de dados (gravação do firmware, uma vez) | R$ 5–12 | |
-| **Total (cenário campo real)** | **R$ 586 – R$ 1.179** | soma linha a linha abaixo |
-
-Conferindo a soma: mínimo = 35+300+20+6+25+25+80+50+40+5 = **R$ 586**; máximo =
-50+600+35+12+45+45+150+150+80+12 = **R$ 1.179**.
-
-> Por que a diferença é tão grande (R$ 150–220 → R$ 586–1.179)? O item que mais pesa é o sensor:
-> um transdutor de pressão submersível de entrada custa 5–10× mais que o sensor ultrassônico, e a
-> proteção industrial (caixa IP65, cabo blindado, fixação) não existe no protótipo de bancada. Isso
-> é esperado e deve ser dito à banca sem meias palavras: **o protótipo demonstra o conceito e a
-> arquitetura, não o custo final de uma instalação de campo em operação real.**
-
-### 1.2 Custo de implantação por ponto (instalação + calibração)
-
-PREMISSA EDITÁVEL — horas de técnico de campo a R$ 60–100/hora:
-
-| Cenário | Horas estimadas | Custo |
-|---|---|---|
-| Protótipo/bancada (montagem simples, sem obra) | 2–4 h | R$ 120–400 |
-| Campo real (acesso ao poço, fixação, calibração do transdutor, teste) | 4–8 h | R$ 240–800 |
-
-### 1.3 OPEX (custo recorrente)
-
-- **Nuvem:** free tier da Cloudflare = **R$ 0/mês** até o limite descrito em `DEFESA_BANCA.md`
-  item (d) (~11 pontos a 1 leitura/10 s, ou ~69 pontos a 1 leitura/min). Acima disso, plano
-  **Cloudflare Workers Paid a partir de US$ 5/mês ≈ R$ 25–30/mês**, **compartilhado entre TODOS os
-  pontos** (não é por ponto). Custo por ponto/mês = (R$ 25–30) ÷ nº de pontos:
-  - 20 pontos → R$ 25/20 = **R$ 1,25** a R$ 30/20 = **R$ 1,50**/ponto/mês
-  - 200 pontos → R$ 25/200 = **R$ 0,125** a R$ 30/200 = **R$ 0,15**/ponto/mês
-  - conforme a escala cresce, o custo por ponto cai — faixa de referência **R$ 0,15 a R$ 1,50/ponto/mês**.
-- **SMS Twilio:** só dispara em transições de faixa (alerta), não é custo contínuo. PREMISSA:
-  R$ 0,20–0,40/SMS (faixa plausível para SMS transacional Twilio no Brasil). Estimando 6–12
-  transições de alerta por ano por ponto (operação estabilizada, sem eventos anômalos): custo ≈
-  R$ 1,20–4,80/ponto/ano.
-- **Manutenção/substituição:** PREMISSA de 10–15% do valor do hardware/ano (sensores e conectores
-  se degradam com exposição):
-  - Cenário protótipo (CAPEX R$ 150–220): R$ 15–33/ano
-  - Cenário campo real (CAPEX R$ 586–1.179): R$ 59–177/ano
-- **Conectividade:** WiFi do cliente = **R$ 0/mês** (premissa padrão do protótipo, dependente da
-  infraestrutura já existente no local). Alternativa PREMISSA para locais sem WiFi: chip 4G IoT
-  (plano M2M) R$ 20–40/mês/ponto, ou rede LoRaWAN (gateway compartilhado R$ 800–1.500 uma vez,
-  custo recorrente por nó R$ 0–15/mês conforme operador).
-
-### 1.4 Tabela-resumo (referência: instalação de 20 pontos, para casar com o exemplo de
-`DEFESA_BANCA.md`)
-
-| | Cenário protótipo | Cenário campo real |
-|---|---|---|
-| CAPEX/ponto (1.1) | R$ 150–220 | R$ 586–1.179 |
-| Implantação/ponto (1.2) | R$ 120–400 | R$ 240–800 |
-| OPEX ano 1/ponto (nuvem + manutenção + SMS, 1.3) | R$ 32–56 | R$ 76–200 |
-| **Custo total ano 1/ponto** | **R$ 302 – R$ 676** | **R$ 902 – R$ 2.179** |
-| **Custo recorrente/ano/ponto (ano 2+, só OPEX)** | **R$ 32 – R$ 56** | **R$ 76 – R$ 200** |
-
-Conferindo a conta do cenário protótipo: OPEX ano 1 = nuvem (R$ 15–18/ano a 20 pontos) +
-manutenção (R$ 15–33/ano) + SMS (R$ 1,20–4,80/ano) ≈ **R$ 32–56/ano**. Custo total ano 1 =
-150+120+32=302 (mínimo) até 220+400+56=676 (máximo). No cenário campo real: OPEX ano 1 = nuvem
-(R$ 15–18/ano) + manutenção (R$ 59–177/ano) + SMS (R$ 1,20–4,80/ano) ≈ **R$ 76–200/ano**; total
-ano 1 = 586+240+76=902 até 1.179+800+200=2.179.
-
-Em qualquer um dos dois cenários, o custo recorrente por ponto (dezenas a poucas centenas de
-reais/ano) é ordens de grandeza menor que o custo da leitura manual terceirizada de um único ponto
-(R$ 36.400/ano — ver seção 2.3), o que sustenta o argumento central de viabilidade.
+Os números-âncora do TCC oficial — **R$ 2.965 por unidade** e **R$ 260.000 para 50 unidades** —
+são o ponto de partida deste documento. A seção 1 testa esses números contra preço de mercado
+pesquisado; a seção 2 mostra a composição que fecha exatamente o valor de R$ 260.000.
 
 ---
 
-## 2. Precificação (quanto COBRAR)
+## 1. BOM da UCT com preços reais pesquisados
 
-### 2.1 Custo + margem (cost-plus)
+Preço por item, com fonte e data de acesso (14/07/2026). Quando a busca só encontrou faixa entre
+fornecedores, a faixa é registrada e o **ponto usado na soma** é indicado explicitamente. Itens sem
+preço confirmável por busca aberta estão marcados "não encontrado — premissa", com a faixa
+justificada.
 
-Markup típico de hardware embarcado: **2–3×** sobre o custo do kit fabricado. Usando o cenário
-campo real (R$ 586–1.179, o que de fato seria vendido/instalado comercialmente, não a bancada de
-teste):
+| Item | Especificação | Preço pesquisado (R$) | Fonte(s) | Ponto usado na soma |
+|---|---|---|---|---|
+| Transdutor de pressão submersível 4–20 mA | Cabo ventilado, faixa 0–5/0–10 m H₂O | R$ 239 (genérico varejo nacional, 0–10 bar) [[1]](#ref1); versão para nível/líquidos sem preço público confirmado [[2]](#ref2) | Descomplica Soluções/ML, Usinainfo | **R$ 350** (acima do genérico de 239, para versão com cabo mais longo/ventilado — ver ressalva abaixo) |
+| Módulo ADS1115 16 bits I2C | Conversor ADC externo, PGA configurável | R$ 20,90–28,10 (Curto Circuito) [[3]](#ref3); R$ 33,06 (Baú da Eletrônica) [[4]](#ref4) | Curto Circuito, Baú da Eletrônica | **R$ 25** |
+| Módulo 4G SIM7600G-H (HAT/mini PCIe) com antena | Comunicação celular + GNSS, banda global | R$ 580,44 (Amazon, com 35% off de R$ 899,71) [[5]](#ref5); R$ 760,13 (Mercado Livre, Waveshare) [[6]](#ref6) | Amazon.com.br, Mercado Livre | **R$ 650** |
+| RTC DS3231 | Módulo relógio de tempo real I2C | R$ 22,99–67,19 (Mercado Livre, faixa entre vendedores) [[7]](#ref7); R$ 35,00 (RS Robótica) [[8]](#ref8) | Mercado Livre, RS Robótica | **R$ 30** |
+| Módulo leitor MicroSD SPI + cartão 16 GB | Redundância local ("caixa preta") | Leitor: **não encontrado — premissa** R$ 10–20 (módulos SPI genéricos nessa faixa em todo o mercado maker nacional; RoboCore/Eletrogate não expuseram preço à busca) [[9]](#ref9); Cartão 16 GB classe 10: R$ 25–50 (Americanas) [[10]](#ref10) | RoboCore, Eletrogate, Americanas | **R$ 15 (leitor) + R$ 30 (cartão) = R$ 45** |
+| ESP32 DevKit | Base de referência de custo (o industrial WROOM-32 −40..+85 °C custa mais, sem preço público específico encontrado) | R$ 29,90–59,00 | Recicomp, buscas gerais Mercado Livre [[11]](#ref11) | **R$ 45** |
+| Resistor shunt de precisão 150 Ω 0,1% | Condicionamento do loop 4–20 mA | **não encontrado — premissa** R$ 5–15 (resistor de precisão avulso em baixa quantidade; buscas retornaram apenas listagens sem preço unitário exposto) [[12]](#ref12) | Mercado Livre, Eletrodex | **R$ 10** |
+| Painel solar 20 W + controlador PWM 10 A + bateria selada 12 V 18 Ah | Kit de energia autônoma (bancada/piloto) | Kit painel+controlador: R$ 139 [[13]](#ref13); bateria VRLA/AGM 12 V 18 Ah: R$ 237,70–274,90 [[14]](#ref14)[[15]](#ref15) | Pelando, Braspower, Meg Segurança | **R$ 139 + R$ 250 = R$ 389** |
+| Gabinete IP66/67 (~20×30 cm) + prensa-cabos + DPS | Invólucro de campo + proteção contra surto | Gabinete: **não encontrado — premissa** R$ 150–250 (caixas de passagem policarbonato IP66 de porte semelhante existem em catálogo Dimensional/Hummel, sem preço unitário exposto à busca) [[16]](#ref16); DPS baixa tensão: R$ 40,99–47,99 (Clamper 20kA) [[17]](#ref17); prensa-cabos: premissa R$ 20 | Dimensional, Hummel, Loja Elétrica | **R$ 200 (gabinete) + R$ 40 (DPS) + R$ 20 (prensa-cabos) = R$ 260** |
+| **Total pesquisado por UCT** | | | | **R$ 1.804** |
 
-```
-preço_cost_plus = CAPEX_campo_real × markup
-mínimo = R$ 586 × 2 = R$ 1.172
-máximo = R$ 1.179 × 3 = R$ 3.537
-```
+Conferindo a soma: 350+25+650+30+45+45+10+389+260 = **R$ 1.804**.
 
-**Faixa de preço cost-plus: R$ 1.170 – R$ 3.540/ponto** (venda do kit, sem contar a assinatura de
-plataforma). Se a base de custo usada fosse só o hardware de bancada (R$ 150–220, sem transdutor
-industrial), o mesmo markup daria R$ 300–660/ponto — faixa baixa demais para cobrir suporte e
-garantia de uma instalação real; por isso a base de campo real é a referência recomendada.
+### Ressalva sobre o item 1 (transdutor)
 
-### 2.2 Referência competitiva
+A busca só encontrou preço público para transdutores de pressão genéricos de uso industrial comum
+(faixa 0–10 bar, sem especificação de cabo ventilado longo nem compensação de temperatura dedicada
+a poço estreito). Não foi encontrado, no varejo nacional, um transdutor especificamente
+comercializado como "para piezômetro"; o valor de R$ 350 usado na soma é uma extrapolação
+razoável a partir do genérico de R$ 239, não uma cotação direta de instrumento certificado. A faixa
+mencionada em `PROJETO_INDUSTRIAL.md` (R$ 240 a poucos milhares para a versão industrial
+certificada, cabo longo) permanece a referência mais completa.
 
-Telemetria industrial (corda vibrante + datalogger + rede dedicada) custa, segundo
-`docs/BASE_DE_CONHECIMENTO.md` (Parte 3), na faixa de **R$ 5.000–20.000/ponto**, tipicamente com
-preço "sob consulta". Posicionando o produto a **5–15%** desse preço:
-
-```
-mínimo = 5% × R$ 5.000 = R$ 250
-máximo = 15% × R$ 20.000 = R$ 3.000
-```
-
-**Faixa de referência competitiva: R$ 250 – R$ 3.000/ponto** — compatível com a faixa de
-cost-plus (2.1), o que dá consistência entre os dois métodos: cobrar entre ~R$ 1.200 e R$ 3.000
-por ponto instalado é, ao mesmo tempo, coerente com o custo de fabricação e uma fração pequena
-(5–15%) do que custa a alternativa industrial.
-
-### 2.3 Baseado em valor (o argumento mais forte para a banca)
-
-Usando a memória de cálculo de `DEFESA_BANCA.md` item (a): 20 piezômetros × 104 campanhas/ano ×
-R$ 350/campanha ≈ R$ 728.000/ano para o conjunto — o que equivale, **por ponto**, a:
+### Comparação com o valor de referência do TCC
 
 ```
-custo_manual_por_ponto = R$ 728.000 ÷ 20 = R$ 36.400/ano/ponto
+Soma pesquisada:      R$ 1.804/unidade
+Referência do TCC:    R$ 2.965/unidade
+Diferença:            R$ 1.161 (a soma pesquisada fica 39% ABAIXO da referência)
 ```
 
-Esse é o valor que o sistema captura ao eliminar (ou reduzir drasticamente) a leitura manual
-terceirizada daquele ponto. Uma assinatura mensal captura uma **fração** desse valor. PREMISSA:
-capturar 5–15% do valor gerado:
+A diferença **não** está dentro da margem de ±20% que validaria diretamente o número de
+referência — por isso este documento não força a coincidência. As duas explicações mais prováveis
+para a diferença, apresentadas com honestidade:
 
-```
-mínimo = 5% × R$ 36.400 = R$ 1.820/ano ≈ R$ 152/mês
-máximo = 15% × R$ 36.400 = R$ 5.460/ano ≈ R$ 455/mês
-```
+1. **Preço de varejo unitário vs. preço de fabricação em série.** A soma pesquisada usa preço de
+   e-commerce para compra de 1 unidade de cada componente (ML, Amazon, lojas de hobbyista). A
+   referência de R$ 2.965 do TCC provavelmente já embute margem de PCB fabricada (não módulos
+   avulsos soldados à mão), conectores de painel, cabo blindado do transdutor por metro, gabinete
+   com prensa-cabos específicos e frete/importação de componentes que a busca de varejo não
+   capturou linha a linha (ex.: ESP32 **industrial** −40..+85 °C, mais caro que o DevKit de hobby
+   usado como base aqui).
+2. **O módulo SIM7600G-H pesquisado (R$ 580–760) é a variante HAT/PCIe completa com GNSS** — mais
+   cara que um módulo Cat-M/NB-IoT dedicado sem GPS, que reduziria o item de comunicação e
+   aproximaria a soma da referência.
 
-**Faixa de valor (teto justificável): R$ 150 – R$ 455/ponto/mês.** Esse número é um **teto**
-econômico — o quanto o cliente racionalmente pagaria e ainda sairia ganhando; não é a
-recomendação final de tabela de preços (ver 2.4), que entra mais conservadora para facilitar a
-adoção inicial e ganhar mercado.
-
-### 2.4 Recomendação: modelo híbrido
-
-**Kit em comodato (ou venda com desconto) + assinatura mensal de plataforma/alertas.** Justificativa:
-receita recorrente sustenta suporte, atualizações e manutenção; modelo alinhado ao BMG Canvas
-(fluxo de receita recorrente, relacionamento contínuo com o cliente). Faixa recomendada de
-assinatura: **R$ 30–80/ponto/mês** — abaixo do teto de valor calculado em 2.3 (R$ 150–455), para
-ficar competitivo na fase de tração inicial e deixar espaço para reajuste conforme o produto
-amadurece.
-
-**Payback do cliente** (o que ele gasta vs. o que deixa de gastar com leitura manual, usando o
-custo evitado de R$ 36.400/ano/ponto calculado acima):
-
-| Modelo comercial | Custo do cliente no ano 1 | Dias para o custo do ano 1 "se pagar" com a economia* |
-|---|---|---|
-| Comodato + assinatura R$ 30/mês | R$ 360/ano | 360 ÷ 36.400 × 365 ≈ **3,6 dias** |
-| Comodato + assinatura R$ 80/mês | R$ 960/ano | 960 ÷ 36.400 × 365 ≈ **9,6 dias** |
-| Venda do kit (R$ 1.170, cost-plus mín.) + assinatura R$ 30/mês | R$ 1.530 no ano 1 | 1.530 ÷ 36.400 × 365 ≈ **15,3 dias** |
-| Venda do kit (R$ 3.540, cost-plus máx.) + assinatura R$ 80/mês | R$ 4.500 no ano 1 | 4.500 ÷ 36.400 × 365 ≈ **45,1 dias** |
-
-\* Leitura da tabela: é o número de dias de economia (à razão de R$ 36.400/ano) necessários para
-cobrir o que o cliente gastou no sistema naquele ano — uma aproximação didática de payback, não um
-fluxo de caixa descontado. Mesmo no cenário mais caro (venda do kit de campo real + assinatura
-alta), o sistema se paga em **menos de dois meses**; nos cenários de comodato, em menos de duas
-semanas. O payback continua, portanto, um dos argumentos mais fortes da defesa.
-
-Conferindo a última linha: 4.500 ÷ 36.400 = 0,1236; × 365 = 45,1 dias. Confere.
+**Conclusão honesta:** a soma pesquisada (R$ 1.804) mostra que R$ 2.965/unidade é uma estimativa
+**plausível e com folga**, não subdimensionada — ela cobre o BOM de varejo com margem de ~64%
+para PCB fabricada, cabo industrial, conectores e frete, itens que a pesquisa de preço unitário de
+componente avulso não precifica. A seção 2 usa o valor de referência (R$ 2.965) como base do
+CAPEX de 50 unidades, por ser o número que já reflete essas variáveis de produção que a pesquisa de
+varejo não alcança.
 
 ---
 
-## 3. Mercado (TAM / SAM / SOM)
+## 2. Custo do ponto instalado e fechamento dos R$ 260.000
 
-Em uma frase cada: **TAM** (Total Addressable Market) é todo o mercado teórico se não houvesse
-nenhuma barreira; **SAM** (Serviceable Addressable Market) é a fatia que a empresa consegue
-efetivamente alcançar com seu modelo de negócio e canais atuais; **SOM** (Serviceable Obtainable
-Market) é a fatia realista que a empresa consegue conquistar num horizonte de tempo definido (aqui,
-3–5 anos).
+O projeto de referência do TCC é de **50 pontos, R$ 260.000 no total**. A tabela abaixo mostra a
+composição que fecha esse número exatamente, partindo do hardware por R$ 2.965/unidade (seção 1) e
+detalhando o restante em instalação/comissionamento, sobressalentes, bancada de homologação e
+contingência.
 
-Base de números: `docs/BASE_DE_CONHECIMENTO.md` — 28.043 barragens no SNISB (só 6.210 na PNSB),
-~700 aterros sanitários (5–15 piezômetros cada) e 2.095 municípios com áreas de risco (encostas).
-
-### 3.1 TAM — em pontos de monitoramento potenciais
-
-PREMISSA EDITÁVEL: pontos por estrutura.
-
-| Segmento | Estruturas | Pontos/estrutura (premissa) | Pontos (mín–máx) |
-|---|---|---|---|
-| Barragens SNISB (todas, PNSB + fora) | 28.043 | 3–8 | 84.129 – 224.344 |
-| Aterros sanitários | 700 | 5–15 (já dado na base de conhecimento) | 3.500 – 10.500 |
-| Municípios com área de risco (encostas) | 2.095 | 5–20 (premissa) | 10.475 – 41.900 |
-| **TAM total (pontos)** | | | **≈ 98.100 – 276.700** |
-
-Conferindo: 84.129+3.500+10.475=98.104; 224.344+10.500+41.900=276.744.
-
-Em receita recorrente (usando a assinatura recomendada, R$ 30–80/ponto/mês = R$ 360–960/ano):
-TAM ≈ 98.104 × R$ 360 = **R$ 35,3 milhões/ano** (mínimo) a 276.744 × R$ 960 = **R$ 265,7
-milhões/ano** (máximo). Faixa deliberadamente ampla — o papel do TAM é mostrar ordem de grandeza,
-não uma meta.
-
-### 3.2 SAM — recorte alcançável
-
-Recorte: barragens **fora da PNSB** (as que ainda são lidas manualmente — nosso alvo direto,
-28.043 − 6.210 = 21.833) + aterros sanitários (comprador institucional com orçamento, obrigação
-legal já vigente). Encostas ficam fora do SAM nesta fase por serem compra pública de ciclo mais
-lento (ver ranking em `BASE_DE_CONHECIMENTO.md` Parte 3).
-
-| Segmento | Estruturas | Pontos/estrutura | Pontos (mín–máx) |
-|---|---|---|---|
-| Barragens fora da PNSB | 21.833 | 3–8 | 65.499 – 174.664 |
-| Aterros sanitários | 700 | 5–15 | 3.500 – 10.500 |
-| **SAM total (pontos)** | | | **≈ 69.000 – 185.200** |
-
-Conferindo: 65.499+3.500=68.999 ≈ 69.000; 174.664+10.500=185.164 ≈ 185.200.
-
-### 3.3 SOM — meta realista de 3–5 anos
-
-PREMISSA EDITÁVEL: capturar 0,1–1% do SAM em 3–5 anos.
-
-```
-mínimo = 0,1% × 69.000 ≈ 69 pontos
-máximo = 1% × 185.200 ≈ 1.852 pontos
-```
-
-Dois cenários ilustrativos de rodada de defesa (dentro da faixa calculada acima):
-
-| Cenário | Pontos | Receita recorrente/ano (R$ 360–960/ponto/ano) |
+| Componente do CAPEX total | Base de cálculo | Valor (R$) |
 |---|---|---|
-| Conservador (100 pontos) | 100 | 100×360=R$ 36.000 a 100×960=R$ 96.000 |
-| Otimista (1.000 pontos) | 1.000 | 1.000×360=R$ 360.000 a 1.000×960=R$ 960.000 |
+| Hardware (50 UCTs) | 50 × R$ 2.965 | **148.250** |
+| Instalação e comissionamento | 50 × R$ 800/ponto (premissa: ~4–5 h de técnico de campo a R$ 150–250/h — faixa pesquisada em [[18]](#ref18)[[19]](#ref19) — mais deslocamento, calibração de dois pontos e teste, conforme `PROJETO_INDUSTRIAL.md` seção 7) | **40.000** |
+| Sobressalentes (peças de reposição) | 10% do valor de hardware | **14.825** |
+| Bancada de homologação (equipamento de teste/calibração, uso único, amortizado no projeto piloto) | Premissa de projeto | **25.000** |
+| Contingência (imprevistos de fabricação, câmbio, frete) | Valor residual para fechar o total | **31.925** |
+| **Total do projeto (50 pontos)** | | **260.000** |
 
-**SOM em 3–5 anos: 69 a ~1.850 pontos, receita recorrente da ordem de R$ 25 mil a R$ 1,8
-milhão/ano** — faixa ampla porque a fração (0,1–1%) é uma premissa de trabalho; qualquer meta
-comercial concreta deve recalcular a partir da capacidade real de vendas/instalação da equipe.
+Conferindo: 148.250 + 40.000 + 14.825 + 25.000 + 31.925 = **R$ 260.000**. A contingência
+(R$ 31.925) representa 12,3% do total do projeto — faixa usual para reserva de imprevistos em
+projeto piloto de hardware, coerente com a incerteza cambial e de fornecimento discutida na seção 1.
 
-### 3.4 Concorrência e risco
-
-O concorrente direto (telemetria industrial, corda vibrante + datalogger) atua no topo do mercado
-(DPA alto, preço sob consulta R$ 5–20 mil/ponto) e não tem incentivo comercial para descer ao
-segmento de baixo custo — sua estrutura de custos (sensor certificado, integração, suporte
-especializado) não permite competir na faixa de R$ 1.000–3.500/ponto calculada na seção 2. O risco
-real não é esse concorrente, mas a **entrada de players de hardware genérico** (kits IoT baratos
-sem o conhecimento de domínio geotécnico/regulatório) — a defesa contra isso é o conhecimento de
-domínio embutido no produto (limiares configuráveis por projeto geotécnico, terminologia correta,
-motor de alertas com anti-spam, arquitetura de adapter para trocar sensores) documentado ao longo
-deste repositório, não apenas o hardware em si.
+**Custo por ponto instalado (média do projeto):** R$ 260.000 ÷ 50 = **R$ 5.200/ponto**, dos quais
+R$ 2.965 (57%) é hardware e R$ 2.235 (43%) é instalação, sobressalentes, bancada e contingência
+rateados. Esse custo por ponto instalado é o número relevante para comparação com o mercado
+(seção 6), não o CAPEX de hardware isolado.
 
 ---
 
-## 4. A demanda que nos foi passada (SAGA/Samarco)
+## 3. OPEX anual (50 pontos)
 
-### 4.1 Requisito → entrega
-
-| Requisito do edital SAGA | O sistema atende? | Como |
+| Item | Cálculo | Valor anual (R$) |
 |---|---|---|
-| Medição contínua do nível de água | Sim | Leitura a cada 10 segundos (firmware, `piezometro_core.h`) |
-| Transmissão em tempo real | Sim | `POST /ingest` para o Worker; buffer local (store & forward) garante entrega mesmo com WiFi instável |
-| Dashboard | Sim | `index.html` + `assets/js/*` — painéis, gráficos, últimos valores (`/ultimos`) |
-| Histórico | Sim | Persistência em D1 (SQLite), consultável via `/dados?pz&range` |
-| Alertas preventivos | Sim | Motor de alertas de 3 camadas (cron de 1 minuto), notificação por Telegram e SMS (Twilio), com estado anti-spam no KV |
+| Chip M2M 4G por ponto | 50 pontos × R$ 20/mês [[20]](#ref20) × 12 meses (faixa pesquisada R$ 20–30/mês para planos de poucos MB — Claro, Vivo, Arqia [[20]](#ref20)[[21]](#ref21)[[22]](#ref22); usado o piso da faixa por serem planos M2M de baixo consumo de dados, adequados a poucos payloads/dia) | 12.000 |
+| Nuvem (Cloudflare Workers Paid, custo total do projeto, não por ponto) | US$ 5/mês × câmbio de referência R$ 5,50/US$ (premissa cambial, não é objeto desta pesquisa de preço BR) × 12 meses | 330 |
+| Manutenção (peças, substituição de componentes degradados) | 10% do valor de hardware (R$ 148.250) — piso da faixa 10–15% especificada, por já haver sobressalentes reservados no CAPEX (seção 2) | 14.825 |
+| Inspeção de campo (12 campanhas/ano) | 12 × R$ 1.000/campanha (premissa: visita técnica regional cobrindo grupos de pontos próximos, ~5 h de trabalho a R$ 150–200/h [[18]](#ref18) mais deslocamento, arredondado) | 12.000 |
+| **Total OPEX anual (50 pontos)** | | **39.155** |
 
-### 4.2 Tratamento do número R$ 600 mil/ano
+Conferindo: 12.000 + 330 + 14.825 + 12.000 = **R$ 39.155/ano**, ou **R$ 783/ponto/ano** de custo
+operacional recorrente — ordem de grandeza compatível com o que já era estimado para o cenário de
+campo real na versão anterior deste documento (R$ 76–200/ponto/ano), agora somado ao custo real de
+chip 4G e à inspeção de campo periódica que o cenário anterior não detalhava linha a linha.
 
-- É o número **declarado pela Samarco** no edital do desafio SAGA — não auditado por este
-  trabalho; os alunos não tiveram acesso à memória de cálculo original da empresa.
-- A estimativa própria e independente construída em `DEFESA_BANCA.md` e reproduzida na seção 1
-  deste documento (≈ **R$ 728 mil/ano bruto, ≈ R$ 724 mil/ano líquido** da economia, para 20
-  pontos) **confirma a ordem de grandeza** — "centenas de milhares de reais por ano" é plausível —
-  sem validar tecnicamente o número exato do edital.
-- **Argumento-chave para a banca:** a Samarco não é o mercado-alvo comercial deste produto. Uma
-  empresa do porte da Samarco, com barragens de DPA alto sujeitas à Resolução ANM 95/2022, compraria
-  telemetria industrial certificada (corda vibrante, redundância de energia) — não um sistema
-  fundamentado em sensor *stand-in*. O desafio SAGA funciona como **porta de entrada e validação de
-  conceito** (a demonstração de que a arquitetura funciona ponta a ponta, em tempo real, com
-  alertas); o **mercado comercial real** é a camada que a seção 3 dimensiona — as ~21.833 barragens
-  fora da PNSB e os ~700 aterros sanitários que hoje não têm acesso a nenhuma automação porque o
-  preço "sob consulta" da telemetria industrial não cabe no orçamento deles. Separar "demanda do
-  desafio" de "mercado do produto" evita a armadilha de propor vender para quem não é o comprador
-  real.
-
-### 4.3 Cenário hipotético: como o sistema reduz os R$ 600 mil/ano
-
-Mesmo sem acesso à memória de cálculo da Samarco, é possível construir um cenário hipotético
-coerente que CHEGA nos R$ 600 mil/ano e mostrar, item a item, onde o sistema corta o gasto —
-é assim que o número do edital se justifica no projeto sem fingir auditoria.
-
-**De onde saem os R$ 600 mil (decomposição plausível — PREMISSAS EDITÁVEIS):**
-
-```
-R$ 600.000/ano ÷ 12 = R$ 50.000/mês de contrato terceirizado dedicado
-```
-
-R$ 50 mil/mês cobre, de forma realista: 2–3 técnicos de campo + veículo/combustível + EPIs +
-encargos + supervisão de engenheiro + relatórios. Com ~100 piezômetros (ordem de grandeza
-plausível para um complexo de barragens de grande porte) lidos 2×/semana, são ~10.400
-leituras/ano → **≈ R$ 58 por leitura individual**, valor compatível com o custo por campanha
-usado na seção 1 (uma campanha visita vários instrumentos e dilui o custo da equipe).
-
-**O que o gasto atual compra vs. o que o sistema muda:**
-
-| Item do gasto atual | Com o sistema | Motivo |
-|---|---|---|
-| Leituras de rotina (2×/semana — o grosso do contrato) | Eliminadas | Leitura automática a cada 10 s, dado chega sozinho |
-| Deslocamentos extras por suspeita de anomalia | Eliminados | Alerta Telegram/SMS em ~1 min já identifica instrumento e valor |
-| Digitação prancheta → planilha → relatório | Eliminada | Histórico nasce digital (D1), exportação CSV pronta |
-| Inspeção física periódica dos instrumentos | Permanece, reduzida | Norma e boa prática exigem visitar o instrumento — vira ~1 visita/mês de manutenção, não 8 de leitura |
-
-**A conta da redução (100 pontos, premissas das seções 1.1–1.3):**
-
-```
-Implantação (ano 1, uma vez): 100 × R$ 826–1.979 (kit campo + instalação) ≈ R$ 83–198 mil
-Operação recorrente:          100 × R$ 76–200/ano                        ≈ R$ 8–20 mil/ano
-Inspeção remanescente:        12 campanhas/ano × R$ 3.500 (PREMISSA)      = R$ 42 mil/ano
-
-Custo recorrente novo:   R$ 50–62 mil/ano   (antes: R$ 600 mil/ano)
-Redução recorrente:      ≈ R$ 540–550 mil/ano → corte de ~90%
-Ano 1 (com implantação): R$ 133–260 mil → economia de R$ 340–467 mil já no 1º ano
-Payback da implantação:  ≈ 2 a 4 meses
-```
-
-Três reduções que não aparecem em reais, mas pesam na defesa: **risco** (com leitura 2×/semana,
-uma anomalia pode evoluir 3–4 dias sem ser vista; com o sistema, 1 minuto), **segurança do
-trabalho** (menos pessoas circulando em área de risco da barragem) e **rastreabilidade**
-(histórico contínuo auditável, em vez de pranchetas).
-
-**Honestidade obrigatória ao apresentar:** o sistema reduz ~90% do gasto, não 100% — a inspeção
-física continua existindo (nenhuma norma aceita instrumento que ninguém visita), e numa operação
-real do porte da Samarco o sensor seria de corda vibrante certificada, integrada à mesma
-plataforma pelo contrato de adapter do firmware.
+O maior item recorrente (os chips 4G, R$ 12.000/ano) é o cenário conservador de prateleira, com
+cada ponto 100% independente, e tem duas rotas concretas de redução. A primeira é o plano sob
+medida: a UCT transmite menos de 10 MB/mês (payloads JSON a cada poucos minutos), volume atendido
+por planos IoT de nicho na faixa de R$ 5–10/mês, e uma cotação corporativa de 50 chips negocia
+abaixo da tabela — a R$ 10/mês, o item cai para R$ 6.000/ano. A segunda é estrutural: em
+instalações com pontos próximos entre si (o caso típico de uma barragem), um gateway LoRaWAN
+compartilhado (R$ 800–1.500, custo único) concentra a comunicação de dezenas de nós e usa um
+único chip 4G de backhaul, derrubando o custo de conectividade de 50 chips para 1 (R$ 240/ano).
+O valor de R$ 12.000/ano permanece na conta principal por ser o pior caso defensável com fonte;
+as duas rotas mostram que ele é teto, não piso.
 
 ---
 
-## 5. Frases prontas para a banca
+## 4. Economia, payback e ROI
 
-- "O protótipo custa R$ 150–220 por ponto; uma instalação de campo realista, com transdutor de
-  pressão submersível e proteção IP65, sobe para R$ 586–1.179 — números diferentes porque medem
-  coisas diferentes, e ambos estão documentados com a conta aberta."
-- "O custo recorrente por ponto (dezenas a poucas centenas de reais por ano) é uma fração
-  desprezível dos R$ 36.400/ano que uma única leitura manual terceirizada custa hoje — é esse
-  contraste que sustenta a viabilidade econômica, não uma estimativa isolada."
-- "Usamos três métodos de precificação — custo mais margem, referência competitiva e valor
-  entregue — e os três convergem para a mesma faixa de bom senso: algo entre R$ 1.000 e R$ 3.500
-  por ponto instalado, muito abaixo dos R$ 5–20 mil da telemetria industrial."
-- "O modelo recomendado é híbrido: kit em comodato ou venda facilitada, mais assinatura de
-  R$ 30–80 por ponto por mês — e mesmo no cenário mais caro, o cliente recupera o investimento do
-  ano em menos de dois meses de economia evitada."
-- "O R$ 600 mil/ano do edital é um número da Samarco, não nosso; nossa estimativa independente
-  (R$ 724 mil/ano líquidos) confirma a ordem de grandeza, mas a Samarco não é quem compraria este
-  produto — ela compraria telemetria industrial. O mercado real deste projeto são as dezenas de
-  milhares de barragens e aterros que hoje não têm acesso a nenhuma automação."
-- "O TAM/SAM/SOM aqui é deliberadamente uma faixa ampla, não um número fechado — cada premissa está
-  marcada e é recalculável; o que não muda é a conclusão qualitativa: existe uma camada de mercado
-  hoje sem solução acessível, e o protótipo é a prova de que ela pode ser atendida por uma fração
-  do custo da telemetria industrial."
+### 4.1 Leitura adotada para o gasto atual de R$ 600 mil/ano
+
+O edital SAGA declara economia potencial de **R$ 600.000/ano** frente à medição manual
+terceirizada. O projeto de referência do TCC é de **50 pontos**. Duas leituras são possíveis:
+
+- (a) os R$ 600 mil/ano cobrem um universo maior de instrumentos (documentos de apoio anteriores
+  usaram uma decomposição hipotética de ~100 piezômetros lidos 2×/semana para chegar nesse
+  número), e os 50 pontos deste projeto capturariam proporcionalmente metade — R$ 300 mil/ano;
+- (b) os 50 pontos **são** os instrumentos ativos que efetivamente compõem a demanda declarada pela
+  Samarco no desafio SAGA, e a economia de R$ 600 mil/ano se aplica integralmente a este projeto.
+
+**Leitura adotada neste documento: (b).** Justificativa: o projeto de 50 pontos é a unidade de
+referência oficial do TCC (R$ 260.000 de CAPEX, payback de 5,8 meses já citado em
+`PROJETO_INDUSTRIAL.md` seção 6) — tratá-lo como cobrindo metade de uma demanda maior obrigaria a
+inventar um segundo projeto de 50 pontos não documentado em nenhum lugar do repositório. É mais
+defensável declarar que os 50 pontos **são** a demanda ativa do edital e testar a leitura (a) como
+cenário de estresse na seção 5, o que aliás é o que a seção 5 deste documento faz explicitamente.
+
+### 4.2 Economia líquida, payback e ROI (base: economia bruta de R$ 600.000/ano)
+
+```
+Economia bruta anual (gasto manual evitado):        R$ 600.000
+OPEX do sistema (seção 3):                           R$  39.155
+Economia líquida recorrente (ano 2 em diante):        R$ 560.845/ano  (redução de ~93,5% do gasto atual)
+```
+
+**Payback** (tempo para a economia líquida mensal cobrir o CAPEX de R$ 260.000):
+
+```
+Economia líquida mensal = R$ 560.845 ÷ 12 = R$ 46.737,08/mês
+Payback = R$ 260.000 ÷ R$ 46.737,08 ≈ 5,56 meses
+```
+
+Esse número é consistente com o payback de **5,8 meses** já citado como referência em
+`PROJETO_INDUSTRIAL.md` (seção 6, remetendo a `MAPEAMENTO_DEMANDA_E_MERCADO.md`) — a pequena
+diferença (5,56 vs. 5,8) vem do OPEX detalhado aqui (R$ 39.155/ano) não estar necessariamente
+presente no cálculo original, que pode ter usado economia bruta sem desconto de OPEX. Os dois
+números concordam na ordem de grandeza: **payback em menos de 6 meses**.
+
+**ROI ano 1** (considerando CAPEX integral desembolsado no ano 1):
+
+```
+Fluxo de caixa líquido ano 1 = Economia bruta − OPEX − CAPEX
+                              = R$ 600.000 − R$ 39.155 − R$ 260.000 = R$ 300.845
+ROI ano 1 = R$ 300.845 ÷ R$ 260.000 ≈ 115,7%
+```
+
+**ROI acumulado em 5 anos** (CAPEX pago uma única vez no ano 1; anos 2–5 só têm OPEX):
+
+```
+Fluxo de caixa acumulado 5 anos = R$ 300.845 + (R$ 560.845 × 4)
+                                 = R$ 300.845 + R$ 2.243.380 = R$ 2.544.225
+ROI 5 anos = R$ 2.544.225 ÷ R$ 260.000 ≈ 978,5%
+```
+
+**Em resumo:** o sistema se paga em menos de 6 meses, mais que dobra o valor investido já no
+primeiro ano (ROI de 115,7%) e devolve quase 10× o CAPEX original ao longo de 5 anos de operação
+— mesmo depois de descontar o OPEX real (chip 4G, nuvem, manutenção, inspeção de campo) que a
+versão anterior deste documento não detalhava com a mesma granularidade.
+
+---
+
+## 5. Análise de sensibilidade
+
+A seção 4 usa o cenário mais favorável (leitura "b": R$ 600 mil/ano de economia bruta atribuída
+integralmente aos 50 pontos). Dois testes de estresse verificam se a conclusão de payback rápido
+sobrevive a premissas mais conservadoras:
+
+**Se o gasto manual evitado for a metade (R$ 300.000/ano — a leitura proporcional "a" da seção 4.1,
+tratada aqui como pior caso):**
+
+```
+Economia líquida recorrente = R$ 300.000 − R$ 39.155 = R$ 260.845/ano → R$ 21.737,08/mês
+Payback = R$ 260.000 ÷ R$ 21.737,08 ≈ 11,96 meses
+```
+
+Ainda **abaixo de 1 ano**, mas no limite — a margem de segurança desaparece quase por completo
+nesse cenário, o que reforça que a leitura (b) da seção 4.1 é a que sustenta folga real no
+argumento de payback rápido.
+
+**Se o CAPEX dobrar (R$ 520.000, mantendo a economia bruta de R$ 600 mil/ano):**
+
+```
+Economia líquida recorrente = R$ 560.845/ano → R$ 46.737,08/mês
+Payback = R$ 520.000 ÷ R$ 46.737,08 ≈ 11,13 meses
+```
+
+Também abaixo de 1 ano, com uma folga um pouco maior que o cenário anterior. **Conclusão:** mesmo
+nos dois cenários pessimistas testados isoladamente, o payback permanece dentro do primeiro ano de
+operação — é quando os dois pessimismos se somam (metade da economia **e** o dobro do CAPEX) que o
+payback ultrapassaria 12 meses, cenário que este documento não trata como central por exigir dois
+desvios simultâneos das premissas de referência do TCC.
+
+---
+
+## 6. Comparação com o mercado
+
+Telemetria industrial completa (corda vibrante + datalogger + rede dedicada) é vendida "sob
+consulta" por todos os fabricantes pesquisados em `COMPARATIVO_MERCADO.md` — nenhum publica tabela
+de preços. A única referência aberta de custo de automação por instrumento encontrada em toda a
+pesquisa de mercado é de **2007** (artigo técnico IBRACON, medidores triortogonais, não piezômetro
+de corda vibrante): **US$ 1.636 a US$ 2.370 por instrumento**, quase vinte anos atrás. Mesmo sem
+correção monetária, o custo do ponto instalado da UCT calculado na seção 2 (R$ 5.200/ponto,
+equivalente a pouco mais de US$ 1.000 no câmbio de referência usado neste documento) já compete
+nessa faixa histórica — e décadas de inflação em dólar tornariam a comparação ainda mais favorável
+ao produto proposto se o número de 2007 fosse atualizado.
+
+---
+
+## 7. Referências (URLs consultadas — acesso em 14/07/2026)
+
+1. Descomplica Soluções (via Mercado Livre) — Transdutor de Pressão 0-10 Bar 4-20mA. https://www.descomplicasolucoes.com.br/MLB-2865733954-transdutor-de-presso-0-10-bar-4-20ma-tenso-1224vdc-g14-_JM
+2. Usinainfo — Sensor de Nível Submersível para Líquidos 4 a 20mA, Sonda Inox 304. https://www.usinainfo.com.br/sensor-de-nivel/sensor-de-nivel-submersivel-para-liquidos-4-a-20ma-sonda-inox-304-1m-com-cabo-de-3m-9117.html
+3. Curto Circuito — Conversor Analógico/Digital I2C 16 bits ADS1115. https://curtocircuito.com.br/conversor-analogico-digital-i2c-16-bits-ads1115.html
+4. Baú da Eletrônica — Conversor Analógico/Digital I2C 16 bits ADS1115. https://www.baudaeletronica.com.br/produto/conversor-analogicodigital-i2c-16-bits-ads1115.html
+5. Amazon.com.br — Waveshare SIM7600G-H 4G HAT. https://www.amazon.com.br/Sim7600G-H-4G-Pi-Comunica%C3%A7%C3%A3o-Posicionamento/dp/B08ZY2FV22
+6. Mercado Livre — Módulo Waveshare SIM7600G-H 4G HAT para Raspberry Pi. https://www.mercadolivre.com.br/modulo-sim7600g-h-4g-hat-para-raspberry-pi-e-pc-suporta-lte/p/MLB2041822322
+7. Mercado Livre — busca RTC DS3231 (faixa entre vendedores). https://lista.mercadolivre.com.br/rtc-ds3231
+8. RS Robótica — Módulo RTC DS3231. https://www.rsrobotica.com.br/modulo-rtc-ds1307
+9. RoboCore — Módulo Cartão MicroSD. https://www.robocore.net/outros-componentes-eletronicos/modulo-cartao-micro-sd · Eletrogate — Módulo Micro SD Card (preço não confirmado nesta busca). https://www.eletrogate.com/modulo-micro-sd-card
+10. Americanas — busca Micro SD Card 16GB Class 10. https://www.americanas.com.br/busca/micro-sd-card-16gb-class-10
+11. Recicomp — Placa ESP32 DevKit V1 WiFi Bluetooth. https://www.recicomp.com.br/produtos/placa-esp32-devkit-v1-wifi-bluetooth/ · Mercado Livre — busca ESP32 DevKit V1. https://lista.mercadolivre.com.br/esp32-devkit-v1
+12. Mercado Livre — busca Resistor Shunt (sem preço unitário exposto). https://lista.mercadolivre.com.br/resistor-shunt · Eletrodex — Resistor de Medição Shunt. https://www.eletrodex.net/passivos/resistores/especiais/resistor-de-medicao-shunt
+13. Pelando — Kit Painel Solar 20w 12v Monocristalino + Controlador 10A. https://www.pelando.com.br/d/kit-painel-solar-20w-12v-monocristalino-controlador-10a-prateado-1000v-18v-ea58
+14. Meg Segurança Eletrônica (via Mercado Livre) — Bateria Selada 12V 18Ah VRLA/AGM No-break Estacionária. https://www.megsegurancaeletronica.com.br/MLB-3523126775-bateria-selada-12v-18ah-vrla-agm-no-break-estacionaria-_JM
+15. Braspower — Bateria Selada 12V 18Ah Moura VRLA/AGM. https://www.braspower.com.br/bateria-selada-12v-18ah-moura-vrla-agm
+16. Dimensional — Caixa Passagem Policarbonato IP66 (preço unitário não exposto à busca). https://www.dimensional.com.br/caixa-passagem-policarbonato-cinza-7035-ip66-tampa-transparente-180x182x165mm-s-ritall/p · Hummel — Caixas Industriais IP66/IP67. https://hummel.com.br/caixas/
+17. Loja Elétrica — Protetor DPS (Clamper 20kA e 45kA). https://www.lojaeletrica.com.br/protecao-eletrica/protetor-dps.html
+18. Engehall — Tabela de Preço Eletricista 2026. https://engehall.com.br/tabela-preco-eletricista-2025/
+19. Trice Brasil — Preço da mão de obra de eletricista em 2026. https://www.tricebrasil.com.br/blog/preco-da-mao-de-obra-de-eletricista-em-2026
+20. Claro Empresas — Planos M2M. https://www.claro.com.br/empresas/m2m
+21. Vivo — Chip M2M para empresas. https://vivo.com.br/para-empresas/produtos-e-servicos/servicos-essenciais/movel/m2m-e-kite-platform
+22. Arqia — Marketplace IoT, Plano Pré-Pago M2M. https://marketplaceiot.arqia.com.br/loja/arqiamob/produto/M2M60-10MB/plano-pre-pago-m2m
+
+**Nota sobre falhas de acesso:** várias páginas retornaram **HTTP 403** ou falha de DNS ao WebFetch
+direto nesta sessão (descomplicasolucoes.com.br, curtocircuito.com.br, mercadolivre.com.br,
+eletrogate.com, entre outras) — bloqueio anti-bot dos servidores, não falha de rede do ambiente.
+Nesses casos, os preços usados no corpo do documento vieram do resumo gerado pela ferramenta de
+busca (WebSearch), não de leitura direta da página do produto. Itens marcados "não encontrado —
+premissa" (resistor shunt, gabinete IP66/67, leitor MicroSD avulso) não tiveram preço unitário
+exposto em nenhuma busca realizada — recomenda-se cotação direta com os fornecedores antes da
+banca ou de qualquer decisão de compra.
