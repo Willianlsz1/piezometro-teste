@@ -66,6 +66,7 @@ function estadoVazio() {
     commStatus: {}, // P2 — pz → "OK" | "SEM_SINAL"
     taxaStatus: {}, // P3 — pz → "OK" | "TAXA_ALTA"
     alertLog: [],
+    ultimaRetencao: "", // data (YYYY-MM-DD, UTC) da última execução da retenção — ver index.js scheduled()
   };
 }
 
@@ -80,6 +81,7 @@ export async function lerEstado(env) {
       commStatus: parsed.commStatus || {},
       taxaStatus: parsed.taxaStatus || {},
       alertLog: Array.isArray(parsed.alertLog) ? parsed.alertLog : [],
+      ultimaRetencao: parsed.ultimaRetencao || "",
     };
   } catch {
     return estadoVazio();

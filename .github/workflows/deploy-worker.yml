@@ -51,5 +51,13 @@ jobs:
           --file=migrations/0002_dedupe_ts_unico.sql
           || echo "Migração 0002 já aplicada — ok"
 
+      # CREATE TABLE ... IF NOT EXISTS com PRIMARY KEY é idempotente por si só,
+      # mas o "|| echo" fica por segurança/consistência com os passos acima.
+      - name: Migração D1 0003 (tabela leituras_diario, idempotente)
+        run: >
+          npx wrangler@4 d1 execute piezometro-db --remote
+          --file=migrations/0003_retencao_diaria.sql
+          || echo "Migração 0003 já aplicada — ok"
+
       - name: Publicar Worker
         run: npx wrangler@4 deploy
