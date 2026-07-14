@@ -132,6 +132,17 @@ operacional recorrente — ordem de grandeza compatível com o que já era estim
 campo real na versão anterior deste documento (R$ 76–200/ponto/ano), agora somado ao custo real de
 chip 4G e à inspeção de campo periódica que o cenário anterior não detalhava linha a linha.
 
+O maior item recorrente (os chips 4G, R$ 12.000/ano) é o cenário conservador de prateleira, com
+cada ponto 100% independente, e tem duas rotas concretas de redução. A primeira é o plano sob
+medida: a UCT transmite menos de 10 MB/mês (payloads JSON a cada poucos minutos), volume atendido
+por planos IoT de nicho na faixa de R$ 5–10/mês, e uma cotação corporativa de 50 chips negocia
+abaixo da tabela — a R$ 10/mês, o item cai para R$ 6.000/ano. A segunda é estrutural: em
+instalações com pontos próximos entre si (o caso típico de uma barragem), um gateway LoRaWAN
+compartilhado (R$ 800–1.500, custo único) concentra a comunicação de dezenas de nós e usa um
+único chip 4G de backhaul, derrubando o custo de conectividade de 50 chips para 1 (R$ 240/ano).
+O valor de R$ 12.000/ano permanece na conta principal por ser o pior caso defensável com fonte;
+as duas rotas mostram que ele é teto, não piso.
+
 ---
 
 ## 4. Economia, payback e ROI
