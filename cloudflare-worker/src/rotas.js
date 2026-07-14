@@ -105,7 +105,7 @@ export async function handleDados(url, env, cfg) {
     // um pico de 15,3 m por 2 min dentro de um bucket de 30 min vira uma
     // média de 12,1 m no gráfico). nivel_max preserva o PICO, que é o que
     // importa em monitoramento de segurança — ver
-    // docs/DASHBOARD_PROFISSIONAL.md §5.
+    // docs/projeto/DASHBOARD_PROFISSIONAL.md §5.
     const pontos = linhas.map((row) => ({
       ts: row.t,
       nivel_agua: row.nivel_agua,

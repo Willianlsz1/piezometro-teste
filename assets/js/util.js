@@ -40,7 +40,7 @@ function classifyComHisterese(nivel, faixaAnterior) {
 
 // ── ESTADO DE COMUNICAÇÃO (P1) ───────────────────────────────────────────────
 // Helper puro: decide se a leitura de um piezômetro está "ok" ou "stale" (sem sinal).
-// Dado ausente NUNCA é avaliado como normal — ver docs/DASHBOARD_PROFISSIONAL.md §2.
+// Dado ausente NUNCA é avaliado como normal — ver docs/projeto/DASHBOARD_PROFISSIONAL.md §2.
 function estadoComunicacao(leitura) {
   if (!leitura || !Number.isFinite(leitura.ts)) return "stale";
   const idadeSeg = Date.now() / 1000 - leitura.ts;

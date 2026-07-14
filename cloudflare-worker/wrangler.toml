@@ -49,7 +49,7 @@ TWILIO_FROM        = ""
 TWILIO_TO          = ""
 
 # Silêncio de instrumento além deste tempo (segundos) = alarme de COMUNICAÇÃO,
-# camada separada do alarme de nível (ver docs/DASHBOARD_PROFISSIONAL.md §2/§6,
+# camada separada do alarme de nível (ver docs/projeto/DASHBOARD_PROFISSIONAL.md §2/§6,
 # P2). Default 900s = 15 min.
 SILENCE_ALERT_SEC  = "900"
 
@@ -72,7 +72,7 @@ STALE_SEG          = "60"
 # Histerese (deadband) da classificação de nível, em metros: evita alarme
 # "chattering" quando o nível oscila bem em cima do limiar de ATENÇÃO ou
 # CRÍTICO (ISA-18.2). Só se aplica na DESCIDA de faixa — a subida continua
-# usando o limiar puro, sem atraso. Ver docs/DASHBOARD_PROFISSIONAL.md §5.
+# usando o limiar puro, sem atraso. Ver docs/projeto/DASHBOARD_PROFISSIONAL.md §5.
 HISTERESE_M        = "0.2"
 
 # Catálogo de instrumentos exibido no dashboard (mapa/seletor de piezômetro):

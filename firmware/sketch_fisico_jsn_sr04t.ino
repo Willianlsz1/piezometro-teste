@@ -12,7 +12,7 @@
  * dentro de um tubo de PVC (ou balde) — uma maquete em escala reduzida do
  * piezômetro real.
  *
- * MONTAGEM FÍSICA (ver docs/PROTOTIPO_FISICO.md para o passo a passo):
+ * MONTAGEM FÍSICA (ver docs/prototipo/PROTOTIPO_FISICO.md para o passo a passo):
  * O sensor fica fixado no TOPO do tubo/balde, apontando para baixo, para a
  * superfície da água. Ele mede a distância até a água; quanto MAIS a água
  * sobe, MENOR a distância medida — por isso o nível é calculado por
@@ -70,7 +70,7 @@
  * quando o NTP sincronizou) — sem pressão/temperatura, pois este protótipo
  * não tem esses sensores; o Worker aceita esses campos ausentes normalmente.
  *
- * CONEXÕES NA MAQUETE (ver docs/PROTOTIPO_FISICO.md para a tabela completa):
+ * CONEXÕES NA MAQUETE (ver docs/prototipo/PROTOTIPO_FISICO.md para a tabela completa):
  * JSN-SR04T: VCC→5V (VIN)  GND→GND  TRIG→GPIO5  ECHO→[divisor 1k/2k]→GPIO18
  * OLED:      VCC→3V3  GND→GND  SCL→GPIO22  SDA→GPIO21
  * LEDs (resistor 220Ω): Verde→GPIO32  Amarelo→GPIO33  Vermelho→GPIO25

@@ -236,11 +236,15 @@ piezometro-teste/
 │   ├── sketch_fisico_jsn_sr04t.ino   # Adapter do sensor do PROTÓTIPO FÍSICO (JSN-SR04T)
 │   └── diagram.json                  # Circuito do Wokwi (ESP32 + BMP180 + OLED + LEDs + buzzer)
 ├── docs/
-│   ├── MAPEAMENTO_DEMANDA_E_MERCADO.md  # Demanda SAGA × mercado real × regulação
-│   ├── BASE_DE_CONHECIMENTO.md          # Piezômetros, barragens, legislação e mercados (fontes)
-│   ├── DASHBOARD_PROFISSIONAL.md        # Padrões ISA-101/18.2 e plano de melhorias P1–P8
-│   ├── PLANO_REFATORACAO.md             # Plano anti-godfile (executado)
-│   └── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e demo
+│   ├── projeto/                         # A face "empresa" (o produto real)
+│   │   ├── PROJETO_INDUSTRIAL.md            # Especificação da unidade industrial (Fase 2)
+│   │   ├── MAPEAMENTO_DEMANDA_E_MERCADO.md  # Demanda SAGA × mercado real × regulação
+│   │   ├── BASE_DE_CONHECIMENTO.md          # Piezômetros, barragens, legislação e mercados (fontes)
+│   │   └── DASHBOARD_PROFISSIONAL.md        # Padrões ISA-101/18.2 e plano de melhorias P1–P8
+│   └── prototipo/                       # A face "maquete/banca" (Fase 1)
+│       ├── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e demo
+│       ├── DEFESA_BANCA.md                  # Posicionamento frente aos equipamentos profissionais
+│       └── PLANO_REFATORACAO.md             # Plano anti-godfile (executado)
 ├── cloudflare-worker/       # Backend (deploy: ver README da pasta)
 │   ├── src/
 │   │   ├── index.js         # Roteador (fetch + scheduled) — só orquestra
@@ -268,7 +272,7 @@ piezometro-teste/
 └── readme.md                # Este arquivo
 ```
 
-> 🧱 **Vai montar a maquete física?** Siga o guia completo em [`docs/PROTOTIPO_FISICO.md`](docs/PROTOTIPO_FISICO.md) — lista de compras (~R$ 150–220), esquema de ligação do JSN-SR04T (com o divisor de tensão obrigatório no ECHO), calibração e roteiro de demonstração para a banca.
+> 🧱 **Vai montar a maquete física?** Siga o guia completo em [`docs/prototipo/PROTOTIPO_FISICO.md`](docs/prototipo/PROTOTIPO_FISICO.md) — lista de compras (~R$ 150–220), esquema de ligação do JSN-SR04T (com o divisor de tensão obrigatório no ECHO), calibração e roteiro de demonstração para a banca.
 
 ---
 

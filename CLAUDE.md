@@ -8,7 +8,7 @@ medição contínua, transmissão em tempo real, dashboard, histórico e alertas
 economia estimada de R$ 600 mil/ano vs. medição manual terceirizada).
 
 O protótipo + código funcionando são a base de tudo: deles derivam o texto do TCC, os slides,
-o vídeo pitch. Documento-fonte de conhecimento: [docs/BASE_DE_CONHECIMENTO.md](docs/BASE_DE_CONHECIMENTO.md).
+o vídeo pitch. Documento-fonte de conhecimento: [docs/projeto/BASE_DE_CONHECIMENTO.md](docs/projeto/BASE_DE_CONHECIMENTO.md).
 
 ## Modelo de trabalho: 10-80-10
 
@@ -49,7 +49,8 @@ Dashboard (GitHub Pages, index.html) → GET /ultimos, /dados?pz&range
 | `assets/styles.css` + `assets/js/*` | CSS e os 8 módulos JS do dashboard (`config`, `util`, `fontes`, `estado`, `graficos`, `paineis`, `exportar`, `app`), carregados por `<script src>` em ordem de dependência — **sem bundler** |
 | `firmware/piezometro_core.h` | Núcleo comum do firmware (WiFi/buffer/envio/alertas/OLED) |
 | `firmware/sketch*.ino` | Adapters de sensor (BMP180 simulação; JSN-SR04T físico) |
-| `docs/` | Base de conhecimento, pesquisa de dashboards, planos e guia da maquete |
+| `docs/projeto/` | A face "empresa": base de conhecimento, mercado, padrões ISA do dashboard e a especificação industrial (`PROJETO_INDUSTRIAL.md`) |
+| `docs/prototipo/` | A face "maquete/banca": guia de montagem física, defesa na banca e planos de dev executados |
 
 **Guarda anti-godfile (permanente):** ≤ ~300 linhas por arquivo (exceção: `paineis.js` até ~450),
 1 responsabilidade por arquivo, nome = responsabilidade. Função nova entra no arquivo cujo nome a
@@ -88,7 +89,7 @@ Testes rápidos de produção: `curl <worker>/health`, `POST <worker>/ingest` (c
 
 - Resposta ao "isso já existe": existe para barragens de DPA alto a preço "sob consulta";
   o projeto democratiza o monitoramento para a camada lida à mão (28 mil barragens no Brasil,
-  só ~6 mil na PNSB). Detalhes e fontes em docs/BASE_DE_CONHECIMENTO.md.
+  só ~6 mil na PNSB). Detalhes e fontes em docs/projeto/BASE_DE_CONHECIMENTO.md.
 - Limitações a admitir: sensor stand-in (não é corda vibrante), sem redundância de energia
   exigida pela ANM 95/2022 para DPA alto. É protótipo de conceito.
 - Terminologia: piezômetro (poropressão de camada específica) ≠ INA (nível freático geral).

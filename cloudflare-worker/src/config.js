@@ -24,7 +24,7 @@ export function getConfig(env) {
   const ALERT_REPEAT_MIN = parseInt(env.ALERT_REPEAT_MIN || "15", 10);
 
   // P2 (alarme de comunicação) e P3 (taxa de variação) — ver
-  // docs/DASHBOARD_PROFISSIONAL.md §2/§4/§6.
+  // docs/projeto/DASHBOARD_PROFISSIONAL.md §2/§4/§6.
   const SILENCE_ALERT_SEC = parseInt(env.SILENCE_ALERT_SEC || "900", 10);
   const TAXA_JANELA_MIN = parseInt(env.TAXA_JANELA_MIN || "60", 10);
   const TAXA_MAX_M_DIA = parseFloat(env.TAXA_MAX_M_DIA || "0.5");

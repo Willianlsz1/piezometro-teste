@@ -1,8 +1,8 @@
 # Defesa na Banca — Posicionamento frente aos Equipamentos Profissionais
 
 > Roteiro de postura e respostas para o quesito "isso não é brinquedo perto de um sistema
-> profissional?". Fontes e números: [BASE_DE_CONHECIMENTO.md](BASE_DE_CONHECIMENTO.md) e
-> [DASHBOARD_PROFISSIONAL.md](DASHBOARD_PROFISSIONAL.md).
+> profissional?". Fontes e números: [BASE_DE_CONHECIMENTO.md](../projeto/BASE_DE_CONHECIMENTO.md) e
+> [DASHBOARD_PROFISSIONAL.md](../projeto/DASHBOARD_PROFISSIONAL.md).
 
 ## A postura em uma frase
 

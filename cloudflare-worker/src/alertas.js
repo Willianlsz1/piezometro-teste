@@ -16,7 +16,7 @@ export function classify(cfg, n) {
 
 export const ORDEM_FAIXA = { NORMAL: 0, ATENCAO: 1, CRITICO: 2 };
 
-// P4 — classificação com histerese (deadband), ver docs/DASHBOARD_PROFISSIONAL.md
+// P4 — classificação com histerese (deadband), ver docs/projeto/DASHBOARD_PROFISSIONAL.md
 // §5 (ISA-18.2). Subir de faixa é imediato (não há motivo para atrasar um
 // alarme de segurança), mas descer de faixa exige que o nível fique
 // HISTERESE_M abaixo do limiar da faixa anterior — sem isso, um nível
