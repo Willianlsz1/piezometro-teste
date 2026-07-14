@@ -107,21 +107,52 @@ No lado do backend, a escolha de uma plataforma de computação em nuvem serverl
 
 ### 1.3.6 Viabilidade econômica
 
-A viabilidade econômica do AquaSense foi avaliada a partir da comparação entre o custo da rotina tradicional de leitura manual terceirizada e o custo estimado de implantação e operação da solução proposta, tomando como referência a demanda oficial que motivou o projeto.
+Para saber se o AquaSense compensa financeiramente, comparamos o que a empresa gasta hoje com o método manual e o que passaria a gastar com o sistema automatizado, incluindo tanto a compra do equipamento quanto sua manutenção ao longo dos anos. O resultado dessa comparação é apresentado a seguir, junto com a explicação de como cada número foi obtido.
+
+**Como levantamos os custos**
+
+Nenhum dos quatro integrantes da equipe tem formação em finanças, então tratamos este levantamento como uma pesquisa de campo: em vez de estimar os preços de memória, buscamos cada componente do sistema em lojas nacionais de eletrônica e em marketplaces, registrando o valor, a loja e a data da consulta (julho de 2026). O transdutor de pressão submersível, peça central do sistema, foi encontrado por R$ 239 na versão genérica de uso industrial; o módulo de comunicação celular 4G, por R$ 580 a R$ 760 dependendo do vendedor; o conjunto de energia solar, com painel, controlador de carga e bateria, por cerca de R$ 389; e o valor de hora de um técnico de campo para instalação, pesquisado em tabelas do setor elétrico, ficou entre R$ 150 e R$ 250. Essa pesquisa de varejo, feita componente por componente, somou R$ 1.804 por unidade, valor que serve de piso de referência: ele cobre a compra avulsa de cada peça, mas não inclui fabricação de placa própria, cabo industrial, conectores de painel nem frete e variação cambial de itens importados, custos que só aparecem quando o sistema é fabricado em série e não montado peça a peça no balcão da loja.
+
+**Quanto custa o AquaSense**
+
+Por isso, o valor de referência usado no projeto para cada unidade é R$ 2.965, um número que acomoda, além dos componentes pesquisados, os itens de montagem industrial, o frete e a variação de câmbio que a pesquisa de varejo não alcança, mas que aparecem de fato quando cinquenta unidades são fabricadas e instaladas de uma vez. Multiplicando por cinquenta pontos de monitoramento, o hardware sozinho custa R$ 148.250. A esse valor somamos a instalação em campo, calculada com a hora técnica pesquisada (a mesma faixa de R$ 150 a R$ 250) considerando cerca de quatro a cinco horas de trabalho por ponto, entre deslocamento, fixação, calibração e teste; um estoque de peças sobressalentes equivalente a 10% do hardware, para reposição rápida sem esperar novo pedido de compra; uma bancada de homologação para testar e calibrar os equipamentos antes de irem a campo; e uma reserva de contingência para imprevistos de fabricação, câmbio e frete. A tabela abaixo mostra como esses valores se somam.
+
+| Item do investimento | Como foi calculado | Valor (R$) |
+|---|---|---|
+| Hardware (50 unidades) | 50 × R$ 2.965 por unidade | 148.250 |
+| Instalação e comissionamento em campo | 50 pontos × cerca de R$ 800, com base na hora técnica pesquisada | 40.000 |
+| Peças sobressalentes | 10% do valor do hardware | 14.825 |
+| Bancada de homologação | Equipamento de teste e calibração, uso único no projeto | 25.000 |
+| Reserva de contingência | Imprevistos de fabricação, câmbio e frete | 31.925 |
+| **Investimento total para 50 pontos** | | **260.000** |
+
+O investimento total de R$ 260.000 equivale a R$ 5.200 por ponto de monitoramento já instalado e funcionando, dos quais R$ 2.965 são o próprio equipamento e o restante cobre tudo o que é preciso para colocá-lo em operação segura no campo.
+
+**Quanto a empresa gasta hoje**
+
+O edital que originou este projeto declara uma economia potencial de R$ 600 mil por ano com a substituição da leitura manual terceirizada. Não tivemos acesso à planilha interna da empresa que gerou esse número, então testamos se ele é coerente com a prática do mercado. Um contrato de leitura manual terceirizada custa, em faixas usuais do setor, algo em torno de R$ 50 mil por mês, valor que paga uma equipe de campo com técnicos, veículo, combustível, equipamentos de segurança, encargos trabalhistas e a elaboração de relatórios. Essa equipe consegue ler cerca de cem piezômetros duas vezes por semana. Dividindo o custo mensal pelo número de leituras realizadas no período, cada leitura individual sai por cerca de R$ 58, um valor plausível para um serviço técnico terceirizado de campo. Ou seja, o número de R$ 600 mil por ano declarado no edital é coerente com o que o mercado de fato cobra por esse tipo de serviço, e não uma cifra arbitrária.
+
+**Quanto passará a gastar**
+
+Depois de instalado, o AquaSense ainda gera custo de manutenção, e ignorá-lo distorceria a comparação. Somamos a conectividade celular dos cinquenta pontos, o serviço de nuvem que recebe e processa os dados, a manutenção preventiva de peças e as inspeções físicas mensais de campo. O total é R$ 39.155 por ano, ou cerca de R$ 783 por ponto por ano. O maior item dessa conta é o chip 4G de cada ponto, calculado no cenário mais caro, com cada unidade operando de forma totalmente independente; existem duas rotas concretas para reduzir esse valor, uma pela contratação de um plano de dados sob medida para o baixo volume que o sistema realmente transmite, outra pela instalação de um único ponto de comunicação compartilhado entre os sensores próximos entre si, o que é o caso típico de uma barragem. Mesmo sem aplicar nenhuma dessas duas reduções, o custo de manutenção anual representa uma fração pequena diante da economia obtida, como mostra o cálculo a seguir.
+
+**O que a empresa ganha**
+
+Comparando a economia bruta de R$ 600.000 por ano com o custo de manutenção de R$ 39.155, sobra uma economia líquida de R$ 560.845 por ano a partir do segundo ano de operação, uma redução de 93,5% do que a empresa gastava antes. No primeiro ano, é preciso descontar também o investimento inicial de R$ 260.000, o que ainda deixa uma economia líquida de R$ 300.845 já nos primeiros doze meses.
+
+Esse resultado permite calcular dois indicadores que costumam aparecer em qualquer análise desse tipo, e que explicamos aqui em palavras simples. O primeiro é o payback, o tempo que a economia gerada leva para pagar de volta o investimento feito. Dividindo o investimento de R$ 260.000 pela economia líquida mensal de aproximadamente R$ 46.737, chegamos a um payback de 5,6 meses: em pouco mais de meio ano de operação, o sistema já se pagou sozinho. O segundo indicador é o ROI, ou retorno sobre o investimento, que mostra quanto volta para o bolso da empresa para cada real investido. No primeiro ano, o ROI é de 116%, o que quer dizer que cada R$ 1,00 investido retorna R$ 2,16: o real investido de volta mais R$ 1,16 de ganho líquido, mesmo já contando o custo de manutenção do primeiro ano. Olhando cinco anos de operação, período em que o investimento inicial é pago uma única vez e só o custo de manutenção se repete, o retorno acumulado chega a 978%, ou seja, cada R$ 1,00 investido vira quase R$ 11,00.
+
+**O AquaSense diante do mercado**
+
+Para situar esses números fora da nossa própria conta, buscamos os preços públicos dos oito principais fabricantes internacionais de telemetria geotécnica e constatamos que nenhum deles publica tabela de preço: todos exigem contato comercial direto para cotação. A única referência concreta que encontramos em toda a pesquisa foi um artigo técnico de congresso de 2007, que registrava um custo entre US$ 1.636 e US$ 2.370 por instrumento automatizado. Mesmo quase vinte anos depois e sem qualquer correção monetária, o custo de R$ 5.200 por ponto instalado do AquaSense já compete com aquela faixa histórica, o que confirma que o mercado tradicional de telemetria geotécnica opera hoje numa faixa de preço bem mais alta, reservada a barragens de Dano Potencial Associado alto. É justamente essa lacuna de preço que sustenta a proposta do AquaSense como alternativa viável para a camada de barragens, açudes e taludes que hoje não têm acesso a nenhuma automação.
 
 | Métrica | Situação tradicional (manual) | Solução AquaSense | Impacto |
 |---|---|---|---|
-| Custo operacional anual | Custo elevado com contratação de equipes de medição, deslocamento de veículos e consumo de combustível | Custo concentrado em manutenções preventivas esporádicas planejadas | Economia estimada de R$ 600.000,00 por ano em escala operacional |
-| Frequência de dados | Baixa frequência, com leitura semanal ou mensal por piezômetro | Alta resolução de monitoramento, com leituras contínuas ao longo do dia | Detecção ágil de transientes de pressão hidráulica e infiltração rápida |
-| Segurança do trabalho | Exposição constante de equipes a áreas geotécnicas instáveis | Exposição mínima, restrita a visitas programadas de manutenção preventiva | Redução direta do risco operacional das equipes de campo |
-| Custo por ponto de monitoramento | Custo recorrente sem geração de ativo permanente | Investimento estimado de aproximadamente R$ 2.965,00 por ponto de monitoramento | Investimento estimado de R$ 260.000,00 para uma primeira série de 50 pontos |
-| Tempo de retorno | Gasto constante sem possibilidade de retorno de capital | Investimento com retorno mensurável frente à economia operacional obtida | Payback estimado em cerca de 6 meses |
-
-O valor de R$ 2.965 corresponde ao hardware de cada unidade; o investimento total de R$ 260.000,00 para a primeira série de 50 pontos inclui, além do hardware (R$ 148.250,00), a instalação e o comissionamento em campo (R$ 40.000,00), sobressalentes (R$ 14.825,00), a bancada de homologação (R$ 25.000,00) e a contingência de projeto (R$ 31.925,00), resultando em R$ 5.200,00 por ponto instalado.
-
-O custo operacional anual estimado do sistema é de R$ 39.155,00, cobrindo a conectividade celular dos 50 pontos, a nuvem, a manutenção e as inspeções mensais de campo, o que representa uma redução de 93,5% sobre os R$ 600 mil/ano da situação tradicional, com payback estimado em 5,6 meses, ROI de 116% já no primeiro ano de operação e de 978% acumulado ao longo de cinco anos. O item de conectividade celular tem rotas concretas de redução de custo, como planos IoT de menor preço por chip e o uso de um gateway LoRaWAN compartilhado entre os pontos mais próximos.
-
-Mesmo em uma comparação conservadora, o investimento estimado por ponto de monitoramento permanece uma ordem de grandeza abaixo dos pacotes comerciais completos de instrumentação e telemetria voltados a barragens de Dano Potencial Associado alto, cujos preços são tipicamente informados apenas sob consulta. Essa diferença sustenta a proposta de valor do AquaSense como alternativa economicamente viável para a camada de estruturas geotécnicas que hoje não têm acesso a nenhuma automação.
+| Custo operacional anual | Equipes de medição, deslocamento de veículos e combustível | Manutenção, nuvem e inspeções planejadas | Economia de R$ 560.845 por ano a partir do segundo ano |
+| Frequência de dados | Leitura semanal ou quinzenal por piezômetro | Leituras contínuas ao longo do dia | Detecção ágil de transientes de pressão e infiltração |
+| Segurança do trabalho | Exposição constante de equipes a áreas geotécnicas instáveis | Exposição mínima, restrita a visitas programadas | Redução direta do risco às equipes de campo |
+| Investimento | Gasto recorrente sem gerar ativo permanente | R$ 260.000 para 50 pontos instalados | R$ 5.200 por ponto, pago uma única vez |
+| Retorno | Gasto constante sem retorno de capital | Payback de 5,6 meses; ROI de 116% no ano 1 e 978% em 5 anos | Cada R$ 1,00 investido retorna quase R$ 11,00 em 5 anos |
 
 ### 1.3.7 Resultados e conclusão
 
