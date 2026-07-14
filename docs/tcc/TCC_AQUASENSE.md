@@ -21,6 +21,7 @@
       1.4.1 Orçamento Estimado (BOM)
       1.4.2 BMG Canvas
       1.4.3 Situação de Aprendizagem
+   Referências
 
 *Nota: atualizar os números de página no Word após a diagramação final (Referências > Sumário)
 ou preencher manualmente.*
@@ -190,4 +191,102 @@ Anexo II: BMG Canvas do projeto. `[PREENCHER: inserir imagem do BMG Canvas]`
 ### 1.4.3 Situação de Aprendizagem
 
 Anexo III: `[PREENCHER: Situação de Aprendizagem aplicada ao curso técnico]`
+
+---
+
+## REFERÊNCIAS
+
+ACKCIO. Wireless Monitoring Solutions For Mining. [S. l.], [20--]. Disponível em: <https://www.ackcio.com/industries/mining/>. Acesso em: 13 jul. 2026.
+
+AGÊNCIA NACIONAL DE ÁGUAS E SANEAMENTO BÁSICO (ANA). Manual de Segurança de Pequenas Barragens. Brasília, DF: ANA, [20--]. Disponível em: <https://www.snirh.gov.br/portal/snisb/Entenda_Mais/publicacoes/ArquivosPNSB_Docs_Estruturantes/produto-10-manual-de-seguranca-de-pequenas-barragens.pdf>. Acesso em: 14 jul. 2026.
+
+AGÊNCIA NACIONAL DE ÁGUAS E SANEAMENTO BÁSICO (ANA). RSB 2024/2025 indica 241 barragens prioritárias que necessitam de maior atenção em termos de segurança em 23 estados e no Distrito Federal. Brasília, DF, 2025. Disponível em: <https://www.gov.br/ana/pt-br/assuntos/noticias-e-eventos/noticias/rsb-2024-2025-indica-241-barragens-prioritarias-que-necessitam-de-maior-atencao-em-termos-de-seguranca-em-23-estados-e-no-distrito-federal>. Acesso em: 14 jul. 2026.
+
+AGÊNCIA NACIONAL DE MINERAÇÃO (ANM). Resolução ANM nº 95, de 7 de fevereiro de 2022. Consolida os atos normativos de segurança de barragens de mineração. Brasília, DF: ANM, 2022. Disponível em: <https://www.gov.br/anm/pt-br/assuntos/barragens/legislacao/resolucao-no-95-2022.pdf>. Acesso em: 14 jul. 2026.
+
+AMAZON.COM.BR. Sim7600G-H 4G HAT: comunicação e posicionamento para Raspberry Pi. [S. l.], 2026. Disponível em: <https://www.amazon.com.br/Sim7600G-H-4G-Pi-Comunica%C3%A7%C3%A3o-Posicionamento/dp/B08ZY2FV22>. Acesso em: 14 jul. 2026.
+
+AMERICANAS. Micro SD Card 16GB Class 10. [S. l.], 2026. Disponível em: <https://www.americanas.com.br/busca/micro-sd-card-16gb-class-10>. Acesso em: 14 jul. 2026.
+
+ARQIA. Plano Pré-Pago M2M. [S. l.], 2026. Disponível em: <https://marketplaceiot.arqia.com.br/loja/arqiamob/produto/M2M60-10MB/plano-pre-pago-m2m>. Acesso em: 14 jul. 2026.
+
+BAÚ DA ELETRÔNICA. Conversor Analógico/Digital I2C 16 bits ADS1115. [S. l.], 2026. Disponível em: <https://www.baudaeletronica.com.br/produto/conversor-analogicodigital-i2c-16-bits-ads1115.html>. Acesso em: 14 jul. 2026.
+
+BRASIL. Lei nº 12.334, de 20 de setembro de 2010. Estabelece a Política Nacional de Segurança de Barragens destinadas à acumulação de água para quaisquer usos, à disposição final ou temporária de rejeitos e à acumulação de resíduos industriais. Diário Oficial da União, Brasília, DF, 2010.
+
+BRASIL. Lei nº 14.066, de 30 de setembro de 2020. Altera a Lei nº 9.984, de 17 de julho de 2000, a Lei nº 12.334, de 20 de setembro de 2010, [...] para dispor sobre a Política Nacional de Segurança de Barragens. Diário Oficial da União, Brasília, DF, 2020. Disponível em: <http://www.planalto.gov.br/ccivil_03/_ato2019-2022/2020/lei/l14066.htm>. Acesso em: 14 jul. 2026.
+
+BRASPOWER. Bateria Selada 12V 18Ah Moura VRLA/AGM. [S. l.], 2026. Disponível em: <https://www.braspower.com.br/bateria-selada-12v-18ah-moura-vrla-agm>. Acesso em: 14 jul. 2026.
+
+CANARY SYSTEMS. MLSAA: Measurand ShapeArray Automation. [S. l.], [20--]. Disponível em: <https://canarysystems.com/products/hardware/mlsaa/>. Acesso em: 13 jul. 2026.
+
+CLARO EMPRESAS. Planos M2M. [S. l.], 2026. Disponível em: <https://www.claro.com.br/empresas/m2m>. Acesso em: 14 jul. 2026.
+
+CURTO CIRCUITO. Conversor Analógico/Digital I2C 16 bits ADS1115. [S. l.], 2026. Disponível em: <https://curtocircuito.com.br/conversor-analogico-digital-i2c-16-bits-ads1115.html>. Acesso em: 14 jul. 2026.
+
+DESCOMPLICA SOLUÇÕES (via Mercado Livre). Transdutor de Pressão 0-10 Bar 4-20mA. [S. l.], 2026. Disponível em: <https://www.descomplicasolucoes.com.br/MLB-2865733954-transdutor-de-presso-0-10-bar-4-20ma-tenso-1224vdc-g14-_JM>. Acesso em: 14 jul. 2026.
+
+DIMENSIONAL. Caixa de Passagem Policarbonato Cinza 7035 IP66, Tampa Transparente, 180x182x165mm. [S. l.], 2026. Disponível em: <https://www.dimensional.com.br/caixa-passagem-policarbonato-cinza-7035-ip66-tampa-transparente-180x182x165mm-s-ritall/p>. Acesso em: 14 jul. 2026.
+
+DYNAMIS TECHNE (host). Alternativas para a automação dos medidores triortogonais. In: CONGRESSO BRASILEIRO DO CONCRETO, 49., 2007, [S. l.]. Anais eletrônicos [...]. São Paulo: IBRACON, 2007. Disponível em: <https://dynamistechne.com/wp-content/uploads/2018/07/2007-ibracon-alternativas-para-a-automacao-dos-medidores-triortogonais.pdf>. Acesso em: 13 jul. 2026.
+
+ELETRODEX. Resistor de Medição Shunt. [S. l.], 2026. Disponível em: <https://www.eletrodex.net/passivos/resistores/especiais/resistor-de-medicao-shunt>. Acesso em: 14 jul. 2026.
+
+ELETROGATE. Módulo Micro SD Card. [S. l.], 2026. Disponível em: <https://www.eletrogate.com/modulo-micro-sd-card>. Acesso em: 14 jul. 2026.
+
+ENCARDIO-RITE. Geotechnical Data Logger System. [S. l.], [20--]. Disponível em: <https://www.encardio.com/geotechnical-products/data-loggers>. Acesso em: 13 jul. 2026.
+
+ENGEHALL. Tabela de Preço Eletricista 2026. [S. l.], 2026. Disponível em: <https://engehall.com.br/tabela-preco-eletricista-2025/>. Acesso em: 14 jul. 2026.
+
+GEOKON. Standard Piezometers: Model 4500 Series. Lebanon, NH, [20--]. Disponível em: <https://www.geokon.com/4500-Series>. Acesso em: 13 jul. 2026.
+
+GITHUB. Topics: piezometer. [S. l.], 2026. Disponível em: <https://github.com/topics/piezometer>. Acesso em: 13 jul. 2026.
+
+HUMMEL. Caixas Industriais IP66/IP67. [S. l.], 2026. Disponível em: <https://hummel.com.br/caixas/>. Acesso em: 14 jul. 2026.
+
+INTERNATIONAL SOCIETY OF AUTOMATION (ISA). ISA-18.2: Management of Alarm Systems for the Process Industries. Research Triangle Park, NC: ISA, 2016. Disponível em: <https://www.isa.org/getmedia/55b4210e-6cb2-4de4-89f8-2b5b6b46d954/PAS-Understanding-ISA-18-2.pdf>. Acesso em: 14 jul. 2026.
+
+LOJA ELÉTRICA. Protetor DPS (Clamper 20kA e 45kA). [S. l.], 2026. Disponível em: <https://www.lojaeletrica.com.br/protecao-eletrica/protetor-dps.html>. Acesso em: 14 jul. 2026.
+
+MEG SEGURANÇA ELETRÔNICA (via Mercado Livre). Bateria Selada 12V 18Ah VRLA/AGM No-break Estacionária. [S. l.], 2026. Disponível em: <https://www.megsegurancaeletronica.com.br/MLB-3523126775-bateria-selada-12v-18ah-vrla-agm-no-break-estacionaria-_JM>. Acesso em: 14 jul. 2026.
+
+MERCADO LIVRE. Módulo Waveshare SIM7600G-H 4G HAT para Raspberry Pi e PC. [S. l.], 2026. Disponível em: <https://www.mercadolivre.com.br/modulo-sim7600g-h-4g-hat-para-raspberry-pi-e-pc-suporta-lte/p/MLB2041822322>. Acesso em: 14 jul. 2026.
+
+MERCADO LIVRE. Placa ESP32 DevKit V1. [S. l.], 2026. Disponível em: <https://lista.mercadolivre.com.br/esp32-devkit-v1>. Acesso em: 14 jul. 2026.
+
+MERCADO LIVRE. Resistor Shunt. [S. l.], 2026. Disponível em: <https://lista.mercadolivre.com.br/resistor-shunt>. Acesso em: 14 jul. 2026.
+
+MERCADO LIVRE. RTC DS3231. [S. l.], 2026. Disponível em: <https://lista.mercadolivre.com.br/rtc-ds3231>. Acesso em: 14 jul. 2026.
+
+NAMUR. NE 43: Standardisation of the Signal Level for the Breakdown Information of Digital Transmitters. [S. l.]: NAMUR, [19--].
+
+PELANDO. Kit Painel Solar 20w 12v Monocristalino + Controlador 10A. [S. l.], 2026. Disponível em: <https://www.pelando.com.br/d/kit-painel-solar-20w-12v-monocristalino-controlador-10a-prateado-1000v-18v-ea58>. Acesso em: 14 jul. 2026.
+
+RECICOMP. Placa ESP32 DevKit V1 WiFi Bluetooth. [S. l.], 2026. Disponível em: <https://www.recicomp.com.br/produtos/placa-esp32-devkit-v1-wifi-bluetooth/>. Acesso em: 14 jul. 2026.
+
+ROBOCORE. Módulo Cartão Micro SD. [S. l.], 2026. Disponível em: <https://www.robocore.net/outros-componentes-eletronicos/modulo-cartao-micro-sd>. Acesso em: 14 jul. 2026.
+
+RS ROBÓTICA. Módulo RTC DS3231. [S. l.], 2026. Disponível em: <https://www.rsrobotica.com.br/modulo-rtc-ds1307>. Acesso em: 14 jul. 2026.
+
+RST INSTRUMENTS. Precision Data Loggers for Geotechnical Sensors. Coquitlam, [20--]. Disponível em: <https://rstinstruments.com/product-category/instruments/data-loggers/>. Acesso em: 13 jul. 2026.
+
+SAMARCO MINERAÇÃO S. A. Desafio SAGA: monitoramento contínuo de piezômetros em barragens de mineração. [S. l.: s. n.], 2026.
+
+SCIENCEDIRECT. ESPiezometer: ESP32-based field tool for installation and validation of piezometric sensors for groundwater level monitoring. [S. l.], 2026. Disponível em: <https://www.sciencedirect.com/science/article/pii/S2468067226000337>. Acesso em: 13 jul. 2026.
+
+SISGEO. WR Log Wireless Dataloggers. [S. l.], [20--]. Disponível em: <https://sisgeo.com/products/discontinued/wr-log-wireless-dataloggers/>. Acesso em: 13 jul. 2026.
+
+SISTEMA NACIONAL DE INFORMAÇÕES SOBRE SEGURANÇA DE BARRAGENS (SNISB). Relatório Anual de Segurança de Barragem. Brasília, DF: ANA, 2025. Disponível em: <https://www.snirh.gov.br/portal/snisb/relatorio-anual-de-seguranca-de-barragem>. Acesso em: 14 jul. 2026.
+
+TRICE BRASIL. Preço da mão de obra de eletricista em 2026. [S. l.], 2026. Disponível em: <https://www.tricebrasil.com.br/blog/preco-da-mao-de-obra-de-eletricista-em-2026>. Acesso em: 14 jul. 2026.
+
+UBIDOTS. Preços. [S. l.], 2026. Disponível em: <https://pt.ubidots.com/pricing>. Acesso em: 13 jul. 2026.
+
+UNIVERSIDADE FEDERAL DE OURO PRETO (UFOP). Sistema de Monitoramento Online de Barragens. Ouro Preto: UFOP, 2019. Disponível em: <https://www.monografias.ufop.br/bitstream/35400000/1818/11/MONOGRAFIA_SistemaMonitoramentoOnline.pdf>. Acesso em: 13 jul. 2026.
+
+USINAINFO. Sensor de Nível Submersível para Líquidos 4 a 20mA, Sonda Inox 304. [S. l.], 2026. Disponível em: <https://www.usinainfo.com.br/sensor-de-nivel/sensor-de-nivel-submersivel-para-liquidos-4-a-20ma-sonda-inox-304-1m-com-cabo-de-3m-9117.html>. Acesso em: 14 jul. 2026.
+
+VIVO. Chip M2M para Empresas. [S. l.], 2026. Disponível em: <https://vivo.com.br/para-empresas/produtos-e-servicos/servicos-essenciais/movel/m2m-e-kite-platform>. Acesso em: 14 jul. 2026.
+
+WORLDSENSING. Piconode: Compact Data Logger. [S. l.], [20--]. Disponível em: <https://www.worldsensing.com/product/piconode-data-acquisition/>. Acesso em: 13 jul. 2026.
 
