@@ -232,8 +232,11 @@ O sistema classifica o **nível d'água** em três faixas — a mesma lógica no
 piezometro-teste/
 ├── firmware/
 │   ├── piezometro_core.h             # Núcleo comum (WiFi, NTP, buffer, envio, alertas, OLED)
+│   ├── piezometro_deep_sleep.h       # Modo de campo a bateria/solar (opt-in via MODO_DEEP_SLEEP)
 │   ├── sketch.ino                    # Adapter do sensor da SIMULAÇÃO (BMP180 como stand-in)
 │   ├── sketch_fisico_jsn_sr04t.ino   # Adapter do sensor do PROTÓTIPO FÍSICO (JSN-SR04T)
+│   ├── sketch_demo_hc_sr04.ino       # Adapter da DEMO de bancada sem água (HC-SR04; mão = água)
+│   ├── sketch_uct_4a20ma.ino         # Adapter da UCT INDUSTRIAL (ADS1115 + loop 4–20 mA, NAMUR)
 │   └── diagram.json                  # Circuito do Wokwi (ESP32 + BMP180 + OLED + LEDs + buzzer)
 ├── docs/
 │   ├── projeto/                         # A face "empresa" (o produto real)
@@ -245,16 +248,20 @@ piezometro-teste/
 │   │   ├── VIABILIDADE_ECONOMICA.md         # Custos, precificação, TAM-SAM-SOM e payback
 │   │   ├── ALIMENTACAO_ENERGIA.md           # Energia: hoje, mercado e dimensionamento solar
 │   │   ├── CADEIA_DE_CONFIANCA.md           # Integridade do dado da medição ao alerta
+│   │   ├── HOMOLOGACAO_UCT.md               # Ensaios E1–E5 da UCT (aceite ±3 cm, 72 h)
 │   │   └── DASHBOARD_PROFISSIONAL.md        # Padrões ISA-101/18.2 e plano de melhorias P1–P8
 │   ├── prototipo/                       # A face "maquete/banca" (Fase 1)
 │   │   ├── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e demo
+│   │   ├── BRINGUP_FISICO.md                # Diário de bordo da montagem real (estado + pendências)
 │   │   ├── VALIDACAO_SENSOR.md              # Protocolo de bancada e incerteza do sensor
 │   │   ├── DEFESA_BANCA.md                  # Posicionamento frente aos equipamentos profissionais
 │   │   ├── PREPARACAO_BANCA.md              # Memória de cálculo, conformidade e perguntas prováveis
 │   │   └── PLANO_REFATORACAO.md             # Plano anti-godfile (executado)
 │   └── tcc/                             # Entregáveis do TCC
-│       ├── TCC_RASCUNHO.md                  # Rascunho estruturado no template oficial do SENAI
-│       └── TCC_ENTREGA.docx                 # Versão para envio ao professor (ABNT)
+│       ├── TCC_AQUASENSE.md                 # Fonte do texto oficial do TCC
+│       ├── TCC_ENTREGA.docx                 # Versão oficial para envio ao professor (ABNT)
+│       ├── TCC_RASCUNHO.md                  # Rascunho antigo (histórico)
+│       └── graficos/                        # PNGs da viabilidade econômica embutidos no docx
 ├── cloudflare-worker/       # Backend (deploy: ver README da pasta)
 │   ├── src/
 │   │   ├── index.js         # Roteador (fetch + scheduled) — só orquestra
