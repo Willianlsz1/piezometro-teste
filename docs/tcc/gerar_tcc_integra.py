@@ -26,6 +26,8 @@ TEMPLATE = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 VERMELHO = RGBColor(0xC0, 0x00, 0x00)
+# marcacoes que ficam em vermelho no docx, sinalizando o que falta preencher
+MARCA = re.compile(r"^`\[(PREENCHER|COLAR AQUI|ESCREVER AQUI)")
 
 # ---------------------------------------------------------------- parse do md
 def carregar_secoes():
@@ -87,12 +89,12 @@ def blocos(linhas):
 # ------------------------------------------------------------- helpers do docx
 def runs_formatados(p, texto):
     """Escreve texto em p tratando **bold**, `[PREENCHER: ...]` (vermelho) e limpando markdown."""
-    for parte in re.split(r"(\*\*[^*]+\*\*|`\[PREENCHER:[^`]+\]`)", texto):
+    for parte in re.split(r"(\*\*[^*]+\*\*|`\[(?:PREENCHER|COLAR AQUI|ESCREVER AQUI)[^`]*\]`)", texto):
         if not parte:
             continue
         if parte.startswith("**") and parte.endswith("**"):
             p.add_run(parte.strip("*")).bold = True
-        elif parte.startswith("`[PREENCHER:"):
+        elif parte.startswith("`[") and MARCA.search(parte):
             r = p.add_run(parte.strip("`"))
             r.font.color.rgb = VERMELHO
             r.bold = True
@@ -204,6 +206,28 @@ def acha(d, texto):
             return p
     raise KeyError(texto)
 
+def preencher_capa(d, marcador, titulo):
+    """Troca o marcador do titulo nos controles de conteudo (capa/folha de rosto).
+
+    O Word quebra o texto em varios <w:r>/<w:t> ("TÍTULO DO " + "PROJETO"), entao
+    procurar o marcador run a run nunca casa. Aqui o texto e comparado por
+    paragrafo: o primeiro run recebe o titulo inteiro (preservando a formatacao
+    dele) e os demais sao esvaziados.
+    """
+    trocas = 0
+    for sdt in d.element.body.iter(W + "sdt"):
+        for p in sdt.iter(W + "p"):
+            ts = list(p.iter(W + "t"))
+            if not ts:
+                continue
+            if marcador not in "".join(t.text or "" for t in ts):
+                continue
+            ts[0].text = titulo
+            for t in ts[1:]:
+                t.text = ""
+            trocas += 1
+    return trocas
+
 # ------------------------------------------------------------------- montagem
 def main():
     if not os.path.exists(TEMPLATE):
@@ -221,11 +245,11 @@ def main():
         print("  ! atencao: o manual pede o codigo da unidade entre cerquilhas antes do")
         print("    titulo (ex.: '#12900# AquaSense: ...'). Titulo atual: " + titulo_md[:60])
 
-    # capa e sumario (controles de conteudo do template)
-    for sdt in d.element.body.iter(W + "sdt"):
-        for t in sdt.iter(W + "t"):
-            if t.text and "TÍTULO DO PROJETO" in t.text:
-                t.text = t.text.replace("TÍTULO DO PROJETO", titulo_md)
+    # capa e folha de rosto (controles de conteudo do template)
+    n = preencher_capa(d, "TÍTULO DO PROJETO", titulo_md)
+    if n == 0:
+        sys.exit("ERRO: o marcador do titulo nao foi encontrado na capa do template.")
+    print("  capa: titulo aplicado em %d paragrafo(s)" % n)
 
     acha(d, "Título").text = titulo_md
 

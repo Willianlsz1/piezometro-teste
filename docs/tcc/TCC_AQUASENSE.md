@@ -1,4 +1,4 @@
-# #[PREENCHER: código da unidade]# AquaSense: Sistema de Telemetria e Monitoramento Geotécnico Remoto e Contínuo para Piezômetros via IoT
+# #HORTO# AquaSense: Sistema de Telemetria e Monitoramento Geotécnico Remoto e Contínuo para Piezômetros via IoT
 
 > Fonte deste documento: transcrição fiel do TCC oficial da equipe (template INTEGRA SENAI-MG),
 > com as correções decididas em 14/07/2026 aplicadas (ver nota ao final). É a partir deste
@@ -209,10 +209,14 @@ A relação abaixo corresponde à unidade industrial especificada para instalaç
 
 ### 1.4.2 BMG Canvas
 
-Anexo II: BMG Canvas do projeto. `[PREENCHER: inserir imagem do BMG Canvas]`
+Anexo II: BMG Canvas do projeto.
+
+`[COLAR AQUI A IMAGEM DO BMG CANVAS]`
 ### 1.4.3 Situação de Aprendizagem
 
-Anexo III: `[PREENCHER: Situação de Aprendizagem aplicada ao curso técnico]`
+Anexo III: Situação de Aprendizagem aplicada ao curso técnico.
+
+`[ESCREVER AQUI A SITUAÇÃO DE APRENDIZAGEM]`
 ---
 
 ## REFERÊNCIAS
