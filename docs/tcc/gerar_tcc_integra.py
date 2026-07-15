@@ -31,6 +31,15 @@ VERMELHO = RGBColor(0xC0, 0x00, 0x00)
 def carregar_secoes():
     """Divide o markdown em secoes por heading (##/###) e retorna lista de blocos."""
     linhas = open(MD, encoding="utf-8").read().splitlines()
+    if not linhas or not linhas[0].startswith("# "):
+        sys.exit(
+            "ERRO: a primeira linha do TCC_AQUASENSE.md precisa comecar com '# ' (cerquilha e\n"
+            "espaco), que e a marcacao de titulo do markdown. Ela deve ficar assim:\n\n"
+            "  # #12900# AquaSense: Sistema de Telemetria e Monitoramento...\n\n"
+            "O primeiro '# ' e a marcacao; o codigo da unidade vem entre as duas cerquilhas\n"
+            "seguintes, conforme o manual do INTEGRA. Linha 1 atual:\n\n  %s"
+            % (linhas[0] if linhas else "(arquivo vazio)")
+        )
     secoes, atual = [], None
     for l in linhas:
         h = re.match(r"^(#{1,3}) +(.*)$", l)
@@ -200,10 +209,17 @@ def main():
     if not os.path.exists(TEMPLATE):
         sys.exit("Template nao encontrado: %s\nPasse o caminho como argumento." % TEMPLATE)
 
-    secs = {s["titulo"]: s for s in carregar_secoes()}
+    lista = carregar_secoes()
+    secs = {s["titulo"]: s for s in lista}
     d = Document(TEMPLATE)
 
-    titulo_md = [s for s in secs if s.startswith("#[PREENCHER")][0]
+    # o titulo do trabalho e o primeiro heading de nivel 1 do markdown
+    titulo_md = next(s["titulo"] for s in lista if s["nivel"] == 1)
+    if "[PREENCHER" in titulo_md:
+        print("  ! atencao: o codigo da unidade ainda nao foi preenchido no titulo")
+    elif not re.match(r"^#[^#]+# ", titulo_md):
+        print("  ! atencao: o manual pede o codigo da unidade entre cerquilhas antes do")
+        print("    titulo (ex.: '#12900# AquaSense: ...'). Titulo atual: " + titulo_md[:60])
 
     # capa e sumario (controles de conteudo do template)
     for sdt in d.element.body.iter(W + "sdt"):

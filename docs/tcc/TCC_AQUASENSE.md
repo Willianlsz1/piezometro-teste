@@ -32,7 +32,7 @@ ou preencher manualmente.*
 
 Unidade SENAI: Belo Horizonte HORTO
 
-Instrutor orientador: `[PREENCHER: instrutor orientador]`
+Instrutor orientador: Jairo
 
 | ALUNO | CURSO | FUNÇÃO NO PROJETO |
 |---|---|---|
@@ -210,11 +210,9 @@ A relação abaixo corresponde à unidade industrial especificada para instalaç
 ### 1.4.2 BMG Canvas
 
 Anexo II: BMG Canvas do projeto. `[PREENCHER: inserir imagem do BMG Canvas]`
-
 ### 1.4.3 Situação de Aprendizagem
 
 Anexo III: `[PREENCHER: Situação de Aprendizagem aplicada ao curso técnico]`
-
 ---
 
 ## REFERÊNCIAS
