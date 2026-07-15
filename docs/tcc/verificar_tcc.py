@@ -37,6 +37,11 @@ CHECAGENS = [
     ("payback correto", "5,6 meses", True, corpo),
     ("OPEX no texto", "39.155", True, corpo),
     ("investimento correto", "260.000", True, corpo),
+    # os R$ 600 mil sao a meta de beneficio do edital, nao um gasto declarado
+    # pela empresa; o gasto atual e estimativa da equipe. Nao reintroduzir.
+    ("edital nao 'declara' o gasto", "declara uma economia", False, corpo),
+    ("edital como beneficio esperado", "benefícios esperados", True, corpo),
+    ("gasto atual qualificado como estimado", "gasto atual estimado", True, corpo),
     ("prototipo declarado com honestidade", "protótipo funcional de bancada", True, corpo),
     ("anexo BMG Canvas", "BMG Canvas", True, corpo),
     ("anexo Situacao de Aprendizagem", "Situação de Aprendizagem", True, corpo),

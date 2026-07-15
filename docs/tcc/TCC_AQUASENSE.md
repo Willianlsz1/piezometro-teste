@@ -138,11 +138,15 @@ O investimento total de R$ 260.000 equivale a R$ 5.200 por ponto de monitorament
 
 **Quanto a empresa gasta hoje**
 
-O edital que originou este projeto declara uma economia potencial de R$ 600 mil por ano com a substituição da leitura manual terceirizada. Não tivemos acesso à planilha interna da empresa que gerou esse número, então testamos se ele é coerente com a prática do mercado. Um contrato de leitura manual terceirizada custa, em faixas usuais do setor, algo em torno de R$ 50 mil por mês, valor que paga uma equipe de campo com técnicos, veículo, combustível, equipamentos de segurança, encargos trabalhistas e a elaboração de relatórios. Essa equipe consegue ler cerca de cem piezômetros duas vezes por semana. Dividindo o custo mensal pelo número de leituras realizadas no período, cada leitura individual sai por cerca de R$ 58, um valor plausível para um serviço técnico terceirizado de campo. Ou seja, o número de R$ 600 mil por ano declarado no edital é coerente com o que o mercado de fato cobra por esse tipo de serviço, e não uma cifra arbitrária.
+O edital que originou este projeto estabelece, entre os benefícios esperados de qualquer solução proposta, uma economia estimada de R$ 600.000,00 por ano. Esse valor é a meta de retorno fixada pela empresa, e não uma informação sobre o quanto ela gasta hoje: o edital não divulga o custo atual da medição manual terceirizada, e a equipe não teve acesso a esse dado. Para que a análise de retorno não partisse de um valor sem base, o gasto atual foi estimado por dedução, a partir de referências de mercado.
+
+Um contrato de leitura manual terceirizada custa, em faixas usuais do setor, algo em torno de R$ 50.000,00 por mês, valor que remunera uma equipe de campo com técnicos, veículo, combustível, equipamentos de segurança, encargos trabalhistas e a elaboração de relatórios. Uma equipe nessas condições consegue ler cerca de cem piezômetros duas vezes por semana. Dividindo o custo mensal pelo número de leituras realizadas no período, cada leitura individual sai por aproximadamente R$ 58,00, valor plausível para um serviço técnico terceirizado de campo.
+
+Pelo levantamento, portanto, o gasto anual com a medição manual fica próximo de R$ 600.000,00. O resultado mostra que a meta do edital é compatível com o que o mercado cobra pelo serviço, já que a automação elimina quase todo esse custo recorrente. Cabe registrar que se trata de uma estimativa construída pela equipe por dedução, e não de um número fornecido pela empresa: os indicadores apresentados a seguir partem dessa estimativa e devem ser lidos com essa ressalva.
 
 **Indicadores de viabilidade do projeto**
 
-Com os custos levantados e o gasto atual da empresa verificado, os cinco indicadores abaixo resumem a viabilidade econômica do AquaSense. Cada um traz o valor calculado e a explicação de como chegamos a ele.
+Com os custos do sistema levantados e o gasto atual estimado, os cinco indicadores abaixo resumem a viabilidade econômica do AquaSense. Cada um traz o valor calculado e a explicação de como chegamos a ele.
 
 **Investimento inicial do projeto: R$ 260.000,00**
 
@@ -154,9 +158,9 @@ Depois de instalado, o AquaSense ainda gera custo de manutenção, e ignorá-lo 
 
 **Economia anual gerada: R$ 560.845,00 (redução de 93,5%)**
 
-Comparando o gasto atual de R$ 600.000,00 por ano com o custo operacional de R$ 39.155,00, a empresa passa a economizar R$ 560.845,00 todos os anos a partir do segundo ano de operação, uma redução de 93,5% do que gastava antes. No primeiro ano, descontando também o investimento inicial de R$ 260.000,00, a economia líquida ainda é de R$ 300.845,00 nos primeiros doze meses. O contraste entre os dois custos anuais é apresentado no gráfico a seguir.
+Comparando o gasto atual estimado de R$ 600.000,00 por ano com o custo operacional de R$ 39.155,00, a empresa passa a economizar R$ 560.845,00 todos os anos a partir do segundo ano de operação, uma redução de 93,5% do que gastava antes. No primeiro ano, descontando também o investimento inicial de R$ 260.000,00, a economia líquida ainda é de R$ 300.845,00 nos primeiros doze meses. O contraste entre os dois custos anuais é apresentado no gráfico a seguir.
 
-[GRAFICO: grafico2_custo_anual.png | Gráfico 2 – Custo anual da leitura manual em comparação com a operação do AquaSense]
+[GRAFICO: grafico2_custo_anual.png | Gráfico 2 – Custo anual estimado da leitura manual em comparação com a operação do AquaSense]
 
 **Payback do projeto: 5,6 meses**
 
@@ -174,7 +178,7 @@ Para situar esses números fora da nossa própria conta, buscamos os preços pú
 
 | Métrica | Situação tradicional (manual) | Solução AquaSense | Impacto |
 |---|---|---|---|
-| Custo operacional anual | Equipes de medição, deslocamento de veículos e combustível | Manutenção, nuvem e inspeções planejadas | Economia de R$ 560.845 por ano a partir do segundo ano |
+| Custo operacional anual | Equipes de medição, deslocamento de veículos e combustível | Manutenção, nuvem e inspeções planejadas | Economia estimada de R$ 560.845 por ano a partir do segundo ano |
 | Frequência de dados | Leitura semanal ou quinzenal por piezômetro | Leituras contínuas ao longo do dia | Detecção ágil de transientes de pressão e infiltração |
 | Segurança do trabalho | Exposição constante de equipes a áreas geotécnicas instáveis | Exposição mínima, restrita a visitas programadas | Redução direta do risco às equipes de campo |
 | Investimento | Gasto recorrente sem gerar ativo permanente | R$ 260.000 para 50 pontos instalados | R$ 5.200 por ponto, pago uma única vez |
