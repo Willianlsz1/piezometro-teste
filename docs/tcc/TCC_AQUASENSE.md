@@ -36,10 +36,10 @@ Instrutor orientador: Jairo
 
 | ALUNO | CURSO | FUNÇÃO NO PROJETO |
 |---|---|---|
-| Gustavo | Técnico em Automação Industrial | Programação do firmware em C/C++ para o microcontrolador ESP32, implementação do mecanismo de store & forward com carimbo de tempo, controle do modo deep sleep e integração com o backend em nuvem. |
+| Isadora | Técnico em Automação Industrial | Modelagem 3D do gabinete e dos suportes dos sensores, redação da documentação técnica oficial do projeto, cotação comercial de componentes e elaboração do orçamento de hardware (BOM). |
 | Marcelo | Técnico em Automação Industrial | Projeto e dimensionamento do circuito de alimentação autônoma da unidade industrial (painel solar, controlador de carga e bateria selada de 12 V 18 Ah) e do condicionamento do sinal de corrente de 4 a 20 mA. |
 | Matheus | Técnico em Automação Industrial | Projeto e dimensionamento da bancada de simulação hidráulica vertical em PVC para os ensaios de homologação e especificação do gabinete de campo com grau de proteção IP66. |
-| Isadora | Técnico em Automação Industrial | Modelagem 3D do gabinete e dos suportes dos sensores, redação da documentação técnica oficial do projeto, cotação comercial de componentes e elaboração do orçamento de hardware (BOM). |
+| Willian | Técnico em Automação Industrial | Programação do firmware em C/C++ para o microcontrolador ESP32, implementação do mecanismo de store & forward com carimbo de tempo, controle do modo deep sleep e integração com o backend em nuvem. |
 
 ---
 
@@ -93,7 +93,7 @@ O desenvolvimento do AquaSense seguiu uma metodologia ágil, organizada em quatr
 
 Na Fase I, de planejamento e especificações, correspondente ao primeiro bimestre, a equipe realizou o levantamento de requisitos da demanda e o estudo dos princípios de sensoriamento industrial de nível, culminando na seleção do transdutor piezorresistivo submersível com saída em corrente de 4 a 20 mA como sensor de referência do projeto. Nesta fase também foi definida a arquitetura geral do sistema, incluindo a decisão pelo uso de uma plataforma de computação em nuvem serverless para o backend, e Matheus elaborou o esboço mecânico da bancada vertical de simulação.
 
-Na Fase II, de prototipagem e testes modulares, correspondente ao segundo bimestre, Isadora conduziu a pesquisa de preços e a cotação dos componentes junto a fornecedores nacionais, consolidando o orçamento de hardware do projeto. Marcelo dimensionou o circuito de alimentação autônoma da unidade industrial, definindo painel solar, controlador de carga e bateria selada, e especificou o condicionamento do sinal de corrente de 4 a 20 mA por resistor de shunt de precisão. Gustavo desenvolveu a primeira versão do firmware, responsável pela leitura do sensor, pela conexão de rede do microcontrolador e pelo envio das leituras. Em paralelo, Matheus elaborou o projeto mecânico da bancada hidráulica vertical de PVC e do gabinete de campo.
+Na Fase II, de prototipagem e testes modulares, correspondente ao segundo bimestre, Isadora conduziu a pesquisa de preços e a cotação dos componentes junto a fornecedores nacionais, consolidando o orçamento de hardware do projeto. Marcelo dimensionou o circuito de alimentação autônoma da unidade industrial, definindo painel solar, controlador de carga e bateria selada, e especificou o condicionamento do sinal de corrente de 4 a 20 mA por resistor de shunt de precisão. Willian desenvolveu a primeira versão do firmware, responsável pela leitura do sensor, pela conexão de rede do microcontrolador e pelo envio das leituras. Em paralelo, Matheus elaborou o projeto mecânico da bancada hidráulica vertical de PVC e do gabinete de campo.
 
 Na Fase III, de integração, correspondente ao terceiro bimestre, foi desenvolvido o backend em nuvem, com os endpoints de ingestão e de leitura, o esquema do banco de dados gerenciado e o motor de alertas executado por gatilho de tempo a cada minuto, além do mecanismo de store & forward do firmware para preservar leituras em caso de interrupção momentânea de rede. Nesta fase a equipe definiu também o método de calibração por dois pontos de referência conhecidos, que correlaciona a tensão medida sobre o resistor de shunt de precisão de 150 ohms ao nível da coluna de água, a ser aplicado quando o transdutor for instalado na bancada.
 
