@@ -1,0 +1,42 @@
+/*
+ * ============================================================================
+ * PIEZOMETRO_CONFIG_LOCAL.H.EXAMPLE — modelo de credenciais/limiares locais
+ * ============================================================================
+ *
+ * Este é um MODELO (valores placeholder). Para usar:
+ *   1. Copie este arquivo para "piezometro_config_local.h" — MESMA pasta,
+ *      SEM o ".example" no nome. O novo arquivo já entra no .gitignore da
+ *      raiz do projeto — nunca será commitado.
+ *   2. Preencha abaixo os valores reais: rede WiFi, endpoint /ingest do
+ *      Cloudflare Worker, DEVICE_KEY e o identificador deste instrumento.
+ *   3. NUNCA commite "piezometro_config_local.h" com valores reais. A
+ *      DEVICE_KEY real também é definida como secret no Worker (via
+ *      `wrangler secret put DEVICE_KEY`) — este arquivo só precisa
+ *      reproduzir o MESMO valor no firmware (header x-device-key).
+ *
+ * Cada sketch FÍSICO (sketch_fisico_jsn_sr04t.ino, sketch_uct_4a20ma.ino,
+ * sketch_demo_hc_sr04.ino) inclui este arquivo ANTES de
+ * "piezometro_core.h" — ele só implementa o adapter do sensor; credenciais
+ * e limiares moram aqui, fora do código versionado. EXCEÇÃO: sketch.ino
+ * (simulação Wokwi) mantém os defines inline, porque o simulador só enxerga
+ * os arquivos do projeto e as credenciais do Wokwi não são segredo.
+ * ============================================================================
+ */
+
+#pragma once
+
+// ===== CREDENCIAIS (preencha antes de usar!) =====
+#define WIFI_SSID   "SUA_REDE_WIFI"
+#define WIFI_PASS   "SUA_SENHA_WIFI"
+#define SERVER_URL  "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev/ingest"  // endpoint /ingest do Cloudflare Worker
+#define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY definida como secret no Worker
+#define MEASUREMENT "telemetria_samarco"                   // (info) rótulo interno das leituras
+#define PIEZOMETRO_ID "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
+
+// ===== LIMIARES DE NÍVEL (m) =====
+// Espelhados em 3 lugares — mudou um, muda os três: aqui, no wrangler.toml
+// ([vars] do Cloudflare Worker) e no CFG do dashboard (index.html). Ver
+// CLAUDE.md, seção "Convenções e invariantes". Padrão: atenção 12 m,
+// crítico 15 m.
+#define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
+#define NIVEL_CRITICO 15.0   // acima disso = CRÍTICO

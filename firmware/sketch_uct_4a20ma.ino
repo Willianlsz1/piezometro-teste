@@ -70,16 +70,12 @@
 
 #include <Adafruit_ADS1X15.h>
 
-// ===== CREDENCIAIS (preencha antes de usar!) =====
-#define WIFI_SSID   "SUA-REDE-WIFI"
-#define WIFI_PASS   "SUA-SENHA-WIFI"
-#define SERVER_URL  "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev/ingest"  // endpoint /ingest do Cloudflare Worker
-#define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY definida como secret no Worker
-#define PIEZOMETRO_ID "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
-
-// ===== LIMIARES DE NÍVEL (m) — espelhados em index.html e no Cloudflare Worker =====
-#define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
-#define NIVEL_CRITICO 15.0   // acima disso = CRÍTICO
+// ===== CREDENCIAIS E LIMIARES (preencha antes de usar!) =====
+// WIFI_SSID/WIFI_PASS/SERVER_URL/DEVICE_KEY/PIEZOMETRO_ID/NIVEL_ATENCAO/
+// NIVEL_CRITICO vêm de piezometro_config_local.h (fora do git — ver o
+// modelo em firmware/piezometro_config_local.h.example: copie para
+// piezometro_config_local.h e preencha antes de gravar o firmware).
+#include "piezometro_config_local.h"
 
 // ===== CONDICIONAMENTO ELÉTRICO DO LOOP 4-20 mA =====
 #define SHUNT_OHMS        150.0f   // decisão fechada (0,6-3,0 V na faixa 4-20 mA)
@@ -112,7 +108,7 @@
 // tranquila dentro do INTERVALO_LEITURA de 1 s do core.
 #define N_AMOSTRAS 16
 
-// O núcleo comum (WiFi, buffer, envio, alertas, OLED) e o struct Leitura
+// O núcleo comum (WiFi, buffer, envio, alertas, tela) e o struct Leitura
 // vêm do core — este sketch só implementa o adapter do sensor UCT (4-20 mA).
 #include "piezometro_core.h"
 
@@ -214,17 +210,15 @@ Leitura lerSensor() {
   return l;
 }
 
-// ===== HOOK: LINHAS EXTRAS NO DISPLAY OLED =====
-void linhasExtrasDisplay(Adafruit_SSD1306 &d) {
-  d.setCursor(0, 25);
-  d.print("Loop: ");
-  d.print(correnteMa, 2);
-  d.print("mA");
+// ===== HOOK: LINHAS EXTRAS NA TELA =====
+void linhasExtrasDisplay(Tela &t) {
+  char l1[32];
+  snprintf(l1, sizeof(l1), "Loop: %.2fmA", correnteMa);
+  t.escreverLinha(SLOT_EXTRA_1, l1);
 
-  d.setCursor(0, 35);
-  d.print("Shunt: ");
-  d.print(vShunt, 3);
-  d.print("V");
+  char l2[32];
+  snprintf(l2, sizeof(l2), "Shunt: %.3fV", vShunt);
+  t.escreverLinha(SLOT_EXTRA_2, l2);
 }
 
 // ===== HOOK: LINHAS EXTRAS NO SERIAL =====
@@ -238,15 +232,8 @@ void linhasExtrasSerial() {
   Serial.println(" V");
 }
 
-// ===== SETUP / LOOP (modo sempre-ligado — bancada/homologação) =====
-void setup() {
-  initSensor();
-  coreSetup();
-}
-
-void loop() {
-  coreLoop();
-}
+// ===== SETUP / LOOP (modo sempre-ligado — bancada/homologação; ver PIEZOMETRO_MAIN em piezometro_core.h) =====
+PIEZOMETRO_MAIN()
 
 /*
  * ============================================================================

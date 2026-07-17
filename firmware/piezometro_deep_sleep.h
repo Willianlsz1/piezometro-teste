@@ -45,7 +45,7 @@
  *   - determinarAlerta(), nivelAlerta (String "NORMAL"/"ATENCAO"/"CRITICO")
  *   - conectarWiFi()   — timeout interno de 15 s, seta wifiOk
  *   - sincronizarNTP() — seta ntpOk
- *   - wifiOk, ntpOk, displayOk, display (objeto Adafruit_SSD1306)
+ *   - wifiOk, ntpOk, displayOk, tela (ponteiro Tela — ver tela.h)
  *   - PIEZOMETRO_ID, DEVICE_KEY, SERVER_URL (defines do .ino)
  * ============================================================================
  */
@@ -220,6 +220,19 @@ void deepSleepCiclo() {
   delay(200);
   Serial.println("=== SAMARCO PIEZOMETRO — modo DEEP SLEEP === " PIEZOMETRO_ID);
 
+  // ACHADO DE REVIEW (B9): antes, displayOk nunca ficava true neste modo
+  // porque display.begin() só era chamado dentro de coreSetup() — nunca
+  // invocado no ciclo de deep sleep. Resultado: o bloco de debug do OLED lá
+  // embaixo (passo 7) nunca executava, mesmo com o hardware presente e
+  // funcionando. Corrigido inicializando a tela aqui, sempre (o "debug
+  // visual" é opt-in só no sentido de que displayOk controla se o bloco 7
+  // desenha algo; não há um define separado para isso). Wire.begin() é
+  // necessário aqui porque, ao contrário do modo sempre-ligado
+  // (coreSetup()), este ciclo não passa por ele. Falha aqui degrada
+  // normalmente (displayOk=false) — nunca trava o ciclo nem atrasa o envio.
+  Wire.begin(21, 22);
+  displayOk = tela->iniciar();
+
   leituraAtual = lerSensor();
   determinarAlerta();
 
@@ -254,21 +267,29 @@ void deepSleepCiclo() {
 
   // OLED opcional — em campo ninguém olha o display, mas ajuda a depurar
   // com o hardware na mão durante os testes. Sem delay longo: só desenha e
-  // já segue para dormir().
+  // já segue para dormir(). Fala só com a interface Tela (ver tela.h) — não
+  // conhece mais Adafruit_SSD1306 diretamente. É uma tela de depuração
+  // própria (3 linhas curtas), mais simples que a de operação de
+  // mostrarDisplay() (piezometro_core.h); reaproveita os slots padrão
+  // (SLOT_NIVEL/EXTRA_1/EXTRA_2), então as linhas caem em y=15/25/35 em vez
+  // das posições y=0/15/30 usadas quando este bloco desenhava direto no
+  // SSD1306 — deslocamento sem consequência aqui (tela só para depuração de
+  // campo, não para o layout "oficial" da maquete).
   if (displayOk) {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setCursor(0, 0);
-    display.print("Nivel: ");
-    display.print(leituraAtual.nivel, 2);
-    display.print(" m");
-    display.setCursor(0, 15);
-    display.print(nivelAlerta);
-    display.setCursor(0, 30);
-    display.print("Enviadas: ");
-    display.print(enviadas);
-    display.display();
-    display.dim(true); // reduz o brilho antes de apagar de vez com o sono
+    tela->limpar();
+
+    char bufNivel[32];
+    snprintf(bufNivel, sizeof(bufNivel), "Nivel: %.2f m", leituraAtual.nivel);
+    tela->escreverLinha(SLOT_NIVEL, bufNivel);
+
+    tela->escreverLinha(SLOT_EXTRA_1, nivelAlerta.c_str());
+
+    char bufEnviadas[24];
+    snprintf(bufEnviadas, sizeof(bufEnviadas), "Enviadas: %d", enviadas);
+    tela->escreverLinha(SLOT_EXTRA_2, bufEnviadas);
+
+    tela->mostrar();
+    tela->atenuar(); // reduz o brilho antes de apagar de vez com o sono
   }
 
   Serial.println("Dormindo...");

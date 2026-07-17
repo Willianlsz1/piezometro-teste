@@ -3,34 +3,34 @@
  * PIEZOMETRO_CORE.H — núcleo comum dos firmwares SAMARCO (simulação + físico)
  * ============================================================================
  *
- * Este arquivo concentra tudo que é IGUAL entre o firmware de simulação
- * (sketch.ino, BMP180) e o firmware do protótipo físico
- * (sketch_fisico_jsn_sr04t.ino, JSN-SR04T): WiFi, NTP, store & forward,
- * envio HTTP ao /ingest, classificação de nível, LEDs, buzzer, OLED e telas
- * de teste. O que muda de um sensor para o outro (como medir o nível) fica
- * no próprio .ino, que implementa um "adapter" de sensor definido pelo
- * contrato abaixo.
+ * Este arquivo concentra tudo que é IGUAL entre os firmwares (sketch.ino
+ * BMP180, sketch_fisico_jsn_sr04t.ino, sketch_uct_4a20ma.ino,
+ * sketch_demo_hc_sr04.ino): WiFi, NTP, store & forward, envio HTTP ao
+ * /ingest, classificação de nível, LEDs, buzzer e tela. O que muda de um
+ * sensor para o outro (como medir o nível) fica no próprio .ino, que
+ * implementa um "adapter" de sensor definido pelo contrato abaixo. O que
+ * muda de um HARDWARE DE TELA para o outro (hoje só o OLED SSD1306) fica em
+ * tela_ssd1306.h — o core só fala com a interface Tela (ver tela.h), nunca
+ * com o tipo concreto do display.
  *
  * COMO USAR NO ARDUINO IDE / WOKWI:
  * Este .h entra como uma ABA A MAIS dentro da mesma pasta do sketch (Arduino
  * IDE: "New Tab" → nome "piezometro_core.h"; no Wokwi: crie o arquivo com
- * esse nome no mesmo projeto). O .ino principal faz "#include
- * "piezometro_core.h"" DEPOIS de definir suas credenciais/limiares e ANTES
- * de implementar os hooks do sensor — o compilador processa tudo como um
- * único arquivo, então a ordem de inclusão importa.
+ * esse nome no mesmo projeto), junto de tela.h e tela_ssd1306.h. O .ino faz
+ * "#include "piezometro_core.h"" DEPOIS de definir credenciais/limiares
+ * (normalmente via "#include "piezometro_config_local.h"" — ver o modelo em
+ * piezometro_config_local.h.example) e ANTES de implementar os hooks do
+ * sensor — o compilador processa tudo como um único arquivo, então a ordem
+ * de inclusão importa.
  *
- * CONTRATO:
- *   O .ino define ANTES do #include deste header:
- *     #define WIFI_SSID / WIFI_PASS / SERVER_URL / DEVICE_KEY / PIEZOMETRO_ID
- *     #define NIVEL_ATENCAO / NIVEL_CRITICO
- *   e implementa DEPOIS (o struct Leitura é definido AQUI, pelo core):
- *     void initSensor();                                 // hardware do sensor
- *     Leitura lerSensor();                                // uma leitura
- *     void linhasExtrasDisplay(Adafruit_SSD1306 &d);      // 0-2 linhas no OLED
- *     void linhasExtrasSerial();                          // idem no Serial
- *
- * O core fornece: coreSetup(), coreLoop() e todas as funções internas de
- * WiFi/NTP/buffer/alerta/LEDs/buzzer/display listadas abaixo.
+ * CONTRATO — o .ino implementa (o struct Leitura é definido AQUI, pelo core):
+ *   void initSensor();                    // hardware do sensor
+ *   Leitura lerSensor();                  // uma leitura
+ *   void linhasExtrasDisplay(Tela &t);    // 0-2 linhas na tela (SLOT_EXTRA_1/2)
+ *   void linhasExtrasSerial();            // idem no Serial
+ * e finaliza com a macro PIEZOMETRO_MAIN() (definida no fim deste arquivo)
+ * no lugar de setup()/loop() manual — só sketches com setup/loop DIFERENTE
+ * do padrão sempre-ligado (ex. modo deep sleep) implementam o próprio.
  * ============================================================================
  */
 
@@ -41,14 +41,9 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <time.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 
-// ===== DISPLAY OLED =====
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-#define SCREEN_ADDRESS 0x3C
+#include "tela.h"
+#include "tela_ssd1306.h"
 
 // ===== PINOS COMUNS (LEDs/buzzer — iguais nos dois firmwares) =====
 #define LED_VERDE    32
@@ -92,11 +87,14 @@ struct Leitura {
 // fora do sketch.
 void initSensor();
 Leitura lerSensor();
-void linhasExtrasDisplay(Adafruit_SSD1306 &d);
+void linhasExtrasDisplay(Tela &t);
 void linhasExtrasSerial();
 
-// ===== OBJETO DO DISPLAY (compartilhado) =====
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// ===== IMPLEMENTAÇÃO DE TELA EM USO =====
+// Trocar de hardware (ex.: TFT ILI9341) é criar tela_ili9341.h implementando
+// Tela e trocar as duas linhas abaixo — core e sketches só falam com Tela.
+TelaSSD1306 telaSsd1306;
+Tela* tela = &telaSsd1306;
 
 // ===== ESTADO DA ÚLTIMA LEITURA (preenchido pelo adapter via lerSensor) =====
 Leitura leituraAtual = {0, 0, 0, false, false, false};
@@ -111,8 +109,8 @@ unsigned long ultimoNtp     = 0;
 bool estadoBuzzer = false;
 bool wifiOk = false;
 bool ntpOk = false;
-// Instrumento de SEGURANÇA: falha de um componente secundário (display) não
-// pode derrubar a medição — degrada (segue sem OLED), nunca trava o setup.
+// Instrumento de SEGURANÇA: falha de um componente secundário (tela) não
+// pode derrubar a medição — degrada (segue sem tela), nunca trava o setup.
 bool displayOk = false;
 
 String bufferDados[BUFFER_MAX];
@@ -195,7 +193,7 @@ void bufferizarLeitura() {
 // ===== FUNÇÃO: DESPACHAR BUFFER AO SERVIDOR =====
 void despacharBuffer() {
   // Atualiza wifiOk aqui (e não só no boot em conectarWiFi()) — é o valor que
-  // o OLED/Serial exibem e que o re-sync NTP do coreLoop consulta; sem isso
+  // a tela/Serial exibem e que o re-sync NTP do coreLoop consulta; sem isso
   // eles ficavam presos ao estado do momento da conexão inicial.
   wifiOk = (WiFi.status() == WL_CONNECTED);
 
@@ -340,67 +338,49 @@ void mostrarSerial() {
   Serial.println();
 }
 
-// ===== FUNÇÃO: MOSTRAR NO DISPLAY OLED =====
-// Componente SECUNDÁRIO: se o OLED falhou no boot (displayOk == false), a
-// função simplesmente não faz nada — a medição, os alertas (LED/buzzer) e a
-// telemetria seguem intactos. Cobre também linhasExtrasDisplay(), chamada
-// logo abaixo.
+// ===== FUNÇÃO: MOSTRAR NA TELA =====
+// Componente SECUNDÁRIO: se a tela falhou no boot (displayOk == false), não
+// faz nada — medição, alertas e telemetria seguem intactos. Fala só com a
+// interface Tela (ver tela.h); pixels/fontes são decisão do adapter concreto.
 void mostrarDisplay() {
   if (!displayOk) return;
 
-  display.clearDisplay();
+  tela->limpar();
 
-  display.setTextSize(1);
-  display.setCursor(0, 0);
-  display.print("SAMARCO PIEZOMETRO");
-  display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
+  tela->escreverLinha(SLOT_TITULO, "SAMARCO PIEZOMETRO");
 
-  display.setCursor(0, 15);
-  display.print("Nivel: ");
-  display.print(leituraAtual.nivel, 2);
-  display.print(" m");
+  char bufNivel[32];
+  snprintf(bufNivel, sizeof(bufNivel), "Nivel: %.2f m", leituraAtual.nivel);
+  tela->escreverLinha(SLOT_NIVEL, bufNivel);
 
-  linhasExtrasDisplay(display); // até 2 linhas específicas do sensor (cursores y=25 e y=35)
+  linhasExtrasDisplay(*tela); // até 2 linhas específicas do sensor (SLOT_EXTRA_1/2)
 
-  display.drawLine(0, 45, 128, 45, SSD1306_WHITE);
-
-  display.setTextSize(2);
-  display.setCursor(0, 50);
-
+  // Rótulo de status: pisca em ATENÇÃO (2 Hz) e CRÍTICO (4 Hz) — rótulo
+  // vazio ("") é a fase "apagada" do pisca-pisca; destacarStatus() decide o
+  // que fazer (o adapter do OLED mantém a moldura fixa e só omite o texto).
+  const char* rotulo = "";
   if (nivelAlerta == "NORMAL") {
-    display.print("NORMAL");
+    rotulo = "NORMAL";
   }
   else if (nivelAlerta == "ATENCAO") {
-    if ((millis() / 500) % 2 == 0) display.print("ATENCAO");
+    if ((millis() / 500) % 2 == 0) rotulo = "ATENCAO";
   }
   else {
-    if ((millis() / 250) % 2 == 0) display.print("CRITICO!");
+    if ((millis() / 250) % 2 == 0) rotulo = "CRITICO!";
   }
+  tela->destacarStatus(rotulo, (uint8_t)corAtual);
 
-  display.display();
+  tela->mostrar();
 }
 
 // ===== FUNÇÃO: TELA DE INICIALIZAÇÃO =====
-// Mesma lógica de degradação de mostrarDisplay(): sem OLED, não há tela de
-// boot, mas o resto do setup continua normalmente.
+// Mesma degradação de mostrarDisplay(): sem tela, não há splash de boot, mas
+// o setup segue normalmente. Layout do splash é do adapter
+// (Tela::mostrarTelaInicio()); aqui só o tempo em que fica visível (2 s).
 void mostrarTelaInicio() {
   if (!displayOk) return;
 
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setCursor(10, 5);
-  display.println("SAMARCO");
-
-  display.setTextSize(1);
-  display.setCursor(8, 30);
-  display.println("Nivel de agua em");
-  display.setCursor(18, 42);
-  display.println("piezometros");
-
-  display.setCursor(10, 55);
-  display.println("Iniciando...");
-
-  display.display();
+  tela->mostrarTelaInicio();
   delay(2000);
 }
 
@@ -442,6 +422,7 @@ void testarBuzzer() {
 
 // ===== SETUP COMUM =====
 // Chamado pelo .ino DEPOIS de initSensor(): void setup(){ initSensor(); coreSetup(); }
+// (ou, na prática, via macro PIEZOMETRO_MAIN() — ver mais abaixo.)
 void coreSetup() {
   Serial.begin(115200); // idempotente — initSensor() pode já ter iniciado o Serial
   delay(1000);
@@ -464,20 +445,19 @@ void coreSetup() {
   Serial.println("Testando buzzer...");
   testarBuzzer();
 
-  Wire.begin(21, 22); // barramento I2C do OLED (compartilhado com o BMP180, quando houver)
+  Wire.begin(21, 22); // barramento I2C da tela (compartilhado com o BMP180, quando houver)
 
   Serial.print("Inicializando OLED... ");
-  // Instrumento de SEGURANÇA: o display é um componente SECUNDÁRIO — sua
+  // Instrumento de SEGURANÇA: a tela é um componente SECUNDÁRIO — sua
   // falha não pode travar o setup e derrubar leitura/alertas/telemetria.
   // Antes entrava em while(1) piscando o LED amarelo; agora só registra o
-  // problema e segue em modo degradado (sem display).
-  displayOk = display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+  // problema e segue em modo degradado (sem tela).
+  displayOk = tela->iniciar();
   if (!displayOk) {
     Serial.println("ERRO!");
     Serial.println("OLED ausente — seguindo em modo degradado (sem display)");
   } else {
     Serial.println("OK!");
-    display.setTextColor(SSD1306_WHITE);
   }
 
   mostrarTelaInicio();
@@ -495,7 +475,7 @@ void coreSetup() {
 }
 
 // ===== LOOP COMUM (não bloqueante) =====
-// Chamado pelo .ino: void loop(){ coreLoop(); }
+// Chamado pelo .ino: void loop(){ coreLoop(); } (ou via PIEZOMETRO_MAIN()).
 void coreLoop() {
   unsigned long agora = millis();
 
@@ -527,3 +507,17 @@ void coreLoop() {
   // Buzzer roda a cada passagem para não perder o timing dos beeps
   atualizarBuzzer();
 }
+
+// ===== MACRO: SETUP()/LOOP() PADRÃO (modo sempre-ligado) =====
+// Expande para o setup()/loop() que todo sketch sempre-ligado escrevia à
+// mão: initSensor()+coreSetup() uma vez, coreLoop() a cada passagem. Modo
+// deep sleep (piezometro_deep_sleep.h) não chama coreLoop() — não usa esta
+// macro, implementa o próprio setup()/loop().
+#define PIEZOMETRO_MAIN() \
+  void setup() { \
+    initSensor(); \
+    coreSetup(); \
+  } \
+  void loop() { \
+    coreLoop(); \
+  }
