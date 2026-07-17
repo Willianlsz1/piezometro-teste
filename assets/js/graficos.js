@@ -152,9 +152,9 @@ function renderMainChart(canvasId, state, color, thresholds, bucketMs, maxData) 
 
 function redrawCharts() {
   const bucketMs = (PERIODOS[periodoSelecionado] || {}).bucketMs;
-  renderMainChart("chart-n", charts.n, "#3ecf7a", [
+  renderMainChart("chart-n", charts.n, "#8fa0bf", [
     { v: CFG.thrCritico, col: "rgba(240,72,72,.5)",  lbl: `${CFG.thrCritico} m crítico` },
     { v: CFG.thrAtencao, col: "rgba(240,192,64,.5)", lbl: `${CFG.thrAtencao} m atenção` },
   ], bucketMs, charts.n.maxData);
-  renderMainChart("chart-t", charts.t, "#4da8f0", null, bucketMs);
+  renderMainChart("chart-t", charts.t, "#7e8ba3", null, bucketMs);
 }
