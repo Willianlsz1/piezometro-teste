@@ -75,6 +75,14 @@ main {
   gap: 18px;
 }
 
+/* O display:flex acima venceria o display:none padrão do atributo hidden —
+   e TODAS as telas apareciam empilhadas ao mesmo tempo (bug pego no primeiro
+   teste real). O !important garante que hidden sempre esconda, custe o que
+   custar na especificidade. */
+[hidden] {
+  display: none !important;
+}
+
 .titulo {
   font-size: 22px;
   font-weight: 700;
