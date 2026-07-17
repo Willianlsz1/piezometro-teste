@@ -49,7 +49,9 @@ function setAlert(n) {
 
   const bn = document.getElementById("badge-n");
   const vn = document.getElementById("val-n");
-  if (lv === "normal")  { bn.className = "mbadge mb-green";  bn.textContent = "Normal";  vn.className = "cv-green"; }
+  // P6/ISA-101: estado normal em tons neutros — número branco, badge cinza;
+  // cor saturada aparece SÓ quando há anormalidade (atenção/crítico).
+  if (lv === "normal")  { bn.className = "mbadge";           bn.textContent = "Normal";  vn.className = "cv-neutral"; }
   if (lv === "atencao") { bn.className = "mbadge mb-yellow"; bn.textContent = "Atenção"; vn.className = "cv-yellow"; }
   if (lv === "critico") { bn.className = "mbadge mb-red";    bn.textContent = "Crítico"; vn.className = "cv-red"; }
 
@@ -99,7 +101,7 @@ function addAlertRow(lv, lbl, nivel) {
     atencao: "Nível d'água em faixa de atenção",
     critico: "ALERTA: nível d'água crítico detectado",
   };
-  const colors = { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" };
+  const colors = { normal: "#8a94ad", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" };
   const msg = (msgs[lv] || lbl) + ` (${pzSelecionado})` + (fonte.simulada ? " (simulação)" : "");
   pushHistorico({ lv, lbl, msg, nivel: Number.isFinite(nivel) ? nivel.toFixed(2) : "···", time: t, color: colors[lv] || colors.info });
 }
@@ -290,7 +292,7 @@ function initMap() {
 
     PIEZOMETROS.forEach(pz => {
       const marker = L.circleMarker([pz.lat, pz.lng], {
-        radius: 9, weight: 2, color: "#3ecf7a", fillColor: "#3ecf7a", fillOpacity: .85,
+        radius: 9, weight: 2, color: "#8a94ad", fillColor: "#8a94ad", fillOpacity: .85,
       }).addTo(leafletMap);
       marker.bindPopup(`<b>${pz.nome}</b>`);
       marker.on("click", () => selectPiezometro(pz.id));

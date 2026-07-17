@@ -85,7 +85,8 @@ function aplicarMaxNivelPico() {
 function pushSpark(key, val) {
   sparks[key].push(val);
   if (sparks[key].length > 20) sparks[key].shift();
-  const colors = { n: "#3ecf7a", p: "#4da8f0", t: "#4da8f0" };
+  // P6/ISA-101: sparkline é tendência, não alarme — cor neutra dessaturada.
+  const colors = { n: "#8fa0bf", p: "#7c8196", t: "#7c8196" };
   drawSparkline("spark-" + key, sparks[key], colors[key]);
 }
 

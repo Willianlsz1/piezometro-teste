@@ -12,7 +12,8 @@ function classifyNivel(n) {
   return { lv: "critico", lbl: "Crítico" };
 }
 function corPorStatus(lv) {
-  return { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0", semsinal: "#8a90a3" }[lv] || "#4da8f0";
+  // P6/ISA-101: normal é NEUTRO (cinza-azulado) — cor saturada só para anormalidade.
+  return { normal: "#8a94ad", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0", semsinal: "#8a90a3" }[lv] || "#4da8f0";
 }
 
 // P4 — histerese na detecção de borda (ISA-18.2: evita repicar bem em cima do limiar).

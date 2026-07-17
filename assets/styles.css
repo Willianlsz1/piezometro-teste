@@ -300,6 +300,8 @@ header {
 .mcard-unit { font-size: 20px; font-weight: 400; opacity: .6; }
 .cv-green  { color: var(--green); }
 .cv-blue   { color: var(--blue); }
+/* P6/ISA-101: valor em estado normal é neutro — cor saturada só para anormalidade */
+.cv-neutral { color: var(--text-1); }
 .cv-yellow { color: var(--yellow); }
 .cv-red    { color: var(--red); }
 
