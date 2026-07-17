@@ -109,14 +109,22 @@ const FonteSimulada = {
   // em vez de rodar num setInterval paralelo.
   async ultimos() {
     const b = this.base;
-    b["PZ-01"].n = clamp(b["PZ-01"].n + (Math.random() - 0.48) * 0.25, 8.5, 13.5);
-    b["PZ-02"].n = clamp(b["PZ-02"].n + (Math.random() - 0.5)  * 0.3,  10.5, 13.2);
-    b["PZ-03"].n = clamp(b["PZ-03"].n + (Math.random() - 0.5)  * 0.15, 8.0, 10.2);
+    // Parâmetros de drift por piezômetro; o drift é aplicado DENTRO do loop, com
+    // nAnterior capturado ANTES — capturado depois, deltaPoll era sempre 0 e a
+    // taxa_m_dia simulada nunca saía de 0.000 (chip/alarme de variação rápida
+    // mortos justamente no modo demonstração).
+    const drift = {
+      "PZ-01": { vies: 0.48, amp: 0.25, min: 8.5,  max: 13.5 },
+      "PZ-02": { vies: 0.5,  amp: 0.3,  min: 10.5, max: 13.2 },
+      "PZ-03": { vies: 0.5,  amp: 0.15, min: 8.0,  max: 10.2 },
+    };
 
     const todos = {};
     Object.keys(b).forEach(pz => {
       const s = b[pz];
       const nAnterior = s.n;
+      const d = drift[pz];
+      if (d) s.n = clamp(s.n + (Math.random() - d.vies) * d.amp, d.min, d.max);
       s.p = 1013.25 + (s.n - 10) * 10;  // coerente com a escala do firmware (10 hPa/m)
       s.t = clamp(s.t + (Math.random() - 0.5) * 0.3, 15, 40);
       // taxa_m_dia plausível: extrapola o drift do último passo do poll (CFG.poll ms) para m/dia,
@@ -180,4 +188,9 @@ function trocarFonte(novaFonte) {
   fonte = novaFonte;
   simActive = fonte.simulada;
   document.getElementById("sim-banner").classList.toggle("on", fonte.simulada);
+  // Recarrega o histórico na fonte recém-ativada: sem isso, gráficos, estatísticas e
+  // export continuavam exibindo a série da fonte ANTERIOR (ex.: simulada, após a API
+  // voltar de uma queda) até o operador trocar de pz/período à mão. O typeof protege
+  // a ordem de carga (app.js, que define a função, carrega depois deste arquivo).
+  if (typeof loadHistoryAndStats === "function") loadHistoryAndStats();
 }

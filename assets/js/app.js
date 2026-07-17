@@ -66,6 +66,8 @@ async function loadHistoryAndStats() {
   }
   if (meuId !== histReqId) return; // seleção mudou enquanto o histórico estava em voo
 
+  histSimulado = viaFallbackLocal; // exportar.js rotula a fonte do CSV/XLS por este flag
+
   const hn = pontosParaCampo(pontos, "nivel_agua");
   const ht = pontosParaCampo(pontos, "temperatura");
 
