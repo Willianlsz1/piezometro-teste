@@ -35,6 +35,7 @@ function selectPiezometro(id) {
   atualizarMapa(pzLatest);
   loadHistoryAndStats();
   if (pzLatest[id]) applyData(pzLatest[id]);
+  atualizarLinkRelatorio();
 }
 
 function selectPeriodo(p) {
@@ -44,6 +45,14 @@ function selectPeriodo(p) {
   updatePeriodLabels();
   resetPzState();
   loadHistoryAndStats();
+  atualizarLinkRelatorio();
+}
+
+// Mantém o link "Relatório (PDF)" sempre apontando pro pz/período em tela —
+// só o href muda, a página relatorio.html é aberta (aba nova) quando clicado.
+function atualizarLinkRelatorio() {
+  const el = document.getElementById("btn-relatorio");
+  if (el) el.href = "relatorio.html?pz=" + pzSelecionado + "&range=" + periodoSelecionado;
 }
 
 // Carrega histórico do piezômetro/período selecionados (nível + temperatura),
