@@ -118,10 +118,14 @@ async function loadHistoryAndStats() {
 
 // ── APLICA DADOS DO PIEZÔMETRO SELECIONADO ───────────────────────────────────
 function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts, recebidoEm }) {
-  const safe = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
-  nivel       = safe(nivel, 10);      // 1013 hPa no Wokwi ↔ 10 m simulados
-  pressao     = safe(pressao, 1013);
-  temperatura = safe(temperatura, 24);
+  // Honestidade do dado (achado do review de 17/07): grandeza ausente NUNCA vira
+  // número fabricado (antes: pressão ausente virava "1013" e temperatura "24",
+  // exibidos como se medidos — a bancada HC-SR04 não mede nenhuma das duas).
+  // Nível não-finito descarta a aplicação inteira; pressão/temperatura são
+  // opcionais e, ausentes, mostram "n/d" (não disponível) com badge "Sem sensor".
+  if (!Number.isFinite(nivel)) return;
+  const temPressao = Number.isFinite(pressao);
+  const temTemp    = Number.isFinite(temperatura);
 
   const flash = id => {
     const el = document.getElementById(id);
@@ -129,35 +133,40 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts, recebidoEm }) 
   };
 
   document.getElementById("val-n").textContent = nivel.toFixed(2);       flash("val-n");
-  document.getElementById("val-p").textContent = pressao.toFixed(1);     flash("val-p");
-  document.getElementById("val-t").textContent = temperatura.toFixed(1); flash("val-t");
+  document.getElementById("val-p").textContent = temPressao ? pressao.toFixed(1) : "n/d";
+  if (temPressao) flash("val-p");
+  document.getElementById("val-t").textContent = temTemp ? temperatura.toFixed(1) : "n/d";
+  if (temTemp) flash("val-t");
 
-  // Sparklines
+  // Sparklines (só com dado real — sparkline de valor fabricado é linha reta mentirosa)
   pushSpark("n", nivel);
-  pushSpark("p", pressao);
-  pushSpark("t", temperatura);
+  if (temPressao) pushSpark("p", pressao);
+  if (temTemp)    pushSpark("t", temperatura);
 
   // Charts
   const lbl = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const iso = new Date().toISOString();
   pushChart("n", lbl, nivel, iso);
-  pushChart("t", lbl, temperatura, iso);
+  if (temTemp) pushChart("t", lbl, temperatura, iso);
   redrawCharts();
 
   // Stats (janela completa do período, não só os pontos visíveis no gráfico)
   pushStats("n", nivel);
   pushStats("nMax", nivel); // leitura ao vivo é instantânea: o valor também é o pico do instante
-  pushStats("p", pressao);
-  pushStats("t", temperatura);
+  if (temPressao) { pushStats("p", pressao); updateStats("p", statsWin.p); }
+  if (temTemp)    { pushStats("t", temperatura); updateStats("t", statsWin.t); }
   updateStats("n", statsWin.n);
-  updateStats("p", statsWin.p);
-  updateStats("t", statsWin.t);
   aplicarMaxNivelPico(); // P5 — MÁX 24H usa o pico do intervalo, não a média
 
-  // Badge dinâmico de temperatura
+  // Badge dinâmico de temperatura (neutro quando a bancada não instrumenta a grandeza)
   const bt = document.getElementById("badge-t");
-  if (temperatura >= 0 && temperatura <= 50) { bt.className = "mbadge mb-blue";   bt.textContent = "Normal"; }
-  else                                        { bt.className = "mbadge mb-yellow"; bt.textContent = "Verificar"; }
+  if (!temTemp)                                    { bt.className = "mbadge";           bt.textContent = "Sem sensor"; }
+  else if (temperatura >= 0 && temperatura <= 50)  { bt.className = "mbadge mb-blue";   bt.textContent = "Normal"; }
+  else                                             { bt.className = "mbadge mb-yellow"; bt.textContent = "Verificar"; }
+
+  // Badge da pressão idem (o HTML traz "Bruta" fixo — só sobrescreve na ausência)
+  const bp = document.getElementById("badge-p");
+  if (bp) { bp.textContent = temPressao ? "Bruta" : "Sem sensor"; if (!temPressao) bp.className = "mbadge"; }
 
   // P3 — taxa de variação (display), independente do estado de comunicação
   renderTaxa(taxa_m_dia);
@@ -225,13 +234,13 @@ async function poll() {
         pzLatest = await FonteApi.ultimos();
         trocarFonte(FonteApi);
         failCount = 0;
-        setStatus("live", `API conectada — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
+        setStatus("live", `Monitoramento ativo · atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
       } catch (_) {
-        setStatus("sim", "Modo simulação ativo — API indisponível");
+        setStatus("sim", "Modo simulação ativo · sem conexão com o sistema");
       }
     } else {
       failCount = 0;
-      setStatus("live", `API conectada — atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
+      setStatus("live", `Monitoramento ativo · atualizado às ${new Date().toLocaleTimeString("pt-BR")}`);
     }
 
     checarTransicoesComunicacao(pzLatest); // P1 — eventos de ok↔stale de todos os pz
@@ -245,11 +254,11 @@ async function poll() {
     console.warn("Fonte de leituras:", e.message);
     if (failCount === 1) {
       setStatus("err", `Falha na API: ${e.message}`);
-      addInfoRow("Erro ao conectar na API — ativando simulação");
+      addInfoRow("Falha de conexão com o sistema · ativando modo simulação");
     }
     if (failCount >= 2 && !fonte.simulada) {
       trocarFonte(FonteSimulada);
-      setStatus("sim", "Modo simulação ativo — API indisponível");
+      setStatus("sim", "Modo simulação ativo · sem conexão com o sistema");
     }
   }
 }

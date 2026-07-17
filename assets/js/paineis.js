@@ -1,4 +1,4 @@
-// ── PAINÉIS (DOM) ─────────────────────────────────────────────────────────────
+﻿// ── PAINÉIS (DOM) ─────────────────────────────────────────────────────────────
 // Renderização de DOM que não é canvas: cards da visão geral, mapa Leaflet,
 // painel de nível de alerta (com/sem sinal), taxa de variação, tabelas de
 // alarmes/eventos/leituras, stats/labels de período e status da barra superior.
@@ -9,7 +9,7 @@ function updateStats(key, arr) {
   stats[key].min = Math.min(...arr);
   stats[key].max = Math.max(...arr);
   const delta = stats[key].max - stats[key].min;
-  const fmt = v => v !== null ? v.toFixed(2) : "—";
+  const fmt = v => v !== null ? v.toFixed(2) : "···";
   document.getElementById(key + "-min").textContent = fmt(stats[key].min);
   document.getElementById(key + "-max").textContent = fmt(stats[key].max);
   const dEl = document.getElementById(key + "-delta");
@@ -35,14 +35,14 @@ function setAlert(n) {
   const { lv } = classifyComHisterese(n, lastLevel);
   let desc, icon;
   if (lv === "normal") {
-    desc = `Nível d'água na faixa segura (< ${CFG.thrAtencao} m) — operação normal, sem ação necessária`;
+    desc = `Nível d'água na faixa segura (< ${CFG.thrAtencao} m): operação normal, sem ação necessária`;
     // P6 — ícone neutro no estado normal (cor reservada a anormalidade, ISA-101)
     icon = `<circle cx="8" cy="8" r="5.5" stroke="#7c8196" stroke-width="1.5"/><path d="M5.5 8l2 2 3.5-3.5" stroke="#7c8196" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
   } else if (lv === "atencao") {
-    desc = `Nível entre ${CFG.thrAtencao} e ${CFG.thrCritico} m — observar de perto e intensificar o monitoramento`;
+    desc = `Nível entre ${CFG.thrAtencao} e ${CFG.thrCritico} m: observar de perto e intensificar o monitoramento`;
     icon = `<path d="M8 2L14.5 13.5H1.5L8 2Z" stroke="#f0c040" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5V9.5" stroke="#f0c040" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r=".75" fill="#f0c040"/>`;
   } else {
-    desc = `Nível acima de ${CFG.thrCritico} m — ACIONAR EQUIPE DE GEOTECNIA IMEDIATAMENTE`;
+    desc = `Nível acima de ${CFG.thrCritico} m: ACIONAR EQUIPE DE GEOTECNIA IMEDIATAMENTE`;
     icon = `<circle cx="8" cy="8" r="5.5" stroke="#f04848" stroke-width="1.5"/><path d="M8 5v3.5" stroke="#f04848" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11" r=".75" fill="#f04848"/>`;
   }
   const upperLbl = { normal: "NORMAL", atencao: "ATENÇÃO", critico: "CRÍTICO" }[lv];
@@ -88,8 +88,8 @@ function setAlertSemSinal(ts) {
   document.getElementById("tby").className = "tb-seg tb-yellow";
   document.getElementById("tbr").className = "tb-seg tb-red";
   document.getElementById("ainfo").textContent = temTs
-    ? `Sem comunicação — última leitura ${ultimaLeitura}`
-    : "Sem comunicação — nenhuma leitura recebida";
+    ? `Sem comunicação · última leitura ${ultimaLeitura}`
+    : "Sem comunicação · nenhuma leitura recebida";
 }
 
 function addAlertRow(lv, lbl, nivel) {
@@ -97,16 +97,16 @@ function addAlertRow(lv, lbl, nivel) {
   const msgs = {
     normal:  "Nível d'água retornou à faixa normal",
     atencao: "Nível d'água em faixa de atenção",
-    critico: "ALERTA — nível d'água crítico detectado",
+    critico: "ALERTA: nível d'água crítico detectado",
   };
   const colors = { normal: "#3ecf7a", atencao: "#f0c040", critico: "#f04848", info: "#4da8f0" };
   const msg = (msgs[lv] || lbl) + ` (${pzSelecionado})` + (fonte.simulada ? " (simulação)" : "");
-  pushHistorico({ lv, lbl, msg, nivel: Number.isFinite(nivel) ? nivel.toFixed(2) : "—", time: t, color: colors[lv] || colors.info });
+  pushHistorico({ lv, lbl, msg, nivel: Number.isFinite(nivel) ? nivel.toFixed(2) : "···", time: t, color: colors[lv] || colors.info });
 }
 
 function addInfoRow(msg) {
   const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  pushHistorico({ lv: "info", lbl: "INFO", msg, nivel: "—", time: t, color: "#4da8f0" });
+  pushHistorico({ lv: "info", lbl: "INFO", msg, nivel: "···", time: t, color: "#4da8f0" });
 }
 
 // P3+P4 — alarme de variação rápida: dispara só na borda (transição parado→rápido), com
@@ -114,8 +114,8 @@ function addInfoRow(msg) {
 function addTaxaRow(taxa) {
   const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const sinal = taxa >= 0 ? "+" : "";
-  const msg = `📈 Variação rápida do nível d'água (${sinal}${taxa.toFixed(2)} m/dia) — ${pzSelecionado}`;
-  pushHistorico({ lv: "taxa", lbl: "TAXA", msg, nivel: "—", time: t, color: corPorStatus("atencao") });
+  const msg = `📈 Variação rápida do nível d'água (${sinal}${taxa.toFixed(2)} m/dia) · ${pzSelecionado}`;
+  pushHistorico({ lv: "taxa", lbl: "TAXA", msg, nivel: "···", time: t, color: corPorStatus("atencao") });
 }
 
 // P1 — evento de transição de comunicação (ok↔stale) de QUALQUER piezômetro monitorado
@@ -127,17 +127,17 @@ function addComunicacaoRow(pzId, estado, ts) {
   if (estado === "stale") {
     const hhmm = Number.isFinite(ts)
       ? new Date(ts * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-      : "—";
+      : "···";
     pushHistorico({
       lv: "semsinal", lbl: "SEM SINAL",
       msg: `⚠️ ${pzId} sem sinal (última leitura ${hhmm})`,
-      nivel: "—", time: t, color: corPorStatus("semsinal"),
+      nivel: "···", time: t, color: corPorStatus("semsinal"),
     });
   } else {
     pushHistorico({
       lv: "info", lbl: "INFO",
       msg: `Comunicação restabelecida (${pzId})`,
-      nivel: "—", time: t, color: corPorStatus("info"),
+      nivel: "···", time: t, color: corPorStatus("info"),
     });
   }
 }
@@ -221,11 +221,11 @@ function atualizarVisaoGeral(mapa) {
     const nivel = d && Number.isFinite(d.nivel) ? d.nivel : null;
     const comm = estadoComunicacao(d);
     const semSinal = comm === "stale";
-    const cls = !semSinal && nivel !== null ? classifyNivel(nivel) : { lv: "info", lbl: "—" };
+    const cls = !semSinal && nivel !== null ? classifyNivel(nivel) : { lv: "info", lbl: "···" };
     const sel = pz.id === pzSelecionado ? " selected" : "";
     const valorHtml = nivel !== null
       ? `${nivel.toFixed(2)}<span class="pz-card-unit">m</span>`
-      : "—";
+      : "···";
 
     // P1 — leitura ausente/stale nunca aparece como normal: badge cinza "SEM SINAL" + cor+texto,
     // valor esmaecido e "última leitura há X min" (nunca vermelho nem verde — ver docs §2).
@@ -250,7 +250,7 @@ function atualizarVisaoGeral(mapa) {
     const taxa = d && Number.isFinite(d.taxa_m_dia) ? d.taxa_m_dia : null;
     const taxaRapida = taxa !== null && Math.abs(taxa) > CFG.taxaMaxMDia;
     const chipHtml = taxaRapida
-      ? `<span class="chip-taxa-rapida" title="Variação rápida — investigar (ref. >0,1 m/dia já é gatilho profissional)">📈 variação rápida</span>`
+      ? `<span class="chip-taxa-rapida" title="Variação rápida: investigar (referência profissional: acima de 0,1 m/dia já é gatilho)">📈 variação rápida</span>`
       : "";
 
     // P6 — badge NORMAL neutro (ISA-101: cor = anormalidade, ~90% da UI neutra)
@@ -315,7 +315,7 @@ function atualizarMapa(mapa) {
     const col = corPorStatus(semSinal ? "semsinal" : cls.lv);
     marker.setStyle({ color: col, fillColor: col, radius: pz.id === pzSelecionado ? 11 : 9 });
     marker.setPopupContent(
-      `<b>${pz.nome}</b><br>Nível: ${!semSinal && nivel !== null ? nivel.toFixed(2) + " m" : "—"}<br>Status: ${cls.lbl}`
+      `<b>${pz.nome}</b><br>Nível: ${!semSinal && nivel !== null ? nivel.toFixed(2) + " m" : "···"}<br>Status: ${cls.lbl}`
     );
   });
 }
@@ -324,7 +324,7 @@ function updatePzLabels() {
   const pz = PIEZOMETROS.find(p => p.id === pzSelecionado);
   const nome = pz ? pz.nome : "";
   const dl = document.getElementById("pz-detail-label");
-  if (dl) dl.innerHTML = `Detalhes de: <b>${pzSelecionado}${nome ? " — " + nome : ""}</b>`;
+  if (dl) dl.innerHTML = `Detalhes de: <b>${pzSelecionado}${nome ? " · " + nome : ""}</b>`;
   const at = document.getElementById("alert-pz-tag");
   if (at) at.textContent = pzSelecionado;
   const rt = document.getElementById("pz-tag-readings");
@@ -340,7 +340,7 @@ function renderTaxa(taxa) {
   const el = document.getElementById("n-taxa");
   if (!el) return;
   if (!Number.isFinite(taxa)) {
-    el.textContent = "—";
+    el.textContent = "···";
     el.className = "mstat-val";
     el.removeAttribute("title");
     return;
@@ -349,7 +349,7 @@ function renderTaxa(taxa) {
   const rapida = Math.abs(taxa) > CFG.taxaMaxMDia;
   el.textContent = `${rapida ? "📈 " : ""}${sinal}${taxa.toFixed(2)} m/dia`;
   el.className = "mstat-val" + (rapida ? " warn" : "");
-  if (rapida) el.title = "Variação rápida — investigar (ref. >0,1 m/dia já é gatilho profissional)";
+  if (rapida) el.title = "Variação rápida: investigar (referência profissional: acima de 0,1 m/dia já é gatilho)";
   else el.removeAttribute("title");
 }
 

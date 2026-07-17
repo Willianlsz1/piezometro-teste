@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Controle de Piezômetro — Samarco</title>
+<title>AquaSense · Monitoramento de Piezômetros</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -15,9 +15,9 @@
 <header>
   <div class="logo">
     <div class="logo-ring"><div class="logo-ring-inner"></div></div>
-    <span class="logo-name">SAMARCO</span>
+    <span class="logo-name">AQUASENSE</span>
   </div>
-  <span class="header-center">Controle de Piezômetro</span>
+  <span class="header-center">Monitoramento de Piezômetros · Samarco</span>
   <div class="live-pill">
     <span class="live-dot"></span>
     <span id="live-time">Ao vivo · --</span>
@@ -30,7 +30,7 @@
 </div>
 
 <div class="sim-banner" id="sim-banner">
-  ⚠ Modo simulação — dados fictícios para demonstração (sensor/API indisponível)
+  ⚠ Modo simulação: dados fictícios para demonstração (sensor/API indisponível)
 </div>
 
 <div class="howto-bar">
@@ -38,8 +38,8 @@
   <div class="howto-content" id="howto-content">
     <div class="howto-item">💧 <b>Nível d'água:</b> altura da água dentro do tubo do piezômetro, em metros. Quanto mais alto, maior a pressão da água dentro da barragem.</div>
     <div class="howto-item">🟢🟡🔴 <b>Faixas:</b> Normal (abaixo de 12 m) = operação segura · Atenção (12–15 m) = observar de perto · Crítico (acima de 15 m) = acionar a equipe de geotecnia imediatamente.</div>
-    <div class="howto-item">📈 <b>Gráficos:</b> mostram como o nível variou ao longo do tempo — linhas tracejadas marcam os limites de segurança.</div>
-    <div class="howto-item">🔔 <b>Alertas:</b> quando o nível cruza um limite, o sistema avisa sozinho por Telegram/SMS — ninguém precisa estar olhando a tela.</div>
+    <div class="howto-item">📈 <b>Gráficos:</b> mostram como o nível variou ao longo do tempo; as linhas tracejadas marcam os limites de segurança.</div>
+    <div class="howto-item">🔔 <b>Alertas:</b> quando o nível cruza um limite, o sistema avisa sozinho por Telegram/SMS, sem ninguém precisar estar olhando a tela.</div>
   </div>
 </div>
 
@@ -54,12 +54,12 @@
     </div>
     <div class="panel">
       <div class="panel-hdr"><span class="panel-title">Localização</span></div>
-      <div class="panel-sub">Coordenadas ilustrativas — Complexo de Germano, Mariana/MG</div>
+      <div class="panel-sub">Coordenadas ilustrativas (Complexo de Germano, Mariana/MG)</div>
       <div class="map-area"><div id="pz-map"></div></div>
     </div>
   </div>
 
-  <div class="pz-detail-label" id="pz-detail-label">Detalhes de: <b>PZ-01 — Dique Norte</b></div>
+  <div class="pz-detail-label" id="pz-detail-label">Detalhes de: <b>PZ-01 · Dique Norte</b></div>
 
   <!-- MÉTRICAS -->
   <div class="metrics-row">
@@ -67,17 +67,17 @@
     <div class="mcard">
       <div class="mcard-top">
         <span class="mcard-label">Nível d'água</span>
-        <span class="mbadge mb-green" id="badge-n">—</span>
+        <span class="mbadge mb-green" id="badge-n">···</span>
       </div>
       <div class="mcard-value cv-green">
-        <span id="val-n">—</span><span class="mcard-unit">m</span>
+        <span id="val-n">···</span><span class="mcard-unit">m</span>
       </div>
       <div class="sparkline-wrap"><canvas id="spark-n"></canvas></div>
       <div class="mcard-stats mcard-stats-4">
-        <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="n-min">—</span></div>
-        <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="n-max">—</span></div>
-        <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="n-delta">—</span></div>
-        <div class="mstat"><span class="mstat-lbl">Taxa</span><span class="mstat-val" id="n-taxa">—</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="n-min">···</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="n-max">···</span></div>
+        <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="n-delta">···</span></div>
+        <div class="mstat"><span class="mstat-lbl">Taxa</span><span class="mstat-val" id="n-taxa">···</span></div>
       </div>
     </div>
 
@@ -85,16 +85,16 @@
     <div class="mcard">
       <div class="mcard-top">
         <span class="mcard-label">Pressão (sensor)</span>
-        <span class="mbadge mb-blue">Bruta</span>
+        <span class="mbadge mb-blue" id="badge-p">Bruta</span>
       </div>
       <div class="mcard-value cv-blue">
-        <span id="val-p">—</span><span class="mcard-unit">hPa</span>
+        <span id="val-p">···</span><span class="mcard-unit">hPa</span>
       </div>
       <div class="sparkline-wrap"><canvas id="spark-p"></canvas></div>
       <div class="mcard-stats">
-        <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="p-min">—</span></div>
-        <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="p-max">—</span></div>
-        <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="p-delta">—</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="p-min">···</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="p-max">···</span></div>
+        <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="p-delta">···</span></div>
       </div>
     </div>
 
@@ -102,16 +102,16 @@
     <div class="mcard">
       <div class="mcard-top">
         <span class="mcard-label">Temperatura</span>
-        <span class="mbadge mb-blue" id="badge-t">—</span>
+        <span class="mbadge mb-blue" id="badge-t">···</span>
       </div>
       <div class="mcard-value cv-blue">
-        <span id="val-t">—</span><span class="mcard-unit">°C</span>
+        <span id="val-t">···</span><span class="mcard-unit">°C</span>
       </div>
       <div class="sparkline-wrap"><canvas id="spark-t"></canvas></div>
       <div class="mcard-stats">
-        <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="t-min">—</span></div>
-        <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="t-max">—</span></div>
-        <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="t-delta">—</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-min">Mín 24h</span><span class="mstat-val" id="t-min">···</span></div>
+        <div class="mstat"><span class="mstat-lbl lbl-max">Máx 24h</span><span class="mstat-val" id="t-max">···</span></div>
+        <div class="mstat"><span class="mstat-lbl">Variação</span><span class="mstat-val" id="t-delta">···</span></div>
       </div>
     </div>
   </div>
@@ -127,8 +127,8 @@
             <button class="period-pill" data-range="7d" type="button">7d</button>
             <button class="period-pill" data-range="30d" type="button">30d</button>
           </div>
-          <button class="btn-export" id="btn-export" type="button">📥 Exportar CSV</button>
-          <button class="btn-export" id="btn-export-xls" type="button">📊 Exportar Excel</button>
+          <button class="btn-export" id="btn-export" type="button" title="Dados brutos em CSV: formato universal de auditoria, importável em qualquer software de engenharia">📥 Dados brutos (CSV)</button>
+          <button class="btn-export" id="btn-export-xls" type="button" title="Planilha Excel formatada: título, cores por status e resumo do período, pronta para imprimir ou apresentar">📊 Relatório (Excel)</button>
         </div>
       </div>
       <!-- P5 — legenda curta: pico do intervalo desenhado junto da média, não escondido -->
