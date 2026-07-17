@@ -53,7 +53,9 @@ function coletarMetaExportacao(totalLinhas) {
     periodoLabel: periodoSelecionado,
     intervaloLabel: intervaloMin === "ao vivo" ? intervaloMin : intervaloMin + " min",
     geradoEm,
-    fonteLabel: fonte.simulada ? "SIMULAÇÃO — dados fictícios de demonstração" : "API real",
+    // histSimulado cobre o fallback local: fonte global ainda é FonteApi, mas o
+    // histórico exibido/exportado veio da simulação (API de histórico fora do ar).
+    fonteLabel: (fonte.simulada || histSimulado) ? "SIMULAÇÃO — dados fictícios de demonstração" : "API real",
     thrAtencaoFmt: String(CFG.thrAtencao).replace(".", ","),
     thrCriticoFmt: String(CFG.thrCritico).replace(".", ","),
     totalIntervalos: totalLinhas,

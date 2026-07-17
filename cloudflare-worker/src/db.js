@@ -55,8 +55,11 @@ export function normalizarLeitura(leitura, indice = 0, total = 1) {
     ts = agoraSeg - (total - 1 - indice) * 10;
   }
 
-  // Relógio do device adiantado não pode projetar leitura no futuro.
-  if (ts > agoraSeg + 300) ts = agoraSeg;
+  // Relógio do device adiantado não pode projetar leitura no futuro. O clamp
+  // escalona como o fallback acima: colapsar o lote inteiro no MESMO agoraSeg
+  // faria o índice único (piezometro, ts) + OR IGNORE descartar N-1 leituras
+  // em silêncio — e o firmware, recebendo 204, apagaria o buffer.
+  if (ts > agoraSeg + 300) ts = agoraSeg - (total - 1 - indice) * 10;
 
   const recebido_em = agoraSeg;
 
@@ -80,6 +83,11 @@ export async function inserirLeituras(env, normalizadas) {
 // Busca o último nível d'água de CADA piezômetro que teve leitura nos
 // últimos 5 minutos. Idêntico em espírito a lerUltimosNiveis() do
 // server.js, mas consultando o D1 em vez do InfluxDB.
+// O frescor é medido por recebido_em (relógio do SERVIDOR), nunca por ts: com o
+// relógio do device atrasado > 5 min, o filtro por ts devolvia vazio e a camada
+// de NÍVEL ficava cega (um CRÍTICO real nunca notificava) — mesma deriva já
+// tratada na camada de comunicação (ver alertas.js). COALESCE cobre linhas
+// antigas gravadas antes da coluna recebido_em existir.
 export async function lerUltimosNiveis(env) {
   const desde = Math.floor(Date.now() / 1000) - 300; // últimos 5 minutos
 
@@ -89,7 +97,7 @@ export async function lerUltimosNiveis(env) {
        JOIN (
          SELECT piezometro, MAX(id) AS mid
            FROM leituras
-          WHERE ts >= ?1
+          WHERE COALESCE(recebido_em, ts) >= ?1
           GROUP BY piezometro
        ) m ON l.id = m.mid`
   )

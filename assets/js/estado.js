@@ -62,6 +62,11 @@ const statsWin = { n: [], p: [], t: [], nMax: [] };
 // bucketSeg: tamanho (segundos) do intervalo de agregação do período carregado, usado só
 // nos metadados de auditoria do CSV exportado — `undefined` quando a fonte não o informou.
 let histPontos = { n: [], bucketSeg: undefined };
+// true quando o histórico atual veio do fallback simulado de loadHistoryAndStats()
+// (API de histórico fora do ar com a fonte global ainda = FonteApi). O export lê
+// este flag: sem ele, um CSV/XLS gerado durante a queda carimbava "API real"
+// sobre dados fictícios — exatamente o que o bloco de auditoria existe para impedir.
+let histSimulado = false;
 const STATS_MAX = 8640;
 function pushStats(key, val) {
   statsWin[key].push(val);
