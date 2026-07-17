@@ -1,6 +1,14 @@
-# 🟢 Samarco — Sistema de Monitoramento de Piezômetro
+# 🟢 AquaSense — Monitoramento Online de Piezômetros
 
-Sistema online de **monitoramento do nível de água em piezômetros** (desafio SAGA SENAI / Samarco): sensores automáticos no ESP32, transmissão em tempo real para o Cloudflare Worker (com armazenamento em D1), dashboard interativo no GitHub Pages e **alertas preventivos por Telegram e SMS** disparados pelo motor de alertas do Worker (cron trigger).
+**AquaSense** é o sistema de **monitoramento contínuo do nível de água em piezômetros de barragens** desenvolvido como TCC do Técnico em Automação Industrial (SENAI Belo Horizonte HORTO), em resposta ao desafio SAGA da **Samarco Mineração**: sensores no ESP32, transmissão em tempo real para o Cloudflare Worker (com armazenamento em D1), dashboard interativo no GitHub Pages e **alertas preventivos por Telegram e SMS** disparados pelo motor de alertas do Worker (cron trigger).
+
+## Estado do projeto (julho/2026)
+
+- ✅ **Plataforma em produção:** Worker + D1 + KV no ar, dashboard publicado, alertas Telegram/SMS ativos, deploy automático no merge da `main`.
+- ✅ **Protótipo físico de bancada validado ponta a ponta** (16/07): ESP32 + sensor ultrassônico + OLED lendo nível real e o dashboard atualizando ao vivo, com *store & forward* comprovado (leituras seguradas sem rede, zero perda).
+- ✅ **TCC oficial** gerado a partir de `docs/tcc/TCC_AQUASENSE.md` sobre o template INTEGRA SENAI-MG.
+- 🔜 **Protótipo v2 em preparação:** tubo de acrílico simulando o piezômetro + sensor de pressão piezorresistivo (MPS20N0040D + HX710B) + display maior (TFT) — o firmware já foi preparado para essas trocas (interface `Tela` e adapters de sensor enxutos).
+- 🔜 Ensaio de validação do sensor (protocolo em `docs/prototipo/VALIDACAO_SENSOR.md`) e cadastro de `DEVICE_KEYS` por dispositivo em produção.
 
 ---
 
@@ -24,14 +32,14 @@ Sistema online de **monitoramento do nível de água em piezômetros** (desafio 
 
 ## Visão Geral
 
-O sistema monitora continuamente um piezômetro simulado via ESP32, enviando **nível d'água (m)**, pressão e temperatura para o Cloudflare Worker a cada 10 segundos — com *store & forward*: leituras feitas sem rede ficam retidas em buffer local (com timestamp NTP) e são reenviadas quando a conexão volta, sem perda de dados.
+O sistema monitora continuamente o piezômetro via ESP32 — **na bancada física** (sensor ultrassônico medindo nível real, OLED local) **ou na simulação Wokwi** (BMP180 como stand-in) — enviando **nível d'água (m)**, pressão e temperatura para o Cloudflare Worker a cada 10 segundos, com *store & forward*: leituras feitas sem rede ficam retidas em buffer local (com timestamp NTP) e são reenviadas quando a conexão volta, sem perda de dados.
 
 Um dashboard web exibe os dados em tempo real com histórico de 24 horas, indicadores visuais de alerta e registro de eventos. Em paralelo, o **motor de alertas** do Worker (executado por *cron trigger*, a cada 1 minuto) vigia o D1 e dispara notificações por **Telegram** (gratuito) e/ou **SMS via Twilio** quando o nível muda de faixa — o alerta chega mesmo sem ninguém olhando o dashboard, cumprindo o requisito de "alertas preventivos" da demanda. Diferente de um servidor tradicional, o Worker não hiberna: o motor de alertas roda 24/7 sem depender de nenhum ping externo para "acordar".
 
 Quando o backend não está acessível, o dashboard ativa automaticamente um **modo de simulação** para demonstração — sinalizado por um banner amarelo e pela marcação "(simulação)" nos eventos, para que dados fictícios nunca sejam confundidos com leituras reais.
 
-> ⚠️ **Limitações do protótipo (Fase 1):**
-> - O **BMP180 é um sensor barométrico** usado apenas como *stand-in* no Wokwi — ele não mede coluna d'água. O firmware converte a pressão do slider em um **nível d'água simulado** pela escala didática de **10 hPa = 1 m** (`SIM_ESCALA`). No hardware real (Fase 2), o sinal virá de um **transdutor piezométrico submersível 4–20 mA** lido por um ADC ADS1115, e a conversão passa a ser física real (1 mH₂O ≈ 98,07 hPa), calibrada na instalação.
+> ⚠️ **Posicionamento do protótipo (Fase 1):**
+> - O protótipo de bancada usa **sensores stand-in** (ultrassônico HC-SR04/JSN-SR04T na bancada; BMP180 no Wokwi, com escala didática de **10 hPa = 1 m**). Na **UCT industrial (Fase 2, especificada em `docs/projeto/PROJETO_INDUSTRIAL.md`)**, o sinal vem de um **transdutor piezorresistivo submersível 4–20 mA** lido por um ADS1115, com comunicação celular 4G (SIM7600) e alimentação solar — o protótipo representa o conceito; o produto é a especificação completa.
 > - A lógica de alerta já é a **correta para piezômetro**: nível d'água **alto** = perigo (saturação do maciço).
 
 ---
@@ -39,10 +47,11 @@ Quando o backend não está acessível, o dashboard ativa automaticamente um **m
 ## Arquitetura do Sistema
 
 ```
-┌─────────────────┐
-│   ESP32 + BMP180│
-│   (Wokwi Sim.)  │
-└────────┬────────┘
+┌──────────────────────┐
+│ ESP32 + sensor       │
+│ (bancada física com  │
+│  OLED, ou Wokwi)     │
+└────────┬─────────────┘
          │
   POST /ingest (JSON, x-device-key)
          │
@@ -71,13 +80,13 @@ O ESP32 nunca fala direto com o banco: ele posta as leituras em `/ingest`, auten
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Firmware | C++ (Arduino), ESP32, BMP180, store & forward com NTP |
+| Firmware | C++ (Arduino), ESP32, núcleo comum + adapters de sensor (HC-SR04/JSN-SR04T na bancada, BMP180 no Wokwi, ADS1115 4–20 mA na UCT), OLED atrás da interface `Tela`, store & forward com NTP |
 | Simulação | [Wokwi](https://wokwi.com) |
 | Backend | [Cloudflare Workers](https://workers.cloudflare.com) (ingestão + leitura + motor de alertas via Cron Trigger) |
 | Banco de dados | [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite gerenciado) |
 | Estado do motor de alertas | [Cloudflare Workers KV](https://developers.cloudflare.com/kv/) |
 | Notificações | Telegram Bot API (gratuito) e Twilio SMS (opcional) |
-| Dashboard / Frontend | HTML + CSS + Canvas API |
+| Dashboard / Frontend | HTML + CSS + Canvas API + Leaflet (mapa), export CSV/Excel com metadados de auditoria |
 | Hospedagem frontend | [GitHub Pages](https://pages.github.com) |
 
 ---
@@ -106,50 +115,32 @@ O backend inteiro (ingestão, leitura para o dashboard e motor de alertas) roda 
 
 ---
 
-### 2. Firmware ESP32 (Wokwi)
+### 2. Firmware ESP32
 
-1. Acesse [wokwi.com](https://wokwi.com) e crie um projeto ESP32
-2. Monte o circuito:
-   - BMP180 → SDA no GPIO 21, SCL no GPIO 22
-   - LED Verde → GPIO 32
-   - LED Amarelo → GPIO 33
-   - LED Vermelho → GPIO 25
-   - Buzzer → GPIO 26
-3. Cole o conteúdo de `firmware/sketch.ino` no editor (e, opcionalmente, o `firmware/diagram.json` na aba **diagram.json** para montar o circuito automaticamente)
-4. Edite as credenciais no topo do arquivo:
+O firmware é organizado em **núcleo comum + adapters**: `piezometro_core.h` concentra WiFi/NTP/buffer/envio/alertas; cada sketch `.ino` implementa só a leitura do seu sensor; a tela fica atrás da interface `Tela` (`tela.h`), com o OLED SSD1306 como adapter concreto (`tela_ssd1306.h`) — trocar de display (ex.: TFT) não toca no core nem nos sketches.
 
-```cpp
-#define WIFI_SSID   "Wokwi-GUEST"
-#define WIFI_PASS   ""
-#define SERVER_URL  "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev/ingest"
-#define DEVICE_KEY  "troque-esta-chave"
-```
+**Bancada física** (`sketch_fisico_jsn_sr04t.ino`, `sketch_demo_hc_sr04.ino` ou `sketch_uct_4a20ma.ino`):
 
-> A placa posta as leituras (JSON) no `/ingest` do Cloudflare Worker, autenticando com `DEVICE_KEY` no header `x-device-key`. O Worker grava no D1 usando essa mesma chave para validar a origem — nenhum segredo de banco fica no firmware.
+1. Copie `firmware/piezometro_config_local.h.example` para `piezometro_config_local.h` (mesma pasta, sem o `.example`) e preencha WiFi, endpoint do Worker, `DEVICE_KEY` e `PIEZOMETRO_ID`. Esse arquivo está no `.gitignore` — **nunca é commitado**.
+2. Abra o sketch no Arduino IDE com as abas `piezometro_core.h`, `tela.h`, `tela_ssd1306.h` e `piezometro_config_local.h` na mesma pasta.
+3. Grave na placa (nesta placa clone: segurando o botão **BOOT** durante o upload). Montagem física, pinos e divisor de tensão: ver [`docs/prototipo/PROTOTIPO_FISICO.md`](docs/prototipo/PROTOTIPO_FISICO.md) e o diário [`docs/prototipo/BRINGUP_FISICO.md`](docs/prototipo/BRINGUP_FISICO.md).
 
-5. O firmware converte a pressão do BMP180 em nível d'água simulado (10 hPa = 1 m) e classifica pelos limiares de **nível**:
+**Simulação Wokwi** (`sketch.ino`, BMP180 como stand-in):
 
-```cpp
-#define PRESSAO_REF 1013.25  // hPa — padrão do BMP180 no Wokwi ↔ nível 10,0 m
-#define NIVEL_ATENCAO 12.0   // m — acima disso = ATENÇÃO
-#define NIVEL_CRITICO 15.0   // m — acima disso = CRÍTICO
-```
+1. Acesse [wokwi.com](https://wokwi.com), crie um projeto ESP32 e cole `firmware/sketch.ino` (e o `firmware/diagram.json` na aba **diagram.json** para montar o circuito: BMP180 na I2C 21/22, LEDs 32/33/25, buzzer 26)
+2. As credenciais do Wokwi já vêm inline no sketch (`Wokwi-GUEST` é rede pública do simulador) — ajuste só `SERVER_URL` e `DEVICE_KEY`
+3. **Start Simulation** — para testar alertas, mova o slider de pressão do BMP180: **1013 hPa → 10,0 m** 🟢 · **1035 hPa → 12,2 m** 🟡 · **1065 hPa → 15,2 m** 🔴 (Telegram/SMS no próximo ciclo do cron, até 1 min depois)
 
-> Estes valores devem ser **os mesmos** do `CFG` em `index.html` (`thrAtencao`/`thrCritico`) e do Worker (`NIVEL_ATENCAO`/`NIVEL_CRITICO` em `wrangler.toml`), para dashboard e notificações espelharem exatamente o firmware.
-
-6. Clique em **Start Simulation** — o ESP32 enviará dados a cada 10 segundos. Para testar os alertas, clique no BMP180 e mova o slider de pressão:
-   - **1013 hPa → 10,0 m** 🟢 normal
-   - **1035 hPa → 12,2 m** 🟡 atenção
-   - **1065 hPa → 15,2 m** 🔴 crítico (e o Worker dispara Telegram/SMS no próximo ciclo do cron, até 1 min depois)
+> A placa posta as leituras (JSON) no `/ingest`, autenticando com `DEVICE_KEY` no header `x-device-key`. Os limiares (atenção 12 m / crítico 15 m) são espelhados no Worker (`[vars]` do `wrangler.toml`) e no dashboard — que os busca do Worker via `GET /config` no boot.
 
 ---
 
 ### 3. Dashboard (GitHub Pages)
 
-1. No arquivo `index.html`, atualize a URL do backend para o Worker publicado (endpoints `/ultimos` e `/dados`):
+1. No arquivo `assets/js/config.js`, atualize a URL do backend para o Worker publicado (endpoints `/ultimos`, `/dados`, `/alerts`, `/config`):
 
 ```javascript
-const WORKER_URL = "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev";
+const API_URL = "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev";
 ```
 
 2. Habilite o GitHub Pages:
@@ -231,9 +222,12 @@ O sistema classifica o **nível d'água** em três faixas — a mesma lógica no
 ```
 piezometro-teste/
 ├── firmware/
-│   ├── piezometro_core.h             # Núcleo comum (WiFi, NTP, buffer, envio, alertas, OLED)
+│   ├── piezometro_core.h             # Núcleo comum (WiFi, NTP, buffer, envio, alertas)
+│   ├── tela.h                        # Interface Tela — core e sketches só falam com ela
+│   ├── tela_ssd1306.h                # Adapter concreto do OLED SSD1306 (um futuro TFT entra aqui do lado)
+│   ├── piezometro_config_local.h.example  # Modelo de credenciais/limiares (copiar sem .example; fora do git)
 │   ├── piezometro_deep_sleep.h       # Modo de campo a bateria/solar (opt-in via MODO_DEEP_SLEEP)
-│   ├── sketch.ino                    # Adapter do sensor da SIMULAÇÃO (BMP180 como stand-in)
+│   ├── sketch.ino                    # Adapter do sensor da SIMULAÇÃO (BMP180 como stand-in; credenciais Wokwi inline)
 │   ├── sketch_fisico_jsn_sr04t.ino   # Adapter do sensor do PROTÓTIPO FÍSICO (JSN-SR04T)
 │   ├── sketch_demo_hc_sr04.ino       # Adapter da DEMO de bancada sem água (HC-SR04; mão = água)
 │   ├── sketch_uct_4a20ma.ino         # Adapter da UCT INDUSTRIAL (ADS1115 + loop 4–20 mA, NAMUR)
@@ -270,7 +264,9 @@ piezometro-teste/
 │   │   ├── db.js            # Todas as queries do D1
 │   │   ├── alertas.js       # Motor de alertas (nível + comunicação + taxa) e estado no KV
 │   │   ├── notificacoes.js  # Telegram e SMS (Twilio)
+│   │   ├── retencao.js      # Retenção: consolidação diária + limpeza (cron)
 │   │   └── rotas.js         # Handlers dos endpoints
+│   ├── migrations/          # Migrações do D1 (0001 recebido_em · 0002 dedupe · 0003 retenção)
 │   ├── schema.sql           # Schema da tabela `leituras` (D1)
 │   ├── wrangler.toml        # Config (vars, D1, KV, cron)
 │   └── README.md            # Guia de deploy passo a passo
@@ -283,7 +279,8 @@ piezometro-teste/
 │       ├── estado.js        # Estado do painel (séries, stats, alarmes/eventos)
 │       ├── graficos.js      # Canvas: sparklines e gráfico principal (média + máx)
 │       ├── paineis.js       # Cards, mapa, painel de alerta, tabelas
-│       ├── exportar.js      # Export CSV
+│       ├── exportar.js      # Export CSV (com metadados de auditoria)
+│       ├── exportar_xls.js  # Export Excel formatado (SpreadsheetML)
 │       └── app.js           # Orquestração: poll, seleção, boot
 ├── index.html               # Dashboard web — só a estrutura HTML (GitHub Pages)
 └── readme.md                # Este arquivo
