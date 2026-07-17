@@ -355,19 +355,16 @@ void mostrarDisplay() {
 
   linhasExtrasDisplay(*tela); // até 2 linhas específicas do sensor (SLOT_EXTRA_1/2)
 
-  // Rótulo de status: pisca em ATENÇÃO (2 Hz) e CRÍTICO (4 Hz) — rótulo
-  // vazio ("") é a fase "apagada" do pisca-pisca; destacarStatus() decide o
-  // que fazer (o adapter do OLED mantém a moldura fixa e só omite o texto).
-  const char* rotulo = "";
-  if (nivelAlerta == "NORMAL") {
-    rotulo = "NORMAL";
-  }
-  else if (nivelAlerta == "ATENCAO") {
-    if ((millis() / 500) % 2 == 0) rotulo = "ATENCAO";
-  }
-  else {
-    if ((millis() / 250) % 2 == 0) rotulo = "CRITICO!";
-  }
+  // Rótulo de status SEMPRE visível. O "pisca" original amostrava a paridade
+  // de millis()/500, mas o display só atualiza a cada 1 s (múltiplo exato de
+  // 500 ms): a paridade caía sempre no mesmo lado do boot em diante, e o
+  // rótulo podia ficar PRESO na fase apagada — ATENCAO/CRITICO sumiam do
+  // OLED (visto em bancada em 17/07). Num instrumento de segurança o status
+  // precisa ser legível a qualquer momento; a urgência visual/sonora já é
+  // dos LEDs (piscam) e do buzzer.
+  const char* rotulo = "NORMAL";
+  if (nivelAlerta == "ATENCAO") rotulo = "ATENCAO";
+  else if (nivelAlerta == "CRITICO") rotulo = "CRITICO!";
   tela->destacarStatus(rotulo, (uint8_t)corAtual);
 
   tela->mostrar();
