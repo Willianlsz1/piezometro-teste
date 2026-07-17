@@ -142,14 +142,21 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts, recebidoEm }) 
   };
 
   document.getElementById("val-n").textContent = nivel.toFixed(2);       flash("val-n");
-  document.getElementById("val-p").textContent = temPressao ? pressao.toFixed(1) : "n/d";
-  if (temPressao) flash("val-p");
+  // Poropressão: com sensor de pressão real (ex.: BMP no Wokwi) exibe a leitura
+  // bruta em hPa; sem ele (bancada ultrassônica), exibe a poropressão EQUIVALENTE
+  // calculada do nível MEDIDO (u = γw·h, 9,807 kPa por metro de coluna d'água,
+  // a grandeza que o piezômetro real mede). Rotulada "Calculada": derivação de
+  // medição real com rótulo explícito, nunca número inventado.
+  const pressaoExib = temPressao ? pressao : nivel * 9.807;
+  document.getElementById("val-p").textContent = pressaoExib.toFixed(1); flash("val-p");
+  const up = document.getElementById("unit-p");
+  if (up) up.textContent = temPressao ? "hPa" : "kPa";
   document.getElementById("val-t").textContent = temTemp ? temperatura.toFixed(1) : "n/d";
   if (temTemp) flash("val-t");
 
   // Sparklines (só com dado real — sparkline de valor fabricado é linha reta mentirosa)
   pushSpark("n", nivel);
-  if (temPressao) pushSpark("p", pressao);
+  pushSpark("p", pressaoExib);
   if (temTemp)    pushSpark("t", temperatura);
 
   // Charts
@@ -162,7 +169,7 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts, recebidoEm }) 
   // Stats (janela completa do período, não só os pontos visíveis no gráfico)
   pushStats("n", nivel);
   pushStats("nMax", nivel); // leitura ao vivo é instantânea: o valor também é o pico do instante
-  if (temPressao) { pushStats("p", pressao); updateStats("p", statsWin.p); }
+  pushStats("p", pressaoExib); updateStats("p", statsWin.p);
   if (temTemp)    { pushStats("t", temperatura); updateStats("t", statsWin.t); }
   updateStats("n", statsWin.n);
   aplicarMaxNivelPico(); // P5 — MÁX 24H usa o pico do intervalo, não a média
@@ -175,7 +182,7 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts, recebidoEm }) 
 
   // Badge da pressão idem (o HTML traz "Bruta" fixo — só sobrescreve na ausência)
   const bp = document.getElementById("badge-p");
-  if (bp) { bp.textContent = temPressao ? "Bruta" : "Sem sensor"; if (!temPressao) bp.className = "mbadge"; }
+  if (bp) { bp.textContent = temPressao ? "Bruta" : "Calculada"; bp.className = temPressao ? "mbadge mb-blue" : "mbadge"; }
 
   // P3 — taxa de variação (display), independente do estado de comunicação
   renderTaxa(taxa_m_dia);
