@@ -81,13 +81,12 @@
  * ============================================================================
  */
 
-// ===== CREDENCIAIS (preencha antes de usar!) =====
-#define WIFI_SSID   "SUA-REDE-WIFI"
-#define WIFI_PASS   "SUA-SENHA-WIFI"
-#define SERVER_URL  "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev/ingest"  // endpoint /ingest do Cloudflare Worker
-#define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY definida como secret no Worker
-#define MEASUREMENT "telemetria_samarco"                   // (info) rótulo interno das leituras
-#define PIEZOMETRO_ID "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
+// ===== CREDENCIAIS E LIMIARES (preencha antes de usar!) =====
+// WIFI_SSID/WIFI_PASS/SERVER_URL/DEVICE_KEY/PIEZOMETRO_ID/NIVEL_ATENCAO/
+// NIVEL_CRITICO vêm de piezometro_config_local.h (fora do git — ver o
+// modelo em firmware/piezometro_config_local.h.example: copie para
+// piezometro_config_local.h e preencha antes de gravar o firmware).
+#include "piezometro_config_local.h"
 
 // ===== SENSOR ULTRASSÔNICO JSN-SR04T =====
 #define PIN_TRIG 5
@@ -98,11 +97,7 @@
 // Com a escala padrão: 20 cm de água → 10 m (normal) · 24 cm → 12 m (atenção)
 // · 30 cm → 15 m (crítico) — os mesmos limiares de sempre, ver abaixo.
 
-// ===== LIMIARES DE NÍVEL (m) — espelhados em index.html e no Cloudflare Worker =====
-#define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
-#define NIVEL_CRITICO 15.0   // acima disso = CRÍTICO
-
-// O núcleo comum (WiFi, buffer, envio, alertas, OLED) e o struct Leitura
+// O núcleo comum (WiFi, buffer, envio, alertas, tela) e o struct Leitura
 // vêm do core — este sketch só implementa o adapter do sensor JSN-SR04T.
 #include "piezometro_core.h"
 
@@ -211,18 +206,15 @@ Leitura lerSensor() {
   return l;
 }
 
-// ===== HOOK: LINHAS EXTRAS NO DISPLAY OLED =====
-void linhasExtrasDisplay(Adafruit_SSD1306 &d) {
-  d.setCursor(0, 25);
-  d.print("Tubo: ");
-  d.print(nivelCm, 1);
-  d.print("cm");
+// ===== HOOK: LINHAS EXTRAS NA TELA =====
+void linhasExtrasDisplay(Tela &t) {
+  char l1[32];
+  snprintf(l1, sizeof(l1), "Tubo: %.1fcm", nivelCm);
+  t.escreverLinha(SLOT_EXTRA_1, l1);
 
-  d.setCursor(0, 35);
-  d.print("Dist: ");
-  d.print(distanciaCm, 1);
-  d.print("cm ");
-  d.print(wifiOk ? "WiFi:OK" : "WiFi:--");
+  char l2[32];
+  snprintf(l2, sizeof(l2), "Dist: %.1fcm %s", distanciaCm, wifiOk ? "WiFi:OK" : "WiFi:--");
+  t.escreverLinha(SLOT_EXTRA_2, l2);
 }
 
 // ===== HOOK: LINHAS EXTRAS NO SERIAL =====
@@ -236,15 +228,8 @@ void linhasExtrasSerial() {
   Serial.println(" cm");
 }
 
-// ===== SETUP / LOOP =====
-void setup() {
-  initSensor();
-  coreSetup();
-}
-
-void loop() {
-  coreLoop();
-}
+// ===== SETUP / LOOP (modo padrão sempre-ligado — ver PIEZOMETRO_MAIN em piezometro_core.h) =====
+PIEZOMETRO_MAIN()
 
 /*
  * ============================================================================

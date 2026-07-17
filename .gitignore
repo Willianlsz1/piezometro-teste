@@ -1,2 +1,3 @@
 node_modules/
 .env
+firmware/piezometro_config_local.h

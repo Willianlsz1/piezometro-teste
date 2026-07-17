@@ -41,13 +41,24 @@
 
 #include <Adafruit_BMP085.h>
 
-// ===== CREDENCIAIS (preencha antes de usar!) =====
+// ===== CREDENCIAIS E LIMIARES (simulação Wokwi) =====
+// EXCEÇÃO à regra do piezometro_config_local.h usada pelos sketches físicos:
+// este sketch roda no SIMULADOR Wokwi, que só enxerga os arquivos do projeto
+// (não existe "arquivo local fora do git" lá) — um include de arquivo
+// ausente quebraria a simulação ao abrir. As credenciais do Wokwi não são
+// segredo (rede pública "Wokwi-GUEST", senha vazia); DEVICE_KEY continua
+// placeholder e é colada direto no editor do Wokwi na hora de demonstrar.
 #define WIFI_SSID   "Wokwi-GUEST"
 #define WIFI_PASS   ""
 #define SERVER_URL  "https://piezometro-worker.SEU-SUBDOMINIO.workers.dev/ingest"  // endpoint /ingest do Cloudflare Worker
 #define DEVICE_KEY  "troque-esta-chave"                    // mesma DEVICE_KEY definida como secret no Worker
 #define MEASUREMENT "telemetria_samarco"                   // (info) rótulo interno das leituras
 #define PIEZOMETRO_ID "PZ-01"   // identificador deste instrumento (PZ-01, PZ-02, ...)
+
+// Limiares de nível (m) — espelhados no Worker ([vars] do wrangler.toml) e
+// no dashboard (CFG); nos sketches físicos vêm do piezometro_config_local.h.
+#define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
+#define NIVEL_CRITICO 15.0   // acima disso = CRÍTICO
 
 // ===== CONVERSÃO PRESSÃO → NÍVEL D'ÁGUA (simulação) =====
 // nivel = NIVEL_REF + (pressao_hPa − PRESSAO_REF) / SIM_ESCALA
@@ -57,11 +68,7 @@
 #define NIVEL_REF   10.0     // m  — nível no ponto de referência
 #define SIM_ESCALA  10.0     // hPa por metro (didático)
 
-// ===== LIMIARES DE NÍVEL (m) — espelhados em index.html e no Cloudflare Worker =====
-#define NIVEL_ATENCAO 12.0   // acima disso = ATENÇÃO
-#define NIVEL_CRITICO 15.0   // acima disso = CRÍTICO
-
-// O núcleo comum (WiFi, buffer, envio, alertas, OLED) e o struct Leitura
+// O núcleo comum (WiFi, buffer, envio, alertas, tela) e o struct Leitura
 // vêm do core — este sketch só implementa o adapter do sensor BMP180.
 #include "piezometro_core.h"
 
@@ -119,18 +126,16 @@ Leitura lerSensor() {
   return l;
 }
 
-// ===== HOOK: LINHAS EXTRAS NO DISPLAY OLED =====
-void linhasExtrasDisplay(Adafruit_SSD1306 &d) {
-  d.setCursor(0, 25);
-  d.print("Press: ");
-  d.print(leituraAtual.pressao, 1);
-  d.print(" hPa");
+// ===== HOOK: LINHAS EXTRAS NA TELA =====
+void linhasExtrasDisplay(Tela &t) {
+  char l1[32];
+  snprintf(l1, sizeof(l1), "Press: %.1f hPa", leituraAtual.pressao);
+  t.escreverLinha(SLOT_EXTRA_1, l1);
 
-  d.setCursor(0, 35);
-  d.print("Temp: ");
-  d.print(leituraAtual.temperatura, 1);
-  d.print(" C  ");
-  d.print(wifiOk ? "WiFi:OK" : "WiFi:--");
+  char l2[32];
+  snprintf(l2, sizeof(l2), "Temp: %.1f C  %s",
+           leituraAtual.temperatura, wifiOk ? "WiFi:OK" : "WiFi:--");
+  t.escreverLinha(SLOT_EXTRA_2, l2);
 }
 
 // ===== HOOK: LINHAS EXTRAS NO SERIAL =====
@@ -144,15 +149,8 @@ void linhasExtrasSerial() {
   Serial.println(" °C");
 }
 
-// ===== SETUP / LOOP =====
-void setup() {
-  initSensor();
-  coreSetup();
-}
-
-void loop() {
-  coreLoop();
-}
+// ===== SETUP / LOOP (modo padrão sempre-ligado — ver PIEZOMETRO_MAIN em piezometro_core.h) =====
+PIEZOMETRO_MAIN()
 
 /*
  * ============================================================================

@@ -1,11 +1,10 @@
 
-// ===== CREDENCIAIS (preencha antes de usar!) =====
-#define WIFI_SSID   "SEU-WIFI-2G4"
-#define WIFI_PASS   "SENHA-DO-WIFI"
-#define SERVER_URL  "https://piezometro-worker.willianloopes123.workers.dev/ingest"
-#define DEVICE_KEY  "troque-esta-chave"   // mesma DEVICE_KEY do secret do Worker
-#define MEASUREMENT "telemetria_samarco"
-#define PIEZOMETRO_ID "PZ-01"
+// ===== CREDENCIAIS E LIMIARES (preencha antes de usar!) =====
+// WIFI_SSID/WIFI_PASS/SERVER_URL/DEVICE_KEY/PIEZOMETRO_ID/NIVEL_ATENCAO/
+// NIVEL_CRITICO vêm de piezometro_config_local.h (fora do git — ver o
+// modelo em firmware/piezometro_config_local.h.example: copie para
+// piezometro_config_local.h e preencha antes de gravar o firmware).
+#include "piezometro_config_local.h"
 
 // ===== SENSOR ULTRASSÔNICO HC-SR04 =====
 #define PIN_TRIG 5
@@ -17,11 +16,7 @@
 #define DIST_MIN_CM  3.0
 #define DIST_MAX_CM  400.0
 
-// ===== LIMIARES DE NÍVEL (m) — os mesmos do Worker e do dashboard =====
-#define NIVEL_ATENCAO 12.0
-#define NIVEL_CRITICO 15.0
-
-// Núcleo comum (WiFi, NTP, buffer/store&forward, envio, alertas, OLED)
+// Núcleo comum (WiFi, NTP, buffer/store&forward, envio, alertas, tela)
 #include "piezometro_core.h"
 
 // ===== VARIÁVEIS DO ADAPTER (para display/serial) =====
@@ -114,16 +109,16 @@ Leitura lerSensor() {
   return l;
 }
 
-// ===== HOOK: LINHAS EXTRAS NO DISPLAY OLED =====
-void linhasExtrasDisplay(Adafruit_SSD1306 &d) {
-  d.setCursor(0, 25);
-  d.print("Dist: ");
-  if (distanciaCm < 0) d.print("---");
-  else { d.print(distanciaCm, 1); d.print("cm"); }
+// ===== HOOK: LINHAS EXTRAS NA TELA =====
+void linhasExtrasDisplay(Tela &t) {
+  char l1[32];
+  if (distanciaCm < 0) snprintf(l1, sizeof(l1), "Dist: ---");
+  else snprintf(l1, sizeof(l1), "Dist: %.1fcm", distanciaCm);
+  t.escreverLinha(SLOT_EXTRA_1, l1);
 
-  d.setCursor(0, 35);
-  d.print("DEMO ");
-  d.print(wifiOk ? "WiFi:OK" : "WiFi:--");
+  char l2[32];
+  snprintf(l2, sizeof(l2), "DEMO %s", wifiOk ? "WiFi:OK" : "WiFi:--");
+  t.escreverLinha(SLOT_EXTRA_2, l2);
 }
 
 // ===== HOOK: LINHAS EXTRAS NO SERIAL =====
@@ -133,12 +128,5 @@ void linhasExtrasSerial() {
   else { Serial.print(distanciaCm, 1); Serial.println(" cm"); }
 }
 
-// ===== SETUP / LOOP =====
-void setup() {
-  initSensor();
-  coreSetup();
-}
-
-void loop() {
-  coreLoop();
-}
+// ===== SETUP / LOOP (modo padrão sempre-ligado — ver PIEZOMETRO_MAIN em piezometro_core.h) =====
+PIEZOMETRO_MAIN()
