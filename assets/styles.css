@@ -255,6 +255,12 @@ header {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
+/* Temperatura não instrumentada na bancada: card/gráfico ficam ocultos e as
+   linhas se reorganizam (2 cards / 1 gráfico). Classes removidas quando um
+   sensor de temperatura real (Wokwi/BMP, futuro BME280) enviar a grandeza. */
+.metrics-row.sem-temp { grid-template-columns: repeat(2, 1fr); }
+.charts-row.sem-temp { grid-template-columns: 1fr; }
+.oculta-metrica { display: none !important; }
 .mcard {
   background: var(--bg-card);
   border: 1px solid var(--border);

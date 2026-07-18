@@ -62,7 +62,7 @@
   <div class="pz-detail-label" id="pz-detail-label">Detalhes de: <b>PZ-01 · Dique Norte</b></div>
 
   <!-- MÉTRICAS -->
-  <div class="metrics-row">
+  <div class="metrics-row sem-temp" id="metrics-row">
     <!-- Nível d'água (métrica principal do desafio SAGA) -->
     <div class="mcard">
       <div class="mcard-top">
@@ -98,8 +98,8 @@
       </div>
     </div>
 
-    <!-- Temperatura -->
-    <div class="mcard">
+    <!-- Temperatura: oculta até um sensor real enviar a grandeza (ver applyData) -->
+    <div class="mcard oculta-metrica" id="card-t">
       <div class="mcard-top">
         <span class="mcard-label">Temperatura</span>
         <span class="mbadge mb-blue" id="badge-t">···</span>
@@ -117,7 +117,7 @@
   </div>
 
   <!-- GRÁFICOS -->
-  <div class="charts-row">
+  <div class="charts-row sem-temp" id="charts-row">
     <div class="panel">
       <div class="panel-hdr">
         <span class="panel-title">Histórico de Nível d'água</span>
@@ -139,7 +139,7 @@
       </div>
       <div class="chart-area"><canvas id="chart-n"></canvas></div>
     </div>
-    <div class="panel">
+    <div class="panel oculta-metrica" id="panel-chart-t">
       <div class="panel-hdr">
         <span class="panel-title">Histórico de Temperatura</span>
         <span class="panel-tag" id="temp-period-tag">24h</span>
