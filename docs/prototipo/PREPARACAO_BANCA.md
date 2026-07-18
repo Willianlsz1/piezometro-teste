@@ -1,67 +1,79 @@
 # Preparação para a Banca
 
 Documento direto, sem enrolação, para responder às perguntas mais prováveis da banca do TCC.
-Referências de contexto: `docs/BASE_DE_CONHECIMENTO.md` (piezômetros/legislação/mercado),
-`docs/PROTOTIPO_FISICO.md` (hardware), `docs/prototipo/VALIDACAO_SENSOR.md` (precisão do sensor).
+Referências de contexto: `docs/projeto/BASE_DE_CONHECIMENTO.md` (piezômetros/legislação/mercado),
+`docs/prototipo/PROTOTIPO_FISICO.md` (hardware), `docs/prototipo/VALIDACAO_SENSOR.md` (precisão do sensor).
 
 ---
 
 ## a) Memória de cálculo da economia (Viabilidade Econômica)
 
-Modelo simples e editável — trocar os números em **negrito** pelas premissas reais da instalação
-que vocês quiserem simular.
+Números **oficiais** do projeto, fechados após pesquisa de preço real (14/07/2026) e documentados
+com fonte em `docs/projeto/VIABILIDADE_ECONOMICA.md` (seções 1–4) — decisão registrada também em
+`docs/projeto/PROJETO_INDUSTRIAL.md` §10, item 5. Substituem a estimativa antiga dos alunos (20
+piezômetros × 104 leituras/ano × R$ 350/campanha ≈ R$ 728.000/ano), que era premissa de trabalho
+não auditada.
 
 ### Custo da leitura manual terceirizada (situação atual)
 
 ```
-custo_anual_manual = nº_piezômetros × frequência_anual × custo_por_campanha
+custo_anual_manual = nº_piezômetros × frequência_anual × custo_por_leitura
 ```
 
-| Variável | Valor de exemplo (premissa dos ALUNOS) | Fonte da premissa |
+| Variável | Valor oficial | Fonte |
 |---|---|---|
-| nº de piezômetros lidos | **20** | Ordem de grandeza razoável para uma barragem de porte médio (ver `BASE_DE_CONHECIMENTO.md` 1.4) |
-| Frequência de leitura | **2×/semana** (≈ 104 campanhas/ano) | Frequência comumente exigida em operação estabilizada, aumentando após anomalias (`BASE_DE_CONHECIMENTO.md` 1.4) |
-| Custo por campanha (deslocamento + técnico terceirizado) | **R$ 350** | Estimativa dos alunos — inclui deslocamento até o local, hora técnica e relatório; **não é número auditado**, é premissa de trabalho |
+| nº de piezômetros lidos | **≈100** | Decomposição usada em `VIABILIDADE_ECONOMICA.md` §4.1 para fechar o valor declarado pela Samarco |
+| Frequência de leitura | **2×/semana** (≈104 leituras/ano) | Idem |
+| Custo por leitura (deslocamento + técnico terceirizado) | **R$ 58** | Idem — fecha o valor declarado no edital |
 
 ```
-custo_anual_manual = 20 × 104 × R$ 350 ≈ R$ 728.000/ano
+custo_anual_manual = 100 × 104 × R$ 58 ≈ R$ 600.000/ano
 ```
 
-### Custo do sistema proposto
+Esse é o número **declarado pela Samarco** no edital do desafio SAGA. A leitura adotada pelo
+projeto (`VIABILIDADE_ECONOMICA.md` §4.1, leitura "b") é que os **50 pontos** do projeto de
+referência do TCC cobrem integralmente essa demanda — não uma fração dela.
+
+### Custo do sistema proposto (UCT industrial, 50 pontos)
 
 | Item | Custo |
 |---|---|
-| Hardware por ponto (ESP32 + sensor + acessórios, ver `PROTOTIPO_FISICO.md`) | **R$ 150–220** (uma vez, não recorrente) |
-| Backend (Cloudflare Workers + D1 + KV) | **R$ 0/mês** dentro do free tier (ver item d) |
-| Notificações (Telegram) | **R$ 0/mês** |
-| Notificações (SMS Twilio, opcional) | Poucos centavos por SMS enviado — só em eventos de alerta, não contínuo |
+| CAPEX (hardware + instalação + sobressalentes + bancada de homologação + contingência, 50 pontos) | **R$ 260.000** (R$ 5.200/ponto) — composição fechada em `VIABILIDADE_ECONOMICA.md` §2 |
+| OPEX anual (chip 4G, nuvem, manutenção, inspeção de campo) | **R$ 39.155/ano** — detalhado em `VIABILIDADE_ECONOMICA.md` §3 |
 
-```
-custo_anual_sistema (20 pontos) = 20 × R$ 185 (hardware, uma vez) + backend R$ 0
-                                 ≈ R$ 3.700 no ano de implantação, ~R$ 0/ano nos anos seguintes
-                                   (fora manutenção/substituição eventual de sensores)
-```
+> **Atenção — não confundir os dois custos de hardware.** O protótipo de bancada (ESP32 DevKit +
+> sensor ultrassônico JSN-SR04T + acessórios, ver `docs/prototipo/PROTOTIPO_FISICO.md`) custa
+> **R$ 150–220/ponto** — esse número é só a maquete de demonstração da banca, não a UCT industrial.
+> A UCT industrial (transdutor 4–20 mA + ADS1115 + módulo celular 4G + energia solar + gabinete
+> IP66/67, ver `docs/projeto/PROJETO_INDUSTRIAL.md` seções 4–6) custa **R$ 2.965/unidade**, que é o
+> componente de hardware dentro do R$ 5.200/ponto instalado acima — o produto que de fato seria
+> fabricado e instalado em campo, não o que está montado na bancada da apresentação.
 
 ### Comparação
 
 ```
-economia_estimada = custo_anual_manual − custo_anual_sistema
-                   ≈ R$ 728.000 − R$ 3.700 ≈ R$ 724.000 no primeiro ano
+economia_líquida = economia_bruta − OPEX
+                  = R$ 600.000 − R$ 39.155 ≈ R$ 560.845/ano (redução de 93,5% do gasto atual)
+
+payback = CAPEX ÷ (economia_líquida ÷ 12)
+        = R$ 260.000 ÷ R$ 46.737,08/mês ≈ 5,6 meses
 ```
 
 ### Importante — não confundir os dois números
 
-- O cálculo acima (**≈ R$ 724 mil/ano**) é uma **estimativa dos alunos**, construída com premissas
-  explícitas (20 pontos, 2×/semana, R$ 350/campanha) que qualquer um pode contestar e recalcular
-  trocando os três números.
-- O **R$ 600 mil/ano** citado no edital do desafio SAGA é o número **declarado pela Samarco**, e
-  é um **número emprestado, não auditado** por este trabalho — os alunos não tiveram acesso à
-  memória de cálculo original da empresa. O TCC deve citar esse número como referência da demanda
-  oficial, não como resultado validado pelo projeto.
+- O cálculo acima usa os **números oficiais do projeto** (CAPEX R$ 260.000, OPEX R$ 39.155/ano,
+  economia líquida R$ 560.845/ano, payback 5,6 meses), com memória de cálculo auditável e fontes
+  pesquisadas em `VIABILIDADE_ECONOMICA.md`.
+- O **R$ 600.000/ano** é o valor declarado no edital do desafio SAGA pela Samarco; a decomposição
+  (≈100 piezômetros × 2×/semana × R$ 58/leitura) é a leitura que o projeto adotou para justificá-lo
+  com uma memória de cálculo própria — não é a memória de cálculo interna da empresa, à qual os
+  alunos não tiveram acesso.
 - Se a banca perguntar "de onde vem o R$ 600 mil?": resposta correta é "é o número que consta no
-  edital do desafio SAGA como estimativa da Samarco; não temos a memória de cálculo deles, então
-  construímos uma estimativa própria e independente (a de cima) para mostrar que a ordem de
-  grandeza da economia é plausível, não para reproduzir o número exato deles."
+  edital do desafio SAGA como estimativa da Samarco; a decomposição (100 piezômetros × 2×/semana ×
+  R$ 58/leitura) é a leitura que adotamos para justificá-lo com uma memória de cálculo auditável,
+  consistente com o CAPEX de 50 pontos do projeto — `VIABILIDADE_ECONOMICA.md` §5 ainda testa o
+  cenário pessimista de metade dessa economia (payback sobe para ~12 meses, mas continua dentro do
+  primeiro ano)."
 
 ---
 

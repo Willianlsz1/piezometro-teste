@@ -61,7 +61,7 @@ Do texto oficial da demanda, extraem-se 8 requisitos:
 
 | Req. | Nosso projeto hoje | Mercado real | Gap / melhoria de autenticidade |
 |------|--------------------|--------------|--------------------------------|
-| R1 Sensor | BMP180 (stand-in barométrico) convertido em nível simulado | Corda vibrante (Geokon 4500) ou transdutor 4–20 mA | 🔶 **Fase física:** transdutor 4–20 mA (~R$ 240) + ADS1115 + shunt 250 Ω — mesmo princípio do industrial |
+| R1 Sensor | BMP180 (stand-in barométrico) convertido em nível simulado | Corda vibrante (Geokon 4500) ou transdutor 4–20 mA | 🔶 **Fase física:** transdutor 4–20 mA (~R$ 240) + ADS1115 + shunt 150 Ω — mesmo princípio do industrial |
 | R2 Automação | Leitura a cada 1 s, envio a cada 10 s, sem intervenção humana | Leituras de 30 s a 24 h (Loadsensing) | ✅ Atendido (nosso intervalo é até mais denso que o usual) |
 | R3 Telemetria | WiFi (Wokwi) → HTTPS `/ingest` com **store & forward** | LoRa privado (Worldsensing), 4G/NB-IoT | 🔶 Wokwi **não simula LoRa** ([issue #344](https://github.com/wokwi/wokwi-features/issues/344)) → manter WiFi na simulação e documentar LoRa (Heltec ESP32-LoRa) para o hardware real |
 | R4 Armazenamento | InfluxDB Cloud via servidor próprio (token fora do firmware) | Historiadores/plataformas (Vista Data Vision) | ✅ Atendido em escala didática |
@@ -81,7 +81,7 @@ Do texto oficial da demanda, extraem-se 8 requisitos:
 4. **Citar a Res. ANM 95/2022 na justificativa**: automação de DPA Alto é obrigação legal — transforma o projeto de "melhoria" em "requisito regulatório".
 
 ### 4.2 Baixo custo — protótipo físico (R$ 300–500)
-5. **Substituir o BMP180 por transdutor de pressão 4–20 mA** (~R$ 240; ex. [Descomplica](https://www.descomplicasolucoes.com.br/MLB-2865733954-transdutor-de-presso-0-10-bar-4-20ma-tenso-1224vdc-g14-_JM)) lido por **ADS1115 + shunt 250 Ω** ([guia de circuito](https://zbotic.in/industrial-4-20ma-sensor-interface-with-arduino-and-esp32/)) — é o **mesmo princípio físico** do piezômetro industrial, num tubo com água para demonstração ao vivo.
+5. **Substituir o BMP180 por transdutor de pressão 4–20 mA** (~R$ 240; ex. [Descomplica](https://www.descomplicasolucoes.com.br/MLB-2865733954-transdutor-de-presso-0-10-bar-4-20ma-tenso-1224vdc-g14-_JM)) lido por **ADS1115 + shunt 150 Ω** ([guia de circuito](https://zbotic.in/industrial-4-20ma-sensor-interface-with-arduino-and-esp32/)) — é o **mesmo princípio físico** do piezômetro industrial, num tubo com água para demonstração ao vivo. 150 Ω é a decisão fechada do projeto (ver `PROJETO_INDUSTRIAL.md` §10, item 1): a 20 mA, 150 Ω × 20 mA = 3,0 V, mantendo a tensão no fundo de escala dentro da faixa do ADS1115 (3,3 V) com margem.
    Alternativa mais barata: **JSN-SR04T** ultrassônico (mede de cima, não submerge).
 6. **Energia solar + deep sleep**: projeto de referência atinge 12 µA e ~1 ano de bateria ([grillbaer/esp32-lora-water-level-meter](https://github.com/grillbaer/esp32-lora-water-level-meter)) — responde à pergunta certa da banca ("e onde não tem tomada?").
 
