@@ -136,6 +136,17 @@ function applyData({ nivel, pressao, temperatura, taxa_m_dia, ts, recebidoEm }) 
   const temPressao = Number.isFinite(pressao);
   const temTemp    = Number.isFinite(temperatura);
 
+  // Card/gráfico de temperatura nascem OCULTOS (a bancada não instrumenta a
+  // grandeza — decisão do usuário: ocultar em vez de exibir "Sem sensor").
+  // São revelados na 1ª leitura que trouxer temperatura real (Wokwi/BMP hoje,
+  // BME280 no protótipo v2) e as linhas voltam ao layout de 3 cards/2 gráficos.
+  if (temTemp) {
+    document.getElementById("card-t")?.classList.remove("oculta-metrica");
+    document.getElementById("panel-chart-t")?.classList.remove("oculta-metrica");
+    document.getElementById("metrics-row")?.classList.remove("sem-temp");
+    document.getElementById("charts-row")?.classList.remove("sem-temp");
+  }
+
   const flash = id => {
     const el = document.getElementById(id);
     el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
