@@ -6,9 +6,9 @@
 
 - ✅ **Plataforma em produção:** Worker + D1 + KV no ar, dashboard publicado, alertas Telegram/SMS ativos, deploy automático no merge da `main`.
 - ✅ **Protótipo físico de bancada validado ponta a ponta** (16/07): ESP32 + sensor ultrassônico + OLED lendo nível real e o dashboard atualizando ao vivo, com *store & forward* comprovado (leituras seguradas sem rede, zero perda).
-- ✅ **TCC oficial** gerado a partir de `docs/tcc/TCC_AQUASENSE.md` sobre o template INTEGRA SENAI-MG.
+- ✅ **TCC oficial** entregue sobre o template INTEGRA SENAI-MG.
 - 🔜 **Protótipo v2 em preparação:** tubo de acrílico simulando o piezômetro + sensor de pressão piezorresistivo (MPS20N0040D + HX710B) + display maior (TFT) — o firmware já foi preparado para essas trocas (interface `Tela` e adapters de sensor enxutos).
-- 🔜 Ensaio de validação do sensor (protocolo em `docs/prototipo/VALIDACAO_SENSOR.md`) e cadastro de `DEVICE_KEYS` por dispositivo em produção.
+- 🔜 Ensaio de validação do sensor e cadastro de `DEVICE_KEYS` por dispositivo em produção.
 
 ---
 
@@ -39,7 +39,7 @@ Um dashboard web exibe os dados em tempo real com histórico de 24 horas, indica
 Quando o backend não está acessível, o dashboard ativa automaticamente um **modo de simulação** para demonstração — sinalizado por um banner amarelo e pela marcação "(simulação)" nos eventos, para que dados fictícios nunca sejam confundidos com leituras reais.
 
 > ⚠️ **Posicionamento do protótipo (Fase 1):**
-> - O protótipo de bancada usa **sensores stand-in** (ultrassônico HC-SR04/JSN-SR04T na bancada; BMP180 no Wokwi, com escala didática de **10 hPa = 1 m**). Na **UCT industrial (Fase 2, especificada em `docs/projeto/PROJETO_INDUSTRIAL.md`)**, o sinal vem de um **transdutor piezorresistivo submersível 4–20 mA** lido por um ADS1115, com comunicação celular 4G (SIM7600) e alimentação solar — o protótipo representa o conceito; o produto é a especificação completa.
+> - O protótipo de bancada usa **sensores stand-in** (ultrassônico HC-SR04/JSN-SR04T na bancada; BMP180 no Wokwi, com escala didática de **10 hPa = 1 m**). Na **UCT industrial (Fase 2)**, o sinal vem de um **transdutor piezorresistivo submersível 4–20 mA** lido por um ADS1115, com comunicação celular 4G (SIM7600) e alimentação solar — o protótipo representa o conceito; o produto é a especificação completa.
 > - A lógica de alerta já é a **correta para piezômetro**: nível d'água **alto** = perigo (saturação do maciço).
 
 ---
@@ -123,7 +123,7 @@ O firmware é organizado em **núcleo comum + adapters**: `piezometro_core.h` co
 
 1. Copie `firmware/piezometro_config_local.h.example` para `piezometro_config_local.h` (mesma pasta, sem o `.example`) e preencha WiFi, endpoint do Worker, `DEVICE_KEY` e `PIEZOMETRO_ID`. Esse arquivo está no `.gitignore` — **nunca é commitado**.
 2. Abra o sketch no Arduino IDE com as abas `piezometro_core.h`, `tela.h`, `tela_ssd1306.h` e `piezometro_config_local.h` na mesma pasta.
-3. Grave na placa (nesta placa clone: segurando o botão **BOOT** durante o upload). Montagem física, pinos e divisor de tensão: ver [`docs/prototipo/PROTOTIPO_FISICO.md`](docs/prototipo/PROTOTIPO_FISICO.md) e o diário [`docs/prototipo/BRINGUP_FISICO.md`](docs/prototipo/BRINGUP_FISICO.md).
+3. Grave na placa (nesta placa clone: segurando o botão **BOOT** durante o upload).
 
 **Simulação Wokwi** (`sketch.ino`, BMP180 como stand-in):
 
@@ -233,29 +233,8 @@ piezometro-teste/
 │   ├── sketch_uct_4a20ma.ino         # Adapter da UCT INDUSTRIAL (ADS1115 + loop 4–20 mA, NAMUR)
 │   └── diagram.json                  # Circuito do Wokwi (ESP32 + BMP180 + OLED + LEDs + buzzer)
 ├── docs/
-│   ├── projeto/                         # A face "empresa" (o produto real)
-│   │   ├── PROJETO_INDUSTRIAL.md            # Especificação da unidade industrial (Fase 2)
-│   │   ├── PROJETO_PROFISSIONAL.md          # Especificação de engenharia da versão de produção
-│   │   ├── MAPEAMENTO_DEMANDA_E_MERCADO.md  # Demanda SAGA × mercado real × regulação
-│   │   ├── BASE_DE_CONHECIMENTO.md          # Piezômetros, barragens, legislação e mercados (fontes)
-│   │   ├── COMPARATIVO_MERCADO.md           # Concorrentes, arquiteturas e preços pesquisados
-│   │   ├── VIABILIDADE_ECONOMICA.md         # Custos, precificação, TAM-SAM-SOM e payback
-│   │   ├── ALIMENTACAO_ENERGIA.md           # Energia: hoje, mercado e dimensionamento solar
-│   │   ├── CADEIA_DE_CONFIANCA.md           # Integridade do dado da medição ao alerta
-│   │   ├── HOMOLOGACAO_UCT.md               # Ensaios E1–E5 da UCT (aceite ±3 cm, 72 h)
-│   │   └── DASHBOARD_PROFISSIONAL.md        # Padrões ISA-101/18.2 e plano de melhorias P1–P8
-│   ├── prototipo/                       # A face "maquete/banca" (Fase 1)
-│   │   ├── PROTOTIPO_FISICO.md              # Lista de compras, montagem, calibração e demo
-│   │   ├── BRINGUP_FISICO.md                # Diário de bordo da montagem real (estado + pendências)
-│   │   ├── VALIDACAO_SENSOR.md              # Protocolo de bancada e incerteza do sensor
-│   │   ├── DEFESA_BANCA.md                  # Posicionamento frente aos equipamentos profissionais
-│   │   ├── PREPARACAO_BANCA.md              # Memória de cálculo, conformidade e perguntas prováveis
-│   │   └── PLANO_REFATORACAO.md             # Plano anti-godfile (executado)
-│   └── tcc/                             # Entregáveis do TCC
-│       ├── TCC_AQUASENSE.md                 # Fonte do texto oficial do TCC
-│       ├── TCC_ENTREGA.docx                 # Versão oficial para envio ao professor (ABNT)
-│       ├── TCC_RASCUNHO.md                  # Rascunho antigo (histórico)
-│       └── graficos/                        # PNGs da viabilidade econômica embutidos no docx
+│   ├── GUIA_MESTRE.md                   # Guia geral do projeto
+│   └── PESQUISA_EXTERNA_PIEZOMETROS.md  # Pesquisa externa sobre piezômetros
 ├── cloudflare-worker/       # Backend (deploy: ver README da pasta)
 │   ├── src/
 │   │   ├── index.js         # Roteador (fetch + scheduled) — só orquestra
@@ -285,8 +264,6 @@ piezometro-teste/
 ├── index.html               # Dashboard web — só a estrutura HTML (GitHub Pages)
 └── readme.md                # Este arquivo
 ```
-
-> 🧱 **Vai montar a maquete física?** Siga o guia completo em [`docs/prototipo/PROTOTIPO_FISICO.md`](docs/prototipo/PROTOTIPO_FISICO.md) — lista de compras (~R$ 150–220), esquema de ligação do JSN-SR04T (com o divisor de tensão obrigatório no ECHO), calibração e roteiro de demonstração para a banca.
 
 ---
 

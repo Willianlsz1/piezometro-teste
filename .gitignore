@@ -1,3 +1,9 @@
 node_modules/
 .env
 firmware/piezometro_config_local.h
+
+# documentacao interna (mantida local, fora do repositorio publico)
+/CLAUDE.md
+/docs/projeto/
+/docs/prototipo/
+/docs/tcc/
